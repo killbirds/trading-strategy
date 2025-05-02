@@ -1,15 +1,16 @@
+use super::Strategy;
 use super::StrategyType;
-use super::context::{GetCandle, StrategyContextOps, StrategyDataOps};
-use super::{Strategy, split};
+use super::context::StrategyContextOps;
+use super::copys_common::{
+    CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext, CopysStrategyData,
+};
+use super::split;
 use crate::candle_store::CandleStore;
-use crate::indicator::bband::{BBand, BBandBuilder};
-use crate::indicator::ma::{MAType, MAs, MAsBuilder, MAsBuilderFactory};
-use crate::indicator::rsi::{RSI, RSIBuilder};
+use crate::indicator::ma::MAType;
 use crate::model::PositionType;
 use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
-use serde_json;
 use std::collections::HashMap;
 use std::fmt::Display;
 use trading_chart::Candle;
@@ -17,18 +18,10 @@ use trading_chart::Candle;
 /// Copys 숏 전략 설정
 #[derive(Debug, Deserialize)]
 pub struct CopysShortStrategyConfig {
-    /// RSI 계산 기간
-    pub rsi_period: usize,
-    /// RSI 상한값
-    pub rsi_upper: f64,
-    /// RSI 하한값
-    pub rsi_lower: f64,
+    #[serde(flatten)]
+    pub base: CopysStrategyConfigBase,
     /// RSI 조건 판정 횟수
     pub rsi_count: usize,
-    /// 볼린저밴드 계산 기간
-    pub bband_period: usize,
-    /// 볼린저밴드 표준편차 승수
-    pub bband_multiplier: f64,
     /// 볼린저밴드 조건 판정 횟수
     pub bband_count: usize,
     /// 이동평균 계산 방식
@@ -41,12 +34,14 @@ impl Default for CopysShortStrategyConfig {
     /// 기본 설정값 반환
     fn default() -> Self {
         CopysShortStrategyConfig {
-            rsi_period: 14,
-            rsi_upper: 70.0,
-            rsi_lower: 30.0,
+            base: CopysStrategyConfigBase {
+                rsi_period: 14,
+                rsi_upper: 70.0,
+                rsi_lower: 30.0,
+                bband_period: 20,
+                bband_multiplier: 2.0,
+            },
             rsi_count: 3,
-            bband_period: 20,
-            bband_multiplier: 2.0,
             bband_count: 2,
             ma: MAType::EMA,
             ma_periods: vec![10, 20, 60],
@@ -56,33 +51,12 @@ impl Default for CopysShortStrategyConfig {
 
 impl CopysShortStrategyConfig {
     /// 설정의 유효성을 검사합니다.
-    ///
-    /// 모든 설정 값이 유효한지 확인하고, 유효하지 않은 경우 오류 메시지를 반환합니다.
-    ///
-    /// # Returns
-    /// * `Result<(), String>` - 유효성 검사 결과 (성공 또는 오류 메시지)
     pub fn validate(&self) -> Result<(), String> {
-        if self.rsi_period < 2 {
-            return Err("RSI 기간은 2 이상이어야 합니다".to_string());
-        }
-
-        if self.rsi_lower >= self.rsi_upper {
-            return Err(format!(
-                "RSI 하한값({})이 상한값({})보다 크거나 같을 수 없습니다",
-                self.rsi_lower, self.rsi_upper
-            ));
-        }
+        // 기본 설정 유효성 검사
+        self.base.validate()?;
 
         if self.rsi_count == 0 {
             return Err("RSI 판정 횟수는 0보다 커야 합니다".to_string());
-        }
-
-        if self.bband_period < 2 {
-            return Err("볼린저밴드 기간은 2 이상이어야 합니다".to_string());
-        }
-
-        if self.bband_multiplier <= 0.0 {
-            return Err("볼린저밴드 승수는 0보다 커야 합니다".to_string());
         }
 
         if self.bband_count == 0 {
@@ -97,21 +71,13 @@ impl CopysShortStrategyConfig {
     }
 
     /// JSON 문자열에서 설정 로드
-    ///
-    /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.
-    ///
-    /// # Arguments
-    /// * `json` - JSON 형식의 문자열
-    ///
-    /// # Returns
-    /// * `Result<CopysShortStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<CopysShortStrategyConfig, String> {
-        match serde_json::from_str::<CopysShortStrategyConfig>(json) {
+        match CopysStrategyConfigBase::from_json::<CopysShortStrategyConfig>(json) {
             Ok(config) => {
                 config.validate()?;
                 Ok(config)
             }
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(e),
         }
     }
 
@@ -244,137 +210,28 @@ impl CopysShortStrategyConfig {
         };
 
         Ok(CopysShortStrategyConfig {
+            base: CopysStrategyConfigBase {
+                rsi_period,
+                rsi_lower,
+                rsi_upper,
+                bband_period,
+                bband_multiplier,
+            },
             rsi_count,
-            rsi_lower,
-            rsi_upper,
-            rsi_period,
             bband_count,
-            bband_period,
-            bband_multiplier,
             ma,
             ma_periods,
         })
     }
 }
 
-/// Copys 숏 전략 데이터
-#[derive(Debug)]
-struct StrategyData<C: Candle> {
-    candle: C,
-    rsi: RSI,
-    mas: MAs,
-    bband: BBand,
-}
-
-impl<C: Candle> StrategyData<C> {
-    fn new(candle: C, rsi: RSI, mas: MAs, bband: BBand) -> StrategyData<C> {
-        StrategyData {
-            candle,
-            rsi,
-            mas,
-            bband,
-        }
-    }
-
-    /// 이동평균선이 정상 배열인지 검사 (숏 전략에서는 역배열 조건에서 청산)
-    fn is_ma_regular_arrangement(&self) -> bool {
-        self.is_regular_arrangement(|data| &data.mas, |ma| ma.get())
-    }
-
-    /// 이동평균선이 역배열인지 검사 (숏 전략에서는 역배열 조건에서 진입)
-    fn is_ma_reverse_arrangement(&self) -> bool {
-        self.is_reverse_arrangement(|data| &data.mas, |ma| ma.get())
-    }
-}
-
-impl<C: Candle> GetCandle<C> for StrategyData<C> {
-    fn candle(&self) -> &C {
-        &self.candle
-    }
-}
-
-impl<C: Candle> StrategyDataOps<C> for StrategyData<C> {}
-
-/// Copys 숏 전략 컨텍스트
-#[derive(Debug)]
-struct StrategyContext<C: Candle> {
-    rsibuilder: RSIBuilder<C>,
-    masbuilder: MAsBuilder<C>,
-    bbandbuilder: BBandBuilder<C>,
-    items: Vec<StrategyData<C>>,
-}
-
-impl<C: Candle> Display for StrategyContext<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(head) = self.items.first() {
-            let tail_rsis = self
-                .items
-                .iter()
-                .skip(1)
-                .take(4)
-                .map(|item| item.rsi.rsi)
-                .collect::<Vec<_>>();
-
-            write!(
-                f,
-                "캔들: {}, RSI: [{}, {:?}], MAs: {}, BBand: {}",
-                head.candle, head.rsi, tail_rsis, head.mas, head.bband
-            )
-        } else {
-            write!(f, "데이터 없음")
-        }
-    }
-}
-
-impl<C: Candle + 'static> StrategyContext<C> {
-    fn new(config: &CopysShortStrategyConfig, storage: &CandleStore<C>) -> StrategyContext<C> {
-        let rsibuilder = RSIBuilder::new(config.rsi_period);
-        let masbuilder = MAsBuilderFactory::build::<C>(&config.ma, &config.ma_periods);
-        let bbandbuilder = BBandBuilder::new(config.bband_period, config.bband_multiplier);
-        let mut ctx = StrategyContext {
-            rsibuilder,
-            masbuilder,
-            bbandbuilder,
-            items: vec![],
-        };
-
-        ctx.init(storage.get_reversed_items());
-        ctx
-    }
-
-    /// 이동평균선이 정상 배열인지 확인
-    fn is_ma_regular_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_regular_arrangement(), n)
-    }
-
-    /// 이동평균선이 역배열인지 확인
-    fn is_ma_reverse_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_reverse_arrangement(), n)
-    }
-}
-
-impl<C: Candle> StrategyContextOps<StrategyData<C>, C> for StrategyContext<C> {
-    fn next_data(&mut self, candle: C) -> StrategyData<C> {
-        let rsi = self.rsibuilder.next(&candle);
-        let mas = self.masbuilder.next(&candle);
-        let bband = self.bbandbuilder.next(&candle);
-        StrategyData::new(candle, rsi, mas, bband)
-    }
-
-    fn datum(&self) -> &Vec<StrategyData<C>> {
-        &self.items
-    }
-
-    fn datum_mut(&mut self) -> &mut Vec<StrategyData<C>> {
-        &mut self.items
-    }
-}
-
 /// Copys 기반 숏 전략
 #[derive(Debug)]
 pub struct CopysShortStrategy<C: Candle> {
+    /// 전략 설정
     config: CopysShortStrategyConfig,
-    ctx: StrategyContext<C>,
+    /// 전략 컨텍스트
+    ctx: CopysStrategyContext<C>,
 }
 
 impl<C: Candle> Display for CopysShortStrategy<C> {
@@ -390,11 +247,11 @@ impl<C: Candle> Display for CopysShortStrategy<C> {
         write!(
             f,
             "[Copys숏전략] 설정: {{RSI: {}(상:{}/하:{}), BB: {}({}), MA타입: {:?}({})}}, 컨텍스트: {}",
-            self.config.rsi_period,
-            self.config.rsi_upper,
-            self.config.rsi_lower,
-            self.config.bband_period,
-            self.config.bband_multiplier,
+            self.config.base.rsi_period,
+            self.config.base.rsi_upper,
+            self.config.base.rsi_lower,
+            self.config.base.bband_period,
+            self.config.base.bband_multiplier,
             self.config.ma,
             periods,
             self.ctx
@@ -404,32 +261,28 @@ impl<C: Candle> Display for CopysShortStrategy<C> {
 
 impl<C: Candle + 'static> CopysShortStrategy<C> {
     /// 새 코피스 숏 전략 인스턴스 생성 (JSON 설정 파일 사용)
-    ///
-    /// # Arguments
-    /// * `storage` - 캔들 데이터 저장소
-    /// * `json_config` - JSON 형식의 설정 문자열
-    ///
-    /// # Returns
-    /// * `Result<CopysShortStrategy<C>, String>` - 초기화된 코피스 숏 전략 인스턴스 또는 오류
     pub fn new(
         storage: &CandleStore<C>,
         json_config: &str,
     ) -> Result<CopysShortStrategy<C>, String> {
         let config = CopysShortStrategyConfig::from_json(json_config)?;
         info!("코피스 숏 전략 설정: {:?}", config);
-        let ctx = StrategyContext::new(&config, storage);
+
+        let masbuilder =
+            crate::indicator::ma::MAsBuilderFactory::build::<C>(&config.ma, &config.ma_periods);
+
+        let bbandbuilder = crate::indicator::bband::BBandBuilder::new(
+            config.base.bband_period,
+            config.base.bband_multiplier,
+        );
+
+        let mut ctx = CopysStrategyContext::new(config.base.rsi_period, masbuilder, bbandbuilder);
+        ctx.init(storage.get_reversed_items());
 
         Ok(CopysShortStrategy { config, ctx })
     }
 
     /// 새 코피스 숏 전략 인스턴스 생성 (설정 직접 제공)
-    ///
-    /// # Arguments
-    /// * `storage` - 캔들 데이터 저장소
-    /// * `config` - 전략 설정 (HashMap 형태)
-    ///
-    /// # Returns
-    /// * `Result<CopysShortStrategy<C>, String>` - 초기화된 코피스 숏 전략 인스턴스 또는 오류
     pub fn new_with_config(
         storage: &CandleStore<C>,
         config: Option<HashMap<String, String>>,
@@ -440,12 +293,43 @@ impl<C: Candle + 'static> CopysShortStrategy<C> {
         };
 
         info!("코피스 숏 전략 설정: {:?}", strategy_config);
-        let ctx = StrategyContext::new(&strategy_config, storage);
+
+        let masbuilder = crate::indicator::ma::MAsBuilderFactory::build::<C>(
+            &strategy_config.ma,
+            &strategy_config.ma_periods,
+        );
+
+        let bbandbuilder = crate::indicator::bband::BBandBuilder::new(
+            strategy_config.base.bband_period,
+            strategy_config.base.bband_multiplier,
+        );
+
+        let mut ctx =
+            CopysStrategyContext::new(strategy_config.base.rsi_period, masbuilder, bbandbuilder);
+        ctx.init(storage.get_reversed_items());
 
         Ok(CopysShortStrategy {
             config: strategy_config,
             ctx,
         })
+    }
+}
+
+impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysShortStrategy<C> {
+    fn context(&self) -> &CopysStrategyContext<C> {
+        &self.ctx
+    }
+
+    fn config_rsi_lower(&self) -> f64 {
+        self.config.base.rsi_lower
+    }
+
+    fn config_rsi_upper(&self) -> f64 {
+        self.config.base.rsi_upper
+    }
+
+    fn config_rsi_count(&self) -> usize {
+        self.config.rsi_count
     }
 }
 
@@ -461,7 +345,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 상한선보다 높으면 숏 진입 (롱 전략과 반대로 높은 값에서 진입)
             self.ctx.is_break_through_by_satisfying(
-                |data| data.rsi.rsi > self.config.rsi_lower,
+                |data: &CopysStrategyData<C>| data.rsi.rsi > self.config.base.rsi_lower,
                 1,
                 self.config.rsi_count,
             )
@@ -475,18 +359,18 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 하한선보다 낮으면 숏 청산
             self.ctx.is_break_through_by_satisfying(
-                |data| data.rsi.rsi < self.config.rsi_upper,
+                |data: &CopysStrategyData<C>| data.rsi.rsi < self.config.base.rsi_upper,
                 1,
                 self.config.rsi_count,
             )
         }
     }
 
-    fn get_position(&self) -> PositionType {
+    fn position(&self) -> PositionType {
         PositionType::Short
     }
 
-    fn get_name(&self) -> StrategyType {
+    fn name(&self) -> StrategyType {
         StrategyType::CopysShort
     }
 }

@@ -1,19 +1,24 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::{GetCandle, StrategyContextOps, StrategyDataOps};
 use crate::candle_store::CandleStore;
-use crate::indicator::macd::{MACD, MACDBuilder};
+use crate::config_loader::{ConfigError, ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
-use serde_json;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::Path;
 use trading_chart::Candle;
 
+// 공통 모듈 가져오기
+use super::macd_common::{
+    MACDStrategyCommon, MACDStrategyConfigBase, MACDStrategyContext, StrategyContextOps,
+};
+
 /// MACD 숏 전략 설정
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct MACDShortStrategyConfig {
     /// 빠른 EMA 기간
     pub fast_period: usize,
@@ -40,263 +45,50 @@ impl Default for MACDShortStrategyConfig {
     }
 }
 
-impl MACDShortStrategyConfig {
-    /// 설정의 유효성을 검사합니다.
-    ///
-    /// 모든 설정 값이 유효한지 확인하고, 유효하지 않은 경우 오류 메시지를 반환합니다.
-    ///
-    /// # Returns
-    /// * `Result<(), String>` - 유효성 검사 결과 (성공 또는 오류 메시지)
-    pub fn validate(&self) -> Result<(), String> {
-        if self.fast_period < 2 {
-            return Err("빠른 EMA 기간은 2 이상이어야 합니다".to_string());
-        }
+impl ConfigValidation for MACDShortStrategyConfig {
+    fn validate(&self) -> ConfigResult<()> {
+        let base = MACDStrategyConfigBase {
+            fast_period: self.fast_period,
+            slow_period: self.slow_period,
+            signal_period: self.signal_period,
+            histogram_threshold: self.histogram_threshold,
+            confirm_period: self.confirm_period,
+        };
 
-        if self.slow_period <= self.fast_period {
-            return Err(format!(
-                "느린 EMA 기간({})은 빠른 EMA 기간({})보다 커야 합니다",
-                self.slow_period, self.fast_period
-            ));
-        }
-
-        if self.signal_period < 1 {
-            return Err("시그널 EMA 기간은 1 이상이어야 합니다".to_string());
-        }
-
+        // 숏 전략에서는 히스토그램 임계값이 0보다 작아야 함을 추가 검증
         if self.histogram_threshold > 0.0 {
-            return Err(format!(
+            return Err(ConfigError::ValidationError(format!(
                 "숏 전략의 히스토그램 임계값({})은 0보다 작아야 합니다",
                 self.histogram_threshold
-            ));
+            )));
         }
 
-        if self.confirm_period < 1 {
-            return Err("신호 확인 기간은 1 이상이어야 합니다".to_string());
-        }
-
-        Ok(())
+        base.validate()
     }
+}
 
+impl MACDShortStrategyConfig {
     /// JSON 문자열에서 설정 로드
-    ///
-    /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.
-    ///
-    /// # Arguments
-    /// * `json` - JSON 형식의 문자열
-    ///
-    /// # Returns
-    /// * `Result<MACDShortStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<MACDShortStrategyConfig, String> {
-        match serde_json::from_str::<MACDShortStrategyConfig>(json) {
-            Ok(config) => {
-                config.validate()?;
-                Ok(config)
-            }
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
-        }
+        let config = MACDStrategyConfigBase::from_json::<MACDShortStrategyConfig>(json, false)?;
+        config.validate()?;
+        Ok(config)
     }
 
     /// HashMap에서 설정 로드
     fn from_hash_map(config: &HashMap<String, String>) -> Result<MACDShortStrategyConfig, String> {
-        // 빠른 EMA 기간 설정
-        let fast_period = match config.get("fast_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "빠른 EMA 기간 파싱 오류".to_string())?;
-
-                if period < 2 {
-                    return Err("빠른 EMA 기간은 2 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("fast_period 설정이 필요합니다".to_string()),
-        };
-
-        // 느린 EMA 기간 설정
-        let slow_period = match config.get("slow_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "느린 EMA 기간 파싱 오류".to_string())?;
-
-                if period <= fast_period {
-                    return Err(format!(
-                        "느린 EMA 기간({})은 빠른 EMA 기간({})보다 커야 합니다",
-                        period, fast_period
-                    ));
-                }
-
-                period
-            }
-            None => return Err("slow_period 설정이 필요합니다".to_string()),
-        };
-
-        // 시그널 EMA 기간 설정
-        let signal_period = match config.get("signal_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "시그널 EMA 기간 파싱 오류".to_string())?;
-
-                if period < 1 {
-                    return Err("시그널 EMA 기간은 1 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("signal_period 설정이 필요합니다".to_string()),
-        };
-
-        // 히스토그램 임계값 설정
-        let histogram_threshold = match config.get("histogram_threshold") {
-            Some(threshold_str) => {
-                let threshold = threshold_str
-                    .parse::<f64>()
-                    .map_err(|_| "히스토그램 임계값 파싱 오류".to_string())?;
-
-                if threshold > 0.0 {
-                    return Err(format!(
-                        "숏 전략의 히스토그램 임계값({})은 0보다 작아야 합니다",
-                        threshold
-                    ));
-                }
-
-                threshold
-            }
-            None => return Err("histogram_threshold 설정이 필요합니다".to_string()),
-        };
-
-        // 신호 확인 기간 설정
-        let confirm_period = match config.get("confirm_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "신호 확인 기간 파싱 오류".to_string())?;
-
-                if period < 1 {
-                    return Err("신호 확인 기간은 1 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("confirm_period 설정이 필요합니다".to_string()),
-        };
+        let base_config = MACDStrategyConfigBase::from_hash_map(config, false)?;
 
         let result = MACDShortStrategyConfig {
-            fast_period,
-            slow_period,
-            signal_period,
-            histogram_threshold,
-            confirm_period,
+            fast_period: base_config.fast_period,
+            slow_period: base_config.slow_period,
+            signal_period: base_config.signal_period,
+            histogram_threshold: base_config.histogram_threshold,
+            confirm_period: base_config.confirm_period,
         };
 
         result.validate()?;
         Ok(result)
-    }
-}
-
-/// MACD 숏 전략 데이터
-#[derive(Debug)]
-struct StrategyData<C: Candle> {
-    /// 현재 캔들 데이터
-    candle: C,
-    /// MACD 지표
-    macd: MACD,
-}
-
-impl<C: Candle> StrategyData<C> {
-    /// 새 전략 데이터 생성
-    fn new(candle: C, macd: MACD) -> StrategyData<C> {
-        StrategyData { candle, macd }
-    }
-
-    /// MACD 히스토그램이 임계값보다 작은지 확인 (하락 추세)
-    fn is_histogram_below_threshold(&self, threshold: f64) -> bool {
-        self.macd.histogram < threshold
-    }
-
-    /// MACD가 시그널 라인을 하향 돌파했는지 확인
-    fn is_macd_below_signal(&self) -> bool {
-        self.macd.macd < self.macd.signal
-    }
-
-    /// MACD가 시그널 라인을 상향 돌파했는지 확인
-    fn is_macd_above_signal(&self) -> bool {
-        self.macd.macd > self.macd.signal
-    }
-}
-
-impl<C: Candle> GetCandle<C> for StrategyData<C> {
-    fn candle(&self) -> &C {
-        &self.candle
-    }
-}
-
-impl<C: Candle> StrategyDataOps<C> for StrategyData<C> {}
-
-/// MACD 숏 전략 컨텍스트
-#[derive(Debug)]
-struct StrategyContext<C: Candle> {
-    /// MACD 빌더
-    macdbuilder: MACDBuilder<C>,
-    /// 전략 데이터 히스토리 (최신 데이터가 인덱스 0)
-    items: Vec<StrategyData<C>>,
-}
-
-impl<C: Candle> Display for StrategyContext<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.items.first() {
-            Some(first) => write!(f, "캔들: {}, MACD: {}", first.candle, first.macd),
-            None => write!(f, "데이터 없음"),
-        }
-    }
-}
-
-impl<C: Candle + 'static> StrategyContext<C> {
-    /// 새 전략 컨텍스트 생성
-    fn new(config: &MACDShortStrategyConfig, storage: &CandleStore<C>) -> StrategyContext<C> {
-        let macdbuilder =
-            MACDBuilder::new(config.fast_period, config.slow_period, config.signal_period);
-
-        let mut ctx = StrategyContext {
-            macdbuilder,
-            items: vec![],
-        };
-
-        ctx.init(storage.get_reversed_items());
-        ctx
-    }
-
-    /// 히스토그램이 임계값보다 작은지 확인
-    fn is_histogram_below_threshold(&self, threshold: f64, n: usize) -> bool {
-        self.is_all(|data| data.is_histogram_below_threshold(threshold), n)
-    }
-
-    /// MACD가 시그널 라인을 하향 돌파했는지 확인
-    fn is_macd_crossed_below_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_below_signal(), n, m)
-    }
-
-    /// MACD가 시그널 라인을 상향 돌파했는지 확인
-    fn is_macd_crossed_above_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_above_signal(), n, m)
-    }
-}
-
-impl<C: Candle> StrategyContextOps<StrategyData<C>, C> for StrategyContext<C> {
-    fn next_data(&mut self, candle: C) -> StrategyData<C> {
-        let macd = self.macdbuilder.next(&candle);
-        StrategyData::new(candle, macd)
-    }
-
-    fn datum(&self) -> &Vec<StrategyData<C>> {
-        &self.items
-    }
-
-    fn datum_mut(&mut self) -> &mut Vec<StrategyData<C>> {
-        &mut self.items
     }
 }
 
@@ -306,7 +98,7 @@ pub struct MACDShortStrategy<C: Candle> {
     /// 전략 설정
     config: MACDShortStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: StrategyContext<C>,
+    ctx: MACDStrategyContext<C>,
 }
 
 impl<C: Candle> Display for MACDShortStrategy<C> {
@@ -325,20 +117,19 @@ impl<C: Candle> Display for MACDShortStrategy<C> {
 
 impl<C: Candle + 'static> MACDShortStrategy<C> {
     /// 새 MACD 숏 전략 인스턴스 생성 (JSON 설정 파일 사용)
-    ///
-    /// # Arguments
-    /// * `storage` - 캔들 데이터 저장소
-    /// * `json_config` - JSON 형식의 설정 문자열
-    ///
-    /// # Returns
-    /// * `Result<MACDShortStrategy<C>, String>` - 초기화된 MACD 숏 전략 인스턴스 또는 오류
     pub fn new(
         storage: &CandleStore<C>,
         json_config: &str,
     ) -> Result<MACDShortStrategy<C>, String> {
         let config = MACDShortStrategyConfig::from_json(json_config)?;
         info!("MACD 숏 전략 설정: {:?}", config);
-        let ctx = StrategyContext::new(&config, storage);
+
+        let ctx = MACDStrategyContext::new(
+            config.fast_period,
+            config.slow_period,
+            config.signal_period,
+            storage,
+        );
 
         Ok(MACDShortStrategy { config, ctx })
     }
@@ -354,12 +145,54 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
         };
 
         info!("MACD 숏 전략 설정: {:?}", strategy_config);
-        let ctx = StrategyContext::new(&strategy_config, storage);
+
+        let ctx = MACDStrategyContext::new(
+            strategy_config.fast_period,
+            strategy_config.slow_period,
+            strategy_config.signal_period,
+            storage,
+        );
 
         Ok(MACDShortStrategy {
             config: strategy_config,
             ctx,
         })
+    }
+
+    /// 설정 파일에서 전략 인스턴스 생성
+    pub fn from_config_file(
+        storage: &CandleStore<C>,
+        config_path: &Path,
+    ) -> Result<MACDShortStrategy<C>, String> {
+        let config = match MACDStrategyConfigBase::from_file::<MACDShortStrategyConfig>(config_path)
+        {
+            Ok(cfg) => cfg,
+            Err(e) => return Err(format!("설정 파일 로드 오류: {}", e)),
+        };
+        info!("MACD 숏 전략 설정 로드됨: {:?}", config);
+
+        let ctx = MACDStrategyContext::new(
+            config.fast_period,
+            config.slow_period,
+            config.signal_period,
+            storage,
+        );
+
+        Ok(MACDShortStrategy { config, ctx })
+    }
+}
+
+impl<C: Candle + 'static> MACDStrategyCommon<C> for MACDShortStrategy<C> {
+    fn context(&self) -> &MACDStrategyContext<C> {
+        &self.ctx
+    }
+
+    fn config_confirm_period(&self) -> usize {
+        self.config.confirm_period
+    }
+
+    fn config_histogram_threshold(&self) -> f64 {
+        self.config.histogram_threshold
     }
 }
 
@@ -383,11 +216,11 @@ impl<C: Candle + 'static> Strategy<C> for MACDShortStrategy<C> {
             .is_macd_crossed_above_signal(1, self.config.confirm_period)
     }
 
-    fn get_position(&self) -> PositionType {
+    fn position(&self) -> PositionType {
         PositionType::Short
     }
 
-    fn get_name(&self) -> StrategyType {
+    fn name(&self) -> StrategyType {
         StrategyType::MACDShort
     }
 }

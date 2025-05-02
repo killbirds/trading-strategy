@@ -111,11 +111,11 @@ impl<C: Candle> Strategy<C> for DummyStrategy<C> {
         false
     }
 
-    fn get_position(&self) -> PositionType {
+    fn position(&self) -> PositionType {
         PositionType::Long
     }
 
-    fn get_name(&self) -> StrategyType {
+    fn name(&self) -> StrategyType {
         StrategyType::Dummy
     }
 }

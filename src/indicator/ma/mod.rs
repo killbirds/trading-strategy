@@ -5,6 +5,7 @@ pub mod wma;
 use crate::indicator::{TABuilder, TAs, TAsBuilder};
 use ema::EMABuilder;
 use serde::Deserialize;
+use serde::Serialize;
 use sma::SMABuilder;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -31,7 +32,7 @@ pub trait MA: Display + Send + Debug {
 /// 이동평균 계산 방식
 ///
 /// 시스템에서 지원하는 이동평균 유형을 정의합니다.
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub enum MAType {
     /// 지수이동평균 (Exponential Moving Average)
     /// 최근 데이터에 더 큰 가중치를 부여합니다.

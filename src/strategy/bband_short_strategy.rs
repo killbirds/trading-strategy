@@ -1,19 +1,21 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::{GetCandle, StrategyContextOps, StrategyDataOps};
+use super::bband_common::{BBandStrategyCommon, BBandStrategyConfigBase, BBandStrategyContext};
 use crate::candle_store::CandleStore;
-use crate::indicator::bband::{BBand, BBandBuilder};
+use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+use crate::strategy::context::StrategyContextOps;
 use log::info;
 use serde::Deserialize;
-use serde_json;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::path::Path;
 use trading_chart::Candle;
 
 /// 볼린저밴드 숏 전략 설정
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BBandShortStrategyConfig {
     /// 판정 기간
     pub count: usize,
@@ -34,29 +36,18 @@ impl Default for BBandShortStrategyConfig {
     }
 }
 
-impl BBandShortStrategyConfig {
-    /// 설정의 유효성을 검사합니다.
-    ///
-    /// 모든 설정 값이 유효한지 확인하고, 유효하지 않은 경우 오류 메시지를 반환합니다.
-    ///
-    /// # Returns
-    /// * `Result<(), String>` - 유효성 검사 결과 (성공 또는 오류 메시지)
-    pub fn validate(&self) -> Result<(), String> {
-        if self.count == 0 {
-            return Err("확인 캔들 수는 0보다 커야 합니다".to_string());
-        }
-
-        if self.period < 2 {
-            return Err("볼린저 밴드 계산 기간은 2 이상이어야 합니다".to_string());
-        }
-
-        if self.multiplier <= 0.0 {
-            return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
-        }
-
-        Ok(())
+impl ConfigValidation for BBandShortStrategyConfig {
+    fn validate(&self) -> ConfigResult<()> {
+        let base = BBandStrategyConfigBase {
+            count: self.count,
+            period: self.period,
+            multiplier: self.multiplier,
+        };
+        base.validate()
     }
+}
 
+impl BBandShortStrategyConfig {
     /// JSON 문자열에서 설정 로드
     ///
     /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.
@@ -67,69 +58,19 @@ impl BBandShortStrategyConfig {
     /// # Returns
     /// * `Result<BBandShortStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<BBandShortStrategyConfig, String> {
-        match serde_json::from_str::<BBandShortStrategyConfig>(json) {
-            Ok(config) => {
-                config.validate()?;
-                Ok(config)
-            }
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
-        }
+        let config = BBandStrategyConfigBase::from_json::<BBandShortStrategyConfig>(json)?;
+        config.validate()?;
+        Ok(config)
     }
 
     /// HashMap에서 설정 로드
     fn from_hash_map(config: &HashMap<String, String>) -> Result<BBandShortStrategyConfig, String> {
-        // 확인 캔들 수 설정
-        let count = match config.get("count") {
-            Some(count_str) => {
-                let count = count_str
-                    .parse::<usize>()
-                    .map_err(|_| "확인 캔들 수 파싱 오류".to_string())?;
-
-                if count == 0 {
-                    return Err("확인 캔들 수는 0보다 커야 합니다".to_string());
-                }
-
-                count
-            }
-            None => return Err("count 설정이 필요합니다".to_string()),
-        };
-
-        // 볼린저 밴드 계산 기간 설정
-        let period = match config.get("period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "볼린저 밴드 계산 기간 파싱 오류".to_string())?;
-
-                if period < 2 {
-                    return Err("볼린저 밴드 계산 기간은 2 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("period 설정이 필요합니다".to_string()),
-        };
-
-        // 볼린저 밴드 승수 설정
-        let multiplier = match config.get("multiplier") {
-            Some(multiplier_str) => {
-                let multiplier = multiplier_str
-                    .parse::<f64>()
-                    .map_err(|_| "볼린저 밴드 승수 파싱 오류".to_string())?;
-
-                if multiplier <= 0.0 {
-                    return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
-                }
-
-                multiplier
-            }
-            None => return Err("multiplier 설정이 필요합니다".to_string()),
-        };
+        let base_config = BBandStrategyConfigBase::from_hash_map(config)?;
 
         let result = BBandShortStrategyConfig {
-            count,
-            period,
-            multiplier,
+            count: base_config.count,
+            period: base_config.period,
+            multiplier: base_config.multiplier,
         };
 
         result.validate()?;
@@ -137,77 +78,11 @@ impl BBandShortStrategyConfig {
     }
 }
 
-/// 볼린저밴드 숏 전략 데이터
-#[derive(Debug)]
-struct StrategyData<C: Candle> {
-    candle: C,
-    bband: BBand,
-}
-
-impl<C: Candle> StrategyData<C> {
-    fn new(candle: C, bband: BBand) -> StrategyData<C> {
-        StrategyData { candle, bband }
-    }
-}
-
-impl<C: Candle> GetCandle<C> for StrategyData<C> {
-    fn candle(&self) -> &C {
-        &self.candle
-    }
-}
-
-impl<C: Candle> StrategyDataOps<C> for StrategyData<C> {}
-
-/// 볼린저밴드 숏 전략 컨텍스트
-#[derive(Debug)]
-struct StrategyContext<C: Candle> {
-    bbandbuilder: BBandBuilder<C>,
-    items: Vec<StrategyData<C>>,
-}
-
-impl<C: Candle> Display for StrategyContext<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(first) = self.items.first() {
-            write!(f, "{}", first.bband)
-        } else {
-            write!(f, "데이터 없음")
-        }
-    }
-}
-
-impl<C: Candle + 'static> StrategyContext<C> {
-    fn new(config: &BBandShortStrategyConfig, storage: &CandleStore<C>) -> StrategyContext<C> {
-        let bbandbuilder = BBandBuilder::new(config.period, config.multiplier);
-        let mut ctx = StrategyContext {
-            bbandbuilder,
-            items: vec![],
-        };
-
-        ctx.init(storage.get_reversed_items());
-        ctx
-    }
-}
-
-impl<C: Candle> StrategyContextOps<StrategyData<C>, C> for StrategyContext<C> {
-    fn next_data(&mut self, candle: C) -> StrategyData<C> {
-        let bband = self.bbandbuilder.next(&candle);
-        StrategyData::new(candle, bband)
-    }
-
-    fn datum(&self) -> &Vec<StrategyData<C>> {
-        &self.items
-    }
-
-    fn datum_mut(&mut self) -> &mut Vec<StrategyData<C>> {
-        &mut self.items
-    }
-}
-
 /// 볼린저밴드 기반 숏 트레이딩 전략
 #[derive(Debug)]
 pub struct BBandShortStrategy<C: Candle> {
     config: BBandShortStrategyConfig,
-    ctx: StrategyContext<C>,
+    ctx: BBandStrategyContext<C>,
 }
 
 impl<C: Candle> Display for BBandShortStrategy<C> {
@@ -217,6 +92,12 @@ impl<C: Candle> Display for BBandShortStrategy<C> {
             "[볼린저밴드숏전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}}}, 컨텍스트: {}",
             self.config.period, self.config.multiplier, self.config.count, self.ctx
         )
+    }
+}
+
+impl<C: Candle + 'static> BBandStrategyCommon<C> for BBandShortStrategy<C> {
+    fn context(&self) -> &BBandStrategyContext<C> {
+        &self.ctx
     }
 }
 
@@ -235,7 +116,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
     ) -> Result<BBandShortStrategy<C>, String> {
         let config = BBandShortStrategyConfig::from_json(json_config)?;
         info!("볼린저밴드 숏 전략 설정: {:?}", config);
-        let ctx = StrategyContext::new(&config, storage);
+        let ctx = BBandStrategyContext::new(config.period, config.multiplier, storage);
 
         Ok(BBandShortStrategy { config, ctx })
     }
@@ -258,7 +139,8 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
         };
 
         info!("볼린저밴드 숏 전략 설정: {:?}", strategy_config);
-        let ctx = StrategyContext::new(&strategy_config, storage);
+        let ctx =
+            BBandStrategyContext::new(strategy_config.period, strategy_config.multiplier, storage);
 
         Ok(BBandShortStrategy {
             config: strategy_config,
@@ -273,6 +155,22 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
             0.02,
             1,
         )
+    }
+
+    /// 설정 파일에서 전략 인스턴스 생성
+    pub fn from_config_file(
+        storage: &CandleStore<C>,
+        config_path: &Path,
+    ) -> Result<BBandShortStrategy<C>, String> {
+        let config =
+            match BBandStrategyConfigBase::from_file::<BBandShortStrategyConfig>(config_path) {
+                Ok(cfg) => cfg,
+                Err(e) => return Err(format!("설정 파일 로드 오류: {}", e)),
+            };
+        info!("볼린저밴드 숏 전략 설정 로드됨: {:?}", config);
+
+        let ctx = BBandStrategyContext::new(config.period, config.multiplier, storage);
+        Ok(BBandShortStrategy { config, ctx })
     }
 }
 
@@ -304,11 +202,11 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         )
     }
 
-    fn get_position(&self) -> PositionType {
+    fn position(&self) -> PositionType {
         PositionType::Short
     }
 
-    fn get_name(&self) -> StrategyType {
+    fn name(&self) -> StrategyType {
         StrategyType::BBandShort
     }
 }

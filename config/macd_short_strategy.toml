@@ -1,0 +1,6 @@
+# MACD 숏 전략 설정
+fast_period = 12         # 빠른 EMA 기간
+slow_period = 26         # 느린 EMA 기간
+signal_period = 9        # 시그널 라인 기간
+histogram_threshold = -0.01 # 히스토그램 임계값 (0보다 작을 때 숏 진입)
+confirm_period = 3       # 확인 기간 (몇 개의 연속된 캔들에서 조건을 충족해야 하는지) 

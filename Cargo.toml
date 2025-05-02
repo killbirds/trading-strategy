@@ -10,12 +10,19 @@ chrono = { version = "0.4.41", features = ["serde"] }
 log = "0.4.27"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toml = "0.8.10"
 ta-lib = "0.1.2"
 once_cell = "1.21.3"
 trading-chart = { path = "../trading-chart" }
+env_logger = "0.10.2"
 
 [lib]
 name = "trading_strategy"
 path = "src/lib.rs" 
 
+[[bin]]
+name = "load_strategy_config"
+path = "src/bin/load_strategy_config.rs"
+
 [dev-dependencies]
+tempfile = "3.19.1"

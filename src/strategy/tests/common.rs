@@ -236,7 +236,7 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
         else if let Some((entry_price, quantity)) = position {
             // 임시 홀딩 생성 (실제 홀딩은 거래 시스템에서 관리되므로 간소화)
             let holdings =
-                TradePosition::new_long(Utc::now(), entry_price, quantity, "default".to_string());
+                TradePosition::new(Utc::now(), entry_price, quantity, "default".to_string());
 
             if strategy.should_exit(&holdings, candle) {
                 let exit_price = candle.close_price();

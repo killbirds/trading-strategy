@@ -75,12 +75,22 @@ pub enum PositionType {
     Short,
 }
 
+/// 트레이딩 신호를 나타내는 열거형
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum Signal {
+    /// 매수 신호
+    Enter,
+    /// 매도 신호
+    Exit,
+    /// 홀딩 (포지션 유지) 신호
+    Hold,
+}
+
 /// 트레이딩 포지션의 보유 상태를 나타내는 구조체
 ///
 /// 이 구조체는 포지션 유형, 진입 시간, 가격, 수량 및 관련 전략 정보를 포함합니다.
 #[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct TradePosition {
-    pub position: PositionType,
     pub datetime: DateTime<Utc>,
     pub price: f64,
     pub quantity: f64,
@@ -97,34 +107,17 @@ impl TradePosition {
     /// * `quantity` - 수량
     /// * `market` - 시장 식별자
     /// * `strategy_type` - 사용된 전략 유형 (선택 사항)
-    pub fn new(
-        position: PositionType,
-        datetime: DateTime<Utc>,
-        price: f64,
-        quantity: f64,
-        market: String,
-    ) -> Self {
+    pub fn new(datetime: DateTime<Utc>, price: f64, quantity: f64, market: String) -> Self {
         // 가격과 수량이 양수인지 확인
         assert!(price > 0.0, "가격은 양수여야 합니다");
         assert!(quantity > 0.0, "수량은 양수여야 합니다");
 
         Self {
-            position,
             datetime,
             price,
             quantity,
             market,
         }
-    }
-
-    /// Long 포지션을 위한 새 TradePosition 인스턴스를 생성합니다.
-    pub fn new_long(datetime: DateTime<Utc>, price: f64, quantity: f64, market: String) -> Self {
-        Self::new(PositionType::Long, datetime, price, quantity, market)
-    }
-
-    /// Short 포지션을 위한 새 TradePosition 인스턴스를 생성합니다.
-    pub fn new_short(datetime: DateTime<Utc>, price: f64, quantity: f64, market: String) -> Self {
-        Self::new(PositionType::Short, datetime, price, quantity, market)
     }
 
     /// 총 포지션 가치를 계산합니다 (가격 * 수량).
@@ -137,10 +130,7 @@ impl TradePosition {
     /// # 인자
     /// * `trade_price` - 현재 거래 가격
     pub fn rate_of_return(&self, trade_price: f64) -> f64 {
-        match self.position {
-            PositionType::Long => (trade_price - self.price) / self.price,
-            PositionType::Short => (self.price - trade_price) / trade_price,
-        }
+        (trade_price - self.price) / self.price
     }
 
     /// 현재 거래 가격에 대한 수익 금액을 계산합니다.
@@ -148,10 +138,7 @@ impl TradePosition {
     /// # 인자
     /// * `trade_price` - 현재 거래 가격
     pub fn returns(&self, trade_price: f64) -> f64 {
-        match self.position {
-            PositionType::Long => (trade_price - self.price) * self.quantity,
-            PositionType::Short => (self.price - trade_price) * self.quantity,
-        }
+        (trade_price - self.price) * self.quantity
     }
 }
 
@@ -160,7 +147,6 @@ impl Default for TradePosition {
     /// 기본값으로 현재 시간, 1.0의 가격과 수량, "default" 시장, Long 포지션을 사용합니다.
     fn default() -> Self {
         Self {
-            position: PositionType::Long,
             datetime: Utc::now(),
             price: 1.0,
             quantity: 1.0,

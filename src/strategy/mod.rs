@@ -1,16 +1,25 @@
+pub mod bband_common;
 pub mod bband_short_strategy;
 pub mod bband_strategy;
 mod context;
+pub mod copys_common;
 pub mod copys_short_strategy;
 pub mod copys_strategy;
 pub mod dummy_strategy;
+pub mod hybrid_common;
+pub mod hybrid_short_strategy;
 pub mod hybrid_strategy;
+pub mod ma_common;
 pub mod ma_short_strategy;
 pub mod ma_strategy;
+pub mod macd_common;
 pub mod macd_short_strategy;
 pub mod macd_strategy;
+pub mod multi_timeframe_strategy;
+pub mod rsi_common;
 pub mod rsi_short_strategy;
 pub mod rsi_strategy;
+pub mod three_rsi_common;
 pub mod three_rsi_short_strategy;
 pub mod three_rsi_strategy;
 
@@ -18,8 +27,10 @@ pub mod three_rsi_strategy;
 mod tests;
 
 use crate::candle_store::CandleStore;
+pub use crate::config_loader::{ConfigError, ConfigResult};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -61,6 +72,10 @@ pub enum StrategyType {
     ThreeRSIShort,
     /// 여러 지표를 결합한 하이브리드 전략
     Hybrid,
+    /// 여러 지표를 결합한 하이브리드 숏 전략
+    HybridShort,
+    /// 여러 타임프레임을 분석하는 전략
+    MultiTimeframe,
 }
 
 impl Display for StrategyType {
@@ -80,6 +95,8 @@ impl Display for StrategyType {
             StrategyType::ThreeRSI => write!(f, "three_rsi"),
             StrategyType::ThreeRSIShort => write!(f, "three_rsi_short"),
             StrategyType::Hybrid => write!(f, "hybrid"),
+            StrategyType::HybridShort => write!(f, "hybrid_short"),
+            StrategyType::MultiTimeframe => write!(f, "multi_timeframe"),
         }
     }
 }
@@ -117,13 +134,13 @@ pub trait Strategy<C: Candle>: Display + Send {
     ///
     /// # Returns
     /// * `PositionType` - 전략의 포지션 타입 (Long 또는 Short)
-    fn get_position(&self) -> PositionType;
+    fn position(&self) -> PositionType;
 
     /// 전략의 타입 반환
     ///
     /// # Returns
     /// * `StrategyType` - 전략의 타입
-    fn get_name(&self) -> StrategyType;
+    fn name(&self) -> StrategyType;
 }
 
 /// 전략 팩토리
@@ -149,53 +166,106 @@ impl StrategyFactory {
         storage: &CandleStore<C>,
         config: Option<HashMap<String, String>>,
     ) -> Result<Box<dyn Strategy<C>>, String> {
-        log::info!("전략 빌드: {}", strategy_type);
-        match strategy_type {
-            StrategyType::Dummy => dummy_strategy::DummyStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
-            StrategyType::MA => ma_strategy::MAStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
+        info!("전략 빌드 시작: {}", strategy_type);
+        debug!("캔들 데이터 상태: 항목 수={}", storage.len());
+
+        if storage.is_empty() {
+            warn!("캔들 데이터가 비어 있습니다. 전략이 제대로 작동하지 않을 수 있습니다.");
+        }
+
+        let result = match strategy_type {
+            StrategyType::Dummy => {
+                debug!("더미 전략 초기화 시작");
+                dummy_strategy::DummyStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MA => {
+                debug!("MA 전략 초기화 시작");
+                ma_strategy::MAStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::MAShort => {
+                debug!("MA 숏 전략 초기화 시작");
                 ma_short_strategy::MAShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
-            StrategyType::RSI => rsi_strategy::RSIStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
+            StrategyType::RSI => {
+                debug!("RSI 전략 초기화 시작");
+                rsi_strategy::RSIStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::RSIShort => {
+                debug!("RSI 숏 전략 초기화 시작");
                 rsi_short_strategy::RSIShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
-            StrategyType::BBand => bband_strategy::BBandStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
+            StrategyType::BBand => {
+                debug!("볼린저 밴드 전략 초기화 시작");
+                bband_strategy::BBandStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::BBandShort => {
+                debug!("볼린저 밴드 숏 전략 초기화 시작");
                 bband_short_strategy::BBandShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
-            StrategyType::MACD => macd_strategy::MACDStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
+            StrategyType::MACD => {
+                debug!("MACD 전략 초기화 시작");
+                macd_strategy::MACDStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::MACDShort => {
+                debug!("MACD 숏 전략 초기화 시작");
                 macd_short_strategy::MACDShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
-            StrategyType::Copys => copys_strategy::CopysStrategy::new_with_config(storage, config)
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>),
+            StrategyType::Copys => {
+                debug!("Copys 전략 초기화 시작");
+                copys_strategy::CopysStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::CopysShort => {
+                debug!("Copys 숏 전략 초기화 시작");
                 copys_short_strategy::CopysShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
             StrategyType::ThreeRSI => {
+                debug!("3-RSI 전략 초기화 시작");
                 three_rsi_strategy::ThreeRSIStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
             StrategyType::ThreeRSIShort => {
+                debug!("3-RSI 숏 전략 초기화 시작");
                 three_rsi_short_strategy::ThreeRSIShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
             StrategyType::Hybrid => {
+                debug!("하이브리드 전략 초기화 시작");
                 hybrid_strategy::HybridStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
+            StrategyType::HybridShort => {
+                debug!("하이브리드 숏 전략 초기화 시작");
+                hybrid_short_strategy::HybridShortStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MultiTimeframe => {
+                debug!("MultiTimeframe 전략 초기화 시작");
+                multi_timeframe_strategy::MultiTimeframeStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+        };
+
+        match &result {
+            Ok(_) => {
+                info!("전략 빌드 성공: {}", strategy_type);
+            }
+            Err(e) => {
+                error!("전략 빌드 실패: {} - {}", strategy_type, e);
+            }
         }
+
+        result
     }
 
     /// 기본 설정으로 전략 인스턴스 생성 (이전 버전과의 호환성 유지)
@@ -236,7 +306,125 @@ impl StrategyFactory {
             StrategyType::ThreeRSI => PositionType::Long,
             StrategyType::ThreeRSIShort => PositionType::Short,
             StrategyType::Hybrid => PositionType::Long,
+            StrategyType::HybridShort => PositionType::Short,
+            StrategyType::MultiTimeframe => PositionType::Long,
         }
+    }
+
+    /// 설정 파일에서 전략 인스턴스 생성
+    ///
+    /// # Arguments
+    /// * `strategy_type` - 생성할 전략 유형
+    /// * `storage` - 캔들 데이터 저장소
+    /// * `config_path` - 설정 파일 경로
+    ///
+    /// # Returns
+    /// * `Result<Box<dyn Strategy>, String>` - 생성된 전략 인스턴스 또는 에러
+    pub fn build_from_config<C: Candle + 'static>(
+        strategy_type: StrategyType,
+        storage: &CandleStore<C>,
+        config_path: &std::path::Path,
+    ) -> Result<Box<dyn Strategy<C>>, String> {
+        info!(
+            "설정 파일에서 전략 빌드 시작: {}, 파일: {}",
+            strategy_type,
+            config_path.display()
+        );
+        debug!("캔들 데이터 상태: 항목 수={}", storage.len());
+
+        if storage.is_empty() {
+            warn!("캔들 데이터가 비어 있습니다. 전략이 제대로 작동하지 않을 수 있습니다.");
+        }
+
+        if !config_path.exists() {
+            error!("설정 파일이 존재하지 않습니다: {}", config_path.display());
+            return Err(format!(
+                "설정 파일이 존재하지 않습니다: {}",
+                config_path.display()
+            ));
+        }
+
+        let result = match strategy_type {
+            StrategyType::BBand => {
+                debug!(
+                    "볼린저 밴드 전략 초기화 시작 (설정 파일: {})",
+                    config_path.display()
+                );
+                bband_strategy::BBandStrategy::from_config_file(storage, config_path)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::BBandShort => {
+                debug!(
+                    "볼린저 밴드 숏 전략 초기화 시작 (설정 파일: {})",
+                    config_path.display()
+                );
+                bband_short_strategy::BBandShortStrategy::from_config_file(storage, config_path)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MACD => {
+                debug!(
+                    "MACD 전략 초기화 시작 (설정 파일: {})",
+                    config_path.display()
+                );
+                macd_strategy::MACDStrategy::from_config_file(storage, config_path)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MACDShort => {
+                debug!(
+                    "MACD 숏 전략 초기화 시작 (설정 파일: {})",
+                    config_path.display()
+                );
+                macd_short_strategy::MACDShortStrategy::from_config_file(storage, config_path)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MA => {
+                debug!("MA 전략 초기화 시작 (설정 파일: {})", config_path.display());
+                ma_strategy::MAStrategy::from_config_file(storage, config_path)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::MultiTimeframe => {
+                debug!(
+                    "MultiTimeframe 전략 초기화 시작 (설정 파일: {})",
+                    config_path.display()
+                );
+                multi_timeframe_strategy::MultiTimeframeStrategy::from_config_file(
+                    storage,
+                    config_path,
+                )
+                .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            _ => {
+                warn!(
+                    "설정 파일 기반 생성이 구현되지 않은 전략: {}. 기본 설정으로 대체합니다.",
+                    strategy_type
+                );
+
+                Self::build(strategy_type, storage, None)
+            }
+        };
+
+        match &result {
+            Ok(_) => {
+                info!("설정 파일에서 전략 빌드 성공: {}", strategy_type);
+            }
+            Err(e) => {
+                error!("설정 파일에서 전략 빌드 실패: {} - {}", strategy_type, e);
+            }
+        }
+
+        result
+    }
+
+    /// 기본 설정 파일 경로 생성
+    ///
+    /// # Arguments
+    /// * `strategy_type` - 전략 유형
+    ///
+    /// # Returns
+    /// * `std::path::PathBuf` - 설정 파일 경로
+    pub fn default_config_path(strategy_type: StrategyType) -> std::path::PathBuf {
+        let filename = format!("{}.toml", strategy_type);
+        std::path::PathBuf::from("config").join(filename)
     }
 }
 
