@@ -1,3 +1,4 @@
+pub mod analyzer;
 pub mod candle_store;
 pub mod indicator;
 pub mod model;

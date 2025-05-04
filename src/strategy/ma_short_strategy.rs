@@ -1,10 +1,10 @@
 use super::Strategy;
 use super::StrategyType;
-use super::ma_common::{MAStrategyCommon, MAStrategyConfigBase, MAStrategyContext};
+use crate::analyzer::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
-use crate::strategy::context::StrategyContextOps;
+use crate::strategy::ma_common::{MAAnalyzer, MAStrategyCommon, MAStrategyConfigBase};
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -85,7 +85,7 @@ pub struct MAShortStrategy<C: Candle> {
     /// 전략 설정
     config: MAShortStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: MAStrategyContext<C>,
+    ctx: MAAnalyzer<C>,
 }
 
 impl<C: Candle> Display for MAShortStrategy<C> {
@@ -107,7 +107,7 @@ impl<C: Candle> Display for MAShortStrategy<C> {
 }
 
 impl<C: Candle + 'static> MAStrategyCommon<C> for MAShortStrategy<C> {
-    fn context(&self) -> &MAStrategyContext<C> {
+    fn context(&self) -> &MAAnalyzer<C> {
         &self.ctx
     }
 
@@ -146,7 +146,7 @@ impl<C: Candle + 'static> MAShortStrategy<C> {
         config: MAShortStrategyConfig,
     ) -> Result<MAShortStrategy<C>, String> {
         info!("MA 숏 전략 설정: {:?}", config);
-        let ctx = MAStrategyContext::new(&config.ma, &config.ma_periods, storage);
+        let ctx = MAAnalyzer::new(&config.ma, &config.ma_periods, storage);
 
         Ok(MAShortStrategy { config, ctx })
     }

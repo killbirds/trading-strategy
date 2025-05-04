@@ -10,9 +10,8 @@ use std::fmt::Display;
 use trading_chart::Candle;
 
 // 공통 모듈 가져오기
-use super::rsi_common::{
-    RSIStrategyCommon, RSIStrategyConfigBase, RSIStrategyContext, StrategyContextOps,
-};
+use super::rsi_common::{RSIAnalyzer, RSIStrategyCommon, RSIStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 
 /// RSI 숏 전략 설정
 #[derive(Debug, Deserialize)]
@@ -91,7 +90,7 @@ pub struct RSIShortStrategy<C: Candle> {
     /// 전략 설정
     config: RSIShortStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: RSIStrategyContext<C>,
+    ctx: RSIAnalyzer<C>,
 }
 
 impl<C: Candle> Display for RSIShortStrategy<C> {
@@ -110,8 +109,7 @@ impl<C: Candle + 'static> RSIShortStrategy<C> {
         let config = RSIShortStrategyConfig::from_json(json_config)?;
         info!("RSI 숏 전략 설정: {:?}", config);
 
-        let ctx =
-            RSIStrategyContext::new(config.rsi_period, &config.ma, &config.ma_periods, storage);
+        let ctx = RSIAnalyzer::new(config.rsi_period, &config.ma, &config.ma_periods, storage);
 
         Ok(RSIShortStrategy { config, ctx })
     }
@@ -128,7 +126,7 @@ impl<C: Candle + 'static> RSIShortStrategy<C> {
 
         info!("RSI 숏 전략 설정: {:?}", strategy_config);
 
-        let ctx = RSIStrategyContext::new(
+        let ctx = RSIAnalyzer::new(
             strategy_config.rsi_period,
             &strategy_config.ma,
             &strategy_config.ma_periods,
@@ -143,7 +141,7 @@ impl<C: Candle + 'static> RSIShortStrategy<C> {
 }
 
 impl<C: Candle + 'static> RSIStrategyCommon<C> for RSIShortStrategy<C> {
-    fn context(&self) -> &RSIStrategyContext<C> {
+    fn context(&self) -> &RSIAnalyzer<C> {
         &self.ctx
     }
 

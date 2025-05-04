@@ -13,9 +13,8 @@ use std::path::Path;
 use trading_chart::Candle;
 
 // 공통 모듈 가져오기
-use super::macd_common::{
-    MACDStrategyCommon, MACDStrategyConfigBase, MACDStrategyContext, StrategyContextOps,
-};
+use super::macd_common::{MACDAnalyzer, MACDStrategyCommon, MACDStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 
 /// MACD 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
@@ -89,7 +88,7 @@ pub struct MACDStrategy<C: Candle> {
     /// 전략 설정
     config: MACDStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: MACDStrategyContext<C>,
+    ctx: MACDAnalyzer<C>,
 }
 
 impl<C: Candle> Display for MACDStrategy<C> {
@@ -123,7 +122,7 @@ impl<C: Candle + 'static> MACDStrategy<C> {
     ) -> Result<MACDStrategy<C>, String> {
         info!("MACD 전략 설정: {:?}", config);
 
-        let ctx = MACDStrategyContext::new(
+        let ctx = MACDAnalyzer::new(
             config.fast_period,
             config.slow_period,
             config.signal_period,
@@ -162,7 +161,7 @@ impl<C: Candle + 'static> MACDStrategy<C> {
 }
 
 impl<C: Candle + 'static> MACDStrategyCommon<C> for MACDStrategy<C> {
-    fn context(&self) -> &MACDStrategyContext<C> {
+    fn context(&self) -> &MACDAnalyzer<C> {
         &self.ctx
     }
 

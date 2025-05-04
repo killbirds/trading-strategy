@@ -1,15 +1,12 @@
 use super::Strategy;
-use super::context::{GetCandle, StrategyContextOps, StrategyDataOps};
-use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
-use crate::indicator::ma::{MA, MABuilderFactory, MAType};
-use crate::indicator::macd::{MACD, MACDBuilder};
-use crate::indicator::rsi::{RSI, RSIBuilder};
+use crate::indicator::ma::MAType;
 use serde::Deserialize;
 use serde_json;
 use std::collections::HashMap;
-use std::fmt::Display;
 use trading_chart::Candle;
+
+// analyzer에서 HybridAnalyzer 관련 구조체 가져오기
+pub use crate::analyzer::hybrid_analyzer::{HybridAnalyzer, HybridAnalyzerData};
 
 /// 하이브리드 전략 공통 설정
 #[derive(Debug, Deserialize)]
@@ -292,171 +289,10 @@ impl HybridStrategyConfigBase {
     }
 }
 
-/// 하이브리드 전략 데이터
-#[derive(Debug)]
-pub struct HybridStrategyData<C: Candle> {
-    /// 현재 캔들 데이터
-    pub candle: C,
-    /// 이동평균 데이터
-    pub ma: Box<dyn MA>,
-    /// MACD 데이터
-    pub macd: MACD,
-    /// RSI 데이터
-    pub rsi: RSI,
-}
-
-impl<C: Candle + Clone> HybridStrategyData<C> {
-    /// 새 전략 데이터 생성
-    pub fn new(candle: C, ma: Box<dyn MA>, macd: MACD, rsi: RSI) -> HybridStrategyData<C> {
-        HybridStrategyData {
-            candle,
-            ma,
-            macd,
-            rsi,
-        }
-    }
-
-    /// 저장된 값으로 데이터 복제
-    pub fn clone_with_stored_values(&self) -> HybridStrategyData<C> {
-        // Box<dyn MA>는 클론할 수 없으므로, MA 구현체의 값을 저장하고 새 객체 생성
-        let ma_period = self.ma.period();
-        let ma_value = self.ma.get();
-
-        // 값을 가지고 있는 간단한 MA 구현체
-        struct SimpleMA {
-            period: usize,
-            value: f64,
-        }
-
-        impl MA for SimpleMA {
-            fn period(&self) -> usize {
-                self.period
-            }
-
-            fn get(&self) -> f64 {
-                self.value
-            }
-        }
-
-        impl Display for SimpleMA {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "MA({}: {:.2})", self.period, self.value)
-            }
-        }
-
-        impl std::fmt::Debug for SimpleMA {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "SimpleMA({}: {:.2})", self.period, self.value)
-            }
-        }
-
-        let simple_ma = SimpleMA {
-            period: ma_period,
-            value: ma_value,
-        };
-
-        HybridStrategyData {
-            candle: self.candle.clone(),
-            ma: Box::new(simple_ma),
-            macd: self.macd.clone(),
-            rsi: self.rsi.clone(),
-        }
-    }
-}
-
-impl<C: Candle> GetCandle<C> for HybridStrategyData<C> {
-    fn candle(&self) -> &C {
-        &self.candle
-    }
-}
-
-impl<C: Candle> StrategyDataOps<C> for HybridStrategyData<C> {}
-
-/// 하이브리드 전략 컨텍스트
-#[derive(Debug)]
-pub struct HybridStrategyContext<C: Candle + Clone> {
-    /// 이동평균 빌더
-    pub mabuilder: Box<dyn TABuilder<Box<dyn MA>, C>>,
-    /// MACD 빌더
-    pub macdbuilder: MACDBuilder<C>,
-    /// RSI 빌더
-    pub rsibuilder: RSIBuilder<C>,
-    /// 전략 데이터 히스토리 (최신 데이터가 인덱스 0)
-    pub items: Vec<HybridStrategyData<C>>,
-}
-
-impl<C: Candle + Clone> Display for HybridStrategyContext<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(first) = self.items.first() {
-            write!(
-                f,
-                "candle: {}, ma: {:.2}, macd: {}, rsi: {:.2}",
-                first.candle,
-                first.ma.get(),
-                first.macd,
-                first.rsi.value()
-            )
-        } else {
-            write!(f, "데이터 없음")
-        }
-    }
-}
-
-impl<C: Candle + Clone + 'static> HybridStrategyContext<C> {
-    /// 새 전략 컨텍스트 생성
-    pub fn new(
-        config: &HybridStrategyConfigBase,
-        storage: &CandleStore<C>,
-    ) -> HybridStrategyContext<C> {
-        let mabuilder = MABuilderFactory::build(&config.ma_type, config.ma_period);
-        let macdbuilder = MACDBuilder::new(
-            config.macd_fast_period,
-            config.macd_slow_period,
-            config.macd_signal_period,
-        );
-        let rsibuilder = RSIBuilder::new(config.rsi_period);
-
-        let mut ctx = HybridStrategyContext {
-            mabuilder,
-            macdbuilder,
-            rsibuilder,
-            items: vec![],
-        };
-
-        ctx.init(storage.get_reversed_items());
-        ctx
-    }
-}
-
-impl<C: Candle + Clone> StrategyContextOps<HybridStrategyData<C>, C> for HybridStrategyContext<C> {
-    fn next_data(&mut self, candle: C) -> HybridStrategyData<C> {
-        let ma = self.mabuilder.next(&candle);
-        let macd = self.macdbuilder.next(&candle);
-        let rsi = self.rsibuilder.next(&candle);
-
-        let data = HybridStrategyData::new(candle, ma, macd, rsi);
-        self.items.push(data.clone_with_stored_values());
-
-        if self.items.len() > 100 {
-            self.items.remove(0);
-        }
-
-        data
-    }
-
-    fn datum(&self) -> &Vec<HybridStrategyData<C>> {
-        &self.items
-    }
-
-    fn datum_mut(&mut self) -> &mut Vec<HybridStrategyData<C>> {
-        &mut self.items
-    }
-}
-
 /// 하이브리드 전략 공통 트레이트
 pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
-    /// 컨텍스트 참조 반환
-    fn context(&self) -> &HybridStrategyContext<C>;
+    /// 분석기 참조 반환
+    fn context(&self) -> &HybridAnalyzer<C>;
 
     /// 설정 기본값 참조 반환
     fn config_base(&self) -> &HybridStrategyConfigBase;
@@ -480,6 +316,11 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
         if current.candle.close_price() > current.ma.get() {
             strength += 1.0;
             count += 1.0;
+
+            // 상승 추세 강화: 가격이 이동평균보다 2% 이상 높으면 추가 점수
+            if current.candle.close_price() > current.ma.get() * 1.02 {
+                strength += 0.5;
+            }
         }
 
         // 2. MACD 기반 신호
@@ -489,7 +330,7 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
             count += 1.0;
         } else if current.macd.histogram > 0.0 {
             // MACD 히스토그램이 0선 위에 있음 (약한 매수 신호)
-            strength += 0.5;
+            strength += 0.8; // 0.5에서 0.8로 증가
             count += 1.0;
         }
 
@@ -501,8 +342,19 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
             count += 1.0;
         } else if rsi > config.rsi_lower && rsi < 50.0 {
             // RSI가 과매도 상태를 벗어나 상승 중 (약한 매수 신호)
-            strength += 0.5;
+            strength += 0.8; // 0.5에서 0.8로 증가
             count += 1.0;
+        } else if rsi > 50.0 && rsi < 60.0 && rsi > previous.rsi.value() {
+            // RSI가 50-60 구간에서 상승 중 (상승 추세 형성)
+            strength += 0.7;
+            count += 0.8;
+        }
+
+        // 4. 가격 변동 패턴 (추가)
+        if current.candle.close_price() > previous.candle.close_price() {
+            // 종가가 전일 종가보다 높음 (상승 추세)
+            strength += 0.5;
+            count += 0.5;
         }
 
         // 최종 강도 계산 (정규화)

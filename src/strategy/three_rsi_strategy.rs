@@ -1,9 +1,9 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
 use super::three_rsi_common::{
-    ThreeRSIStrategyCommon, ThreeRSIStrategyConfigBase, ThreeRSIStrategyContext,
+    ThreeRSIAnalyzer, ThreeRSIStrategyCommon, ThreeRSIStrategyConfigBase,
 };
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -48,7 +48,7 @@ impl ThreeRSIStrategyConfig {
 #[derive(Debug)]
 pub struct ThreeRSIStrategy<C: Candle> {
     config: ThreeRSIStrategyConfig,
-    ctx: ThreeRSIStrategyContext<C>,
+    ctx: ThreeRSIAnalyzer<C>,
 }
 
 impl<C: Candle> Display for ThreeRSIStrategy<C> {
@@ -90,7 +90,13 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
         config: ThreeRSIStrategyConfig,
     ) -> Result<ThreeRSIStrategy<C>, String> {
         info!("세개 RSI 전략 설정: {:?}", config);
-        let ctx = ThreeRSIStrategyContext::new(&config.base, storage);
+        let ctx = ThreeRSIAnalyzer::new(
+            &config.base.rsi_periods,
+            &config.base.ma,
+            config.base.ma_period,
+            config.base.adx_period,
+            storage,
+        );
 
         Ok(ThreeRSIStrategy { config, ctx })
     }
@@ -170,7 +176,7 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
 }
 
 impl<C: Candle + 'static> ThreeRSIStrategyCommon<C> for ThreeRSIStrategy<C> {
-    fn context(&self) -> &ThreeRSIStrategyContext<C> {
+    fn context(&self) -> &ThreeRSIAnalyzer<C> {
         &self.ctx
     }
 }

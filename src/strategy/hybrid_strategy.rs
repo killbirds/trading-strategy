@@ -1,7 +1,7 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
-use super::hybrid_common::{HybridStrategyCommon, HybridStrategyConfigBase, HybridStrategyContext};
+use super::hybrid_common::{HybridAnalyzer, HybridStrategyCommon, HybridStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -59,7 +59,7 @@ pub struct HybridStrategy<C: Candle + Clone> {
     /// 전략 설정
     config: HybridStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: HybridStrategyContext<C>,
+    ctx: HybridAnalyzer<C>,
 }
 
 impl<C: Candle + Clone> Display for HybridStrategy<C> {
@@ -94,7 +94,15 @@ impl<C: Candle + Clone + 'static> HybridStrategy<C> {
         config: HybridStrategyConfig,
     ) -> Result<HybridStrategy<C>, String> {
         info!("하이브리드 전략 설정: {:?}", config);
-        let ctx = HybridStrategyContext::new(&config.base, storage);
+        let ctx = HybridAnalyzer::new(
+            &config.base.ma_type,
+            config.base.ma_period,
+            config.base.macd_fast_period,
+            config.base.macd_slow_period,
+            config.base.macd_signal_period,
+            config.base.rsi_period,
+            storage,
+        );
 
         Ok(HybridStrategy { config, ctx })
     }
@@ -114,7 +122,7 @@ impl<C: Candle + Clone + 'static> HybridStrategy<C> {
 }
 
 impl<C: Candle + Clone + 'static> HybridStrategyCommon<C> for HybridStrategy<C> {
-    fn context(&self) -> &HybridStrategyContext<C> {
+    fn context(&self) -> &HybridAnalyzer<C> {
         &self.ctx
     }
 
@@ -132,8 +140,8 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
         // 여러 지표를 종합한 매수 신호를 기반으로 결정
         let signal_strength = self.calculate_buy_signal_strength();
 
-        // 신호 강도가 0.7 이상인 경우에만 매수 (임계값은 조정 가능)
-        signal_strength >= 0.7
+        // 신호 강도가 0.5 이상인 경우에만 매수 (임계값을 낮춤)
+        signal_strength >= 0.5
     }
 
     fn should_exit(&self, holdings: &TradePosition, candle: &C) -> bool {

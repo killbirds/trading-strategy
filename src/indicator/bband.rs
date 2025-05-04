@@ -285,21 +285,6 @@ where
     }
 }
 
-/// 가격의 밴드 상대 위치 계산
-///
-/// # Arguments
-/// * `trade_price` - 현재 거래 가격
-/// * `band` - 참조 밴드 값
-///
-/// # Returns
-/// * `f64` - 밴드 대비 상대적 위치 비율
-fn get_ratio(trade_price: f64, band: f64) -> f64 {
-    if band.abs() < f64::EPSILON {
-        return 0.0; // 0으로 나누는 것 방지
-    }
-    (trade_price - band) / band
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

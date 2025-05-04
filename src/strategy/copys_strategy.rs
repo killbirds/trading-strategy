@@ -1,9 +1,8 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
-use super::copys_common::{
-    CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext, CopysStrategyData,
-};
+use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
+use crate::analyzer::base::AnalyzerOps;
+use crate::analyzer::rsi_analyzer::RSIAnalyzerData;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -224,17 +223,10 @@ impl<C: Candle + 'static> CopysStrategy<C> {
     ) -> Result<CopysStrategy<C>, String> {
         info!("CopyS 전략 설정: {:?}", config);
 
-        let masbuilder = crate::indicator::ma::MAsBuilderFactory::build::<C>(
-            &crate::indicator::ma::MAType::EMA,
-            &[10, 20, 60],
-        );
-
-        let bbandbuilder = crate::indicator::bband::BBandBuilder::new(
-            config.base.bband_period,
-            config.base.bband_multiplier,
-        );
-
-        let mut ctx = CopysStrategyContext::new(config.base.rsi_period, masbuilder, bbandbuilder);
+        let ma_type = crate::indicator::ma::MAType::EMA;
+        let ma_periods = [10, 20, 60];
+        let mut ctx =
+            CopysStrategyContext::new(config.base.rsi_period, &ma_type, &ma_periods, storage);
         ctx.init(storage.get_reversed_items());
 
         Ok(CopysStrategy { config, ctx })
@@ -282,7 +274,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &CopysStrategyData<C>| data.rsi.rsi > self.config.base.rsi_lower,
+                |data: &RSIAnalyzerData<C>| data.rsi.rsi > self.config.base.rsi_lower,
                 1,
                 self.config_rsi_count(),
             )
@@ -294,7 +286,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &CopysStrategyData<C>| data.rsi.rsi < self.config.base.rsi_upper,
+                |data: &RSIAnalyzerData<C>| data.rsi.rsi < self.config.base.rsi_upper,
                 1,
                 self.config_rsi_count(),
             )

@@ -1,7 +1,7 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
-use super::hybrid_common::{HybridStrategyCommon, HybridStrategyConfigBase, HybridStrategyContext};
+use super::hybrid_common::{HybridAnalyzer, HybridStrategyCommon, HybridStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -169,7 +169,7 @@ impl HybridShortStrategyConfig {
 /// MACD, RSI, 이동평균선을 결합하여 시장 하락 상황에 적응적으로 대응하는 전략
 pub struct HybridShortStrategy<C: Candle + Clone> {
     config: HybridShortStrategyConfig,
-    ctx: HybridStrategyContext<C>,
+    ctx: HybridAnalyzer<C>,
 
     // 캐시 및 최적화를 위한 필드
     cache: RefCell<SignalCache>,
@@ -206,7 +206,15 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         let config = HybridShortStrategyConfig::from_json(json_config)?;
         info!("하이브리드 숏 전략 설정: {:?}", config);
         debug!("캔들 데이터 상태: 항목 수={}", storage.len());
-        let ctx = HybridStrategyContext::new(&config.base, storage);
+        let ctx = HybridAnalyzer::new(
+            &config.base.ma_type,
+            config.base.ma_period,
+            config.base.macd_fast_period,
+            config.base.macd_slow_period,
+            config.base.macd_signal_period,
+            config.base.rsi_period,
+            storage,
+        );
 
         Ok(HybridShortStrategy {
             config,
@@ -227,7 +235,15 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         };
 
         debug!("캔들 데이터 상태: 항목 수={}", storage.len());
-        let ctx = HybridStrategyContext::new(&strategy_config.base, storage);
+        let ctx = HybridAnalyzer::new(
+            &strategy_config.base.ma_type,
+            strategy_config.base.ma_period,
+            strategy_config.base.macd_fast_period,
+            strategy_config.base.macd_slow_period,
+            strategy_config.base.macd_signal_period,
+            strategy_config.base.rsi_period,
+            storage,
+        );
 
         Ok(HybridShortStrategy {
             config: strategy_config,
@@ -411,7 +427,7 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
 }
 
 impl<C: Candle + Clone + 'static> HybridStrategyCommon<C> for HybridShortStrategy<C> {
-    fn context(&self) -> &HybridStrategyContext<C> {
+    fn context(&self) -> &HybridAnalyzer<C> {
         &self.ctx
     }
 

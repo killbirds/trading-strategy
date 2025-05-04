@@ -1,16 +1,12 @@
 use super::Strategy;
-use super::context::{GetCandle, StrategyDataOps};
-use crate::candle_store::CandleStore;
-use crate::indicator::ma::{MAType, MAs, MAsBuilder, MAsBuilderFactory};
-use crate::indicator::rsi::{RSI, RSIBuilder};
+use crate::indicator::ma::MAType;
 use serde::Deserialize;
 use serde_json;
 use std::collections::HashMap;
-use std::fmt::Display;
 use trading_chart::Candle;
 
-// context에서 StrategyContextOps를 공개 가져오기
-pub use super::context::StrategyContextOps;
+// analyzer에서 RSIAnalyzer 관련 구조체 가져오기
+pub use crate::analyzer::rsi_analyzer::{RSIAnalyzer, RSIAnalyzerData};
 
 /// RSI 전략 공통 설정
 #[derive(Debug, Deserialize)]
@@ -169,117 +165,10 @@ impl RSIStrategyConfigBase {
     }
 }
 
-/// RSI 전략 데이터
-#[derive(Debug)]
-pub struct RSIStrategyData<C: Candle> {
-    /// 현재 캔들 데이터
-    pub candle: C,
-    /// RSI 지표 값
-    pub rsi: RSI,
-    /// 이동평균선 집합
-    pub mas: MAs,
-}
-
-impl<C: Candle> RSIStrategyData<C> {
-    /// 새 전략 데이터 생성
-    pub fn new(candle: C, mas: MAs, rsi: RSI) -> RSIStrategyData<C> {
-        RSIStrategyData { candle, rsi, mas }
-    }
-
-    /// 이동평균이 정규 배열(오름차순)인지 확인
-    pub fn is_ma_regular_arrangement(&self) -> bool {
-        self.is_regular_arrangement(|data| &data.mas, |ma| ma.get())
-    }
-
-    /// 이동평균이 역배열(내림차순)인지 확인
-    pub fn is_ma_reverse_arrangement(&self) -> bool {
-        self.is_reverse_arrangement(|data| &data.mas, |ma| ma.get())
-    }
-}
-
-impl<C: Candle> GetCandle<C> for RSIStrategyData<C> {
-    fn candle(&self) -> &C {
-        &self.candle
-    }
-}
-
-impl<C: Candle> StrategyDataOps<C> for RSIStrategyData<C> {}
-
-/// RSI 전략 컨텍스트
-#[derive(Debug)]
-pub struct RSIStrategyContext<C: Candle> {
-    /// RSI 빌더
-    pub rsibuilder: RSIBuilder<C>,
-    /// 이동평균 빌더
-    pub masbuilder: MAsBuilder<C>,
-    /// 전략 데이터 히스토리 (최신 데이터가 인덱스 0)
-    pub items: Vec<RSIStrategyData<C>>,
-}
-
-impl<C: Candle> Display for RSIStrategyContext<C> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.items.first() {
-            Some(first) => write!(
-                f,
-                "캔들: {}, RSI: {}, MAs: {}",
-                first.candle, first.rsi, first.mas
-            ),
-            None => write!(f, "데이터 없음"),
-        }
-    }
-}
-
-impl<C: Candle + 'static> RSIStrategyContext<C> {
-    /// 새 전략 컨텍스트 생성
-    pub fn new(
-        rsi_period: usize,
-        ma_type: &MAType,
-        ma_periods: &[usize],
-        storage: &CandleStore<C>,
-    ) -> RSIStrategyContext<C> {
-        let rsibuilder = RSIBuilder::new(rsi_period);
-        let masbuilder = MAsBuilderFactory::build::<C>(ma_type, ma_periods);
-        let mut ctx = RSIStrategyContext {
-            rsibuilder,
-            masbuilder,
-            items: vec![],
-        };
-
-        ctx.init(storage.get_reversed_items());
-        ctx
-    }
-
-    /// n개의 연속 데이터에서 이동평균이 정규 배열인지 확인
-    pub fn is_ma_regular_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_regular_arrangement(), n)
-    }
-
-    /// n개의 연속 데이터에서 이동평균이 역배열인지 확인
-    pub fn is_ma_reverse_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_reverse_arrangement(), n)
-    }
-}
-
-impl<C: Candle> StrategyContextOps<RSIStrategyData<C>, C> for RSIStrategyContext<C> {
-    fn next_data(&mut self, candle: C) -> RSIStrategyData<C> {
-        let rsi = self.rsibuilder.next(&candle);
-        let mas = self.masbuilder.next(&candle);
-        RSIStrategyData::new(candle, mas, rsi)
-    }
-
-    fn datum(&self) -> &Vec<RSIStrategyData<C>> {
-        &self.items
-    }
-
-    fn datum_mut(&mut self) -> &mut Vec<RSIStrategyData<C>> {
-        &mut self.items
-    }
-}
-
 /// RSI 전략을 위한 공통 트레이트
 pub trait RSIStrategyCommon<C: Candle + 'static>: Strategy<C> {
-    /// 컨텍스트 참조 반환
-    fn context(&self) -> &RSIStrategyContext<C>;
+    /// 분석기 참조 반환
+    fn context(&self) -> &RSIAnalyzer<C>;
 
     /// 설정의 rsi_lower 반환
     fn config_rsi_lower(&self) -> f64;

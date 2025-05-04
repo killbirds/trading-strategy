@@ -1,10 +1,9 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
-use super::copys_common::{
-    CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext, CopysStrategyData,
-};
+use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
 use super::split;
+use crate::analyzer::base::AnalyzerOps;
+use crate::analyzer::rsi_analyzer::RSIAnalyzerData;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use crate::model::PositionType;
@@ -268,15 +267,12 @@ impl<C: Candle + 'static> CopysShortStrategy<C> {
         let config = CopysShortStrategyConfig::from_json(json_config)?;
         info!("코피스 숏 전략 설정: {:?}", config);
 
-        let masbuilder =
-            crate::indicator::ma::MAsBuilderFactory::build::<C>(&config.ma, &config.ma_periods);
-
-        let bbandbuilder = crate::indicator::bband::BBandBuilder::new(
-            config.base.bband_period,
-            config.base.bband_multiplier,
+        let mut ctx = CopysStrategyContext::new(
+            config.base.rsi_period,
+            &config.ma,
+            &config.ma_periods,
+            storage,
         );
-
-        let mut ctx = CopysStrategyContext::new(config.base.rsi_period, masbuilder, bbandbuilder);
         ctx.init(storage.get_reversed_items());
 
         Ok(CopysShortStrategy { config, ctx })
@@ -294,18 +290,12 @@ impl<C: Candle + 'static> CopysShortStrategy<C> {
 
         info!("코피스 숏 전략 설정: {:?}", strategy_config);
 
-        let masbuilder = crate::indicator::ma::MAsBuilderFactory::build::<C>(
+        let mut ctx = CopysStrategyContext::new(
+            strategy_config.base.rsi_period,
             &strategy_config.ma,
             &strategy_config.ma_periods,
+            storage,
         );
-
-        let bbandbuilder = crate::indicator::bband::BBandBuilder::new(
-            strategy_config.base.bband_period,
-            strategy_config.base.bband_multiplier,
-        );
-
-        let mut ctx =
-            CopysStrategyContext::new(strategy_config.base.rsi_period, masbuilder, bbandbuilder);
         ctx.init(storage.get_reversed_items());
 
         Ok(CopysShortStrategy {
@@ -345,7 +335,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 상한선보다 높으면 숏 진입 (롱 전략과 반대로 높은 값에서 진입)
             self.ctx.is_break_through_by_satisfying(
-                |data: &CopysStrategyData<C>| data.rsi.rsi > self.config.base.rsi_lower,
+                |data: &RSIAnalyzerData<C>| data.rsi.rsi > self.config.base.rsi_lower,
                 1,
                 self.config.rsi_count,
             )
@@ -359,7 +349,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 하한선보다 낮으면 숏 청산
             self.ctx.is_break_through_by_satisfying(
-                |data: &CopysStrategyData<C>| data.rsi.rsi < self.config.base.rsi_upper,
+                |data: &RSIAnalyzerData<C>| data.rsi.rsi < self.config.base.rsi_upper,
                 1,
                 self.config.rsi_count,
             )

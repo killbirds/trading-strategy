@@ -12,7 +12,7 @@ pub trait GetCandle<C: Candle> {
 ///
 /// 이 트레이트는 전략 데이터에 대한 다양한 연산 메서드를 제공합니다.
 /// 기본 구현이 포함되어 있어 구현체에서 추가 구현 없이 사용할 수 있습니다.
-pub trait StrategyDataOps<C: Candle>: GetCandle<C> {
+pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
     /// 수익률 계산
     ///
     /// # Arguments
@@ -235,7 +235,7 @@ pub trait StrategyDataOps<C: Candle>: GetCandle<C> {
 /// 전략 컨텍스트 연산을 위한 트레이트
 ///
 /// 이 트레이트는 전략 데이터의 시계열 컬렉션에 대한 연산을 제공합니다.
-pub trait StrategyContextOps<Data: StrategyDataOps<C>, C: Candle> {
+pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// 새로운 캔들로부터 전략 데이터 생성
     ///
     /// # Arguments
@@ -463,7 +463,7 @@ pub trait StrategyContextOps<Data: StrategyDataOps<C>, C: Candle> {
         )
     }
 
-    /// n개의 연속된 데이터에서 특정 값이 거래 가격보다 큰지 확인
+    /// n개의 연속된 데이터에서 특정 값이 거래 가격보다 커지는 돌파 패턴 확인
     fn is_greater_than_trade_price(&self, get_value: impl Fn(&Data) -> f64, n: usize) -> bool {
         self.is_greater_than_candle(&get_value, |candle| candle.close_price(), n)
     }

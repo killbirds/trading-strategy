@@ -1,11 +1,11 @@
 use super::Strategy;
 use super::StrategyType;
-use super::bband_common::{BBandStrategyCommon, BBandStrategyConfigBase, BBandStrategyContext};
+use super::bband_common::{BBandAnalyzer, BBandStrategyCommon, BBandStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
-use crate::strategy::context::StrategyContextOps;
 use log::{debug, error, info};
 use serde::Deserialize;
 use serde::Serialize;
@@ -84,7 +84,7 @@ pub struct BBandStrategy<C: Candle> {
     /// 전략 설정
     config: BBandStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: BBandStrategyContext<C>,
+    ctx: BBandAnalyzer<C>,
 }
 
 impl<C: Candle> Display for BBandStrategy<C> {
@@ -98,7 +98,7 @@ impl<C: Candle> Display for BBandStrategy<C> {
 }
 
 impl<C: Candle + 'static> BBandStrategyCommon<C> for BBandStrategy<C> {
-    fn context(&self) -> &BBandStrategyContext<C> {
+    fn context(&self) -> &BBandAnalyzer<C> {
         &self.ctx
     }
 }
@@ -149,7 +149,7 @@ impl<C: Candle + 'static> BBandStrategy<C> {
             config.period, config.multiplier
         );
 
-        let ctx = BBandStrategyContext::new(config.period, config.multiplier, storage);
+        let ctx = BBandAnalyzer::new(config.period, config.multiplier, storage);
         debug!("볼린저 밴드 컨텍스트 초기화 완료");
 
         let strategy = BBandStrategy { config, ctx };

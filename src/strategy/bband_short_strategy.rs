@@ -1,11 +1,11 @@
 use super::Strategy;
 use super::StrategyType;
-use super::bband_common::{BBandStrategyCommon, BBandStrategyConfigBase, BBandStrategyContext};
+use super::bband_common::{BBandAnalyzer, BBandStrategyCommon, BBandStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
-use crate::strategy::context::StrategyContextOps;
 use log::info;
 use serde::Deserialize;
 use serde::Serialize;
@@ -82,7 +82,7 @@ impl BBandShortStrategyConfig {
 #[derive(Debug)]
 pub struct BBandShortStrategy<C: Candle> {
     config: BBandShortStrategyConfig,
-    ctx: BBandStrategyContext<C>,
+    ctx: BBandAnalyzer<C>,
 }
 
 impl<C: Candle> Display for BBandShortStrategy<C> {
@@ -96,7 +96,7 @@ impl<C: Candle> Display for BBandShortStrategy<C> {
 }
 
 impl<C: Candle + 'static> BBandStrategyCommon<C> for BBandShortStrategy<C> {
-    fn context(&self) -> &BBandStrategyContext<C> {
+    fn context(&self) -> &BBandAnalyzer<C> {
         &self.ctx
     }
 }
@@ -116,7 +116,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
     ) -> Result<BBandShortStrategy<C>, String> {
         let config = BBandShortStrategyConfig::from_json(json_config)?;
         info!("볼린저밴드 숏 전략 설정: {:?}", config);
-        let ctx = BBandStrategyContext::new(config.period, config.multiplier, storage);
+        let ctx = BBandAnalyzer::new(config.period, config.multiplier, storage);
 
         Ok(BBandShortStrategy { config, ctx })
     }
@@ -139,8 +139,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
         };
 
         info!("볼린저밴드 숏 전략 설정: {:?}", strategy_config);
-        let ctx =
-            BBandStrategyContext::new(strategy_config.period, strategy_config.multiplier, storage);
+        let ctx = BBandAnalyzer::new(strategy_config.period, strategy_config.multiplier, storage);
 
         Ok(BBandShortStrategy {
             config: strategy_config,
@@ -169,7 +168,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
             };
         info!("볼린저밴드 숏 전략 설정 로드됨: {:?}", config);
 
-        let ctx = BBandStrategyContext::new(config.period, config.multiplier, storage);
+        let ctx = BBandAnalyzer::new(config.period, config.multiplier, storage);
         Ok(BBandShortStrategy { config, ctx })
     }
 }

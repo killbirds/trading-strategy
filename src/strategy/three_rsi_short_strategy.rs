@@ -1,9 +1,9 @@
 use super::Strategy;
 use super::StrategyType;
-use super::context::StrategyContextOps;
 use super::three_rsi_common::{
-    ThreeRSIStrategyCommon, ThreeRSIStrategyConfigBase, ThreeRSIStrategyContext,
+    ThreeRSIAnalyzer, ThreeRSIStrategyCommon, ThreeRSIStrategyConfigBase,
 };
+use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -61,7 +61,7 @@ pub struct ThreeRSIShortStrategy<C: Candle> {
     /// 전략 설정
     config: ThreeRSIShortStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: ThreeRSIStrategyContext<C>,
+    ctx: ThreeRSIAnalyzer<C>,
 }
 
 impl<C: Candle> Display for ThreeRSIShortStrategy<C> {
@@ -95,7 +95,13 @@ impl<C: Candle + 'static> ThreeRSIShortStrategy<C> {
     ) -> Result<ThreeRSIShortStrategy<C>, String> {
         let config = ThreeRSIShortStrategyConfig::from_json(json_config)?;
         info!("세개 RSI 숏 전략 설정: {:?}", config);
-        let ctx = ThreeRSIStrategyContext::new(&config.base, storage);
+        let ctx = ThreeRSIAnalyzer::new(
+            &config.base.rsi_periods,
+            &config.base.ma,
+            config.base.ma_period,
+            config.base.adx_period,
+            storage,
+        );
 
         Ok(ThreeRSIShortStrategy { config, ctx })
     }
@@ -111,7 +117,13 @@ impl<C: Candle + 'static> ThreeRSIShortStrategy<C> {
         };
 
         info!("삼중 RSI 숏 전략 설정: {:?}", strategy_config);
-        let ctx = ThreeRSIStrategyContext::new(&strategy_config.base, storage);
+        let ctx = ThreeRSIAnalyzer::new(
+            &strategy_config.base.rsi_periods,
+            &strategy_config.base.ma,
+            strategy_config.base.ma_period,
+            strategy_config.base.adx_period,
+            storage,
+        );
 
         Ok(ThreeRSIShortStrategy {
             config: strategy_config,
@@ -181,7 +193,7 @@ impl<C: Candle + 'static> ThreeRSIShortStrategy<C> {
 }
 
 impl<C: Candle + 'static> ThreeRSIStrategyCommon<C> for ThreeRSIShortStrategy<C> {
-    fn context(&self) -> &ThreeRSIStrategyContext<C> {
+    fn context(&self) -> &ThreeRSIAnalyzer<C> {
         &self.ctx
     }
 }

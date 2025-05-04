@@ -13,9 +13,8 @@ use std::path::Path;
 use trading_chart::Candle;
 
 // 공통 모듈 가져오기
-use super::macd_common::{
-    MACDStrategyCommon, MACDStrategyConfigBase, MACDStrategyContext, StrategyContextOps,
-};
+use super::macd_common::{MACDAnalyzer, MACDStrategyCommon, MACDStrategyConfigBase};
+use crate::analyzer::base::AnalyzerOps;
 
 /// MACD 숏 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
@@ -98,7 +97,7 @@ pub struct MACDShortStrategy<C: Candle> {
     /// 전략 설정
     config: MACDShortStrategyConfig,
     /// 전략 컨텍스트 (데이터 보관 및 연산)
-    ctx: MACDStrategyContext<C>,
+    ctx: MACDAnalyzer<C>,
 }
 
 impl<C: Candle> Display for MACDShortStrategy<C> {
@@ -124,7 +123,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
         let config = MACDShortStrategyConfig::from_json(json_config)?;
         info!("MACD 숏 전략 설정: {:?}", config);
 
-        let ctx = MACDStrategyContext::new(
+        let ctx = MACDAnalyzer::new(
             config.fast_period,
             config.slow_period,
             config.signal_period,
@@ -146,7 +145,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
 
         info!("MACD 숏 전략 설정: {:?}", strategy_config);
 
-        let ctx = MACDStrategyContext::new(
+        let ctx = MACDAnalyzer::new(
             strategy_config.fast_period,
             strategy_config.slow_period,
             strategy_config.signal_period,
@@ -171,7 +170,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
         };
         info!("MACD 숏 전략 설정 로드됨: {:?}", config);
 
-        let ctx = MACDStrategyContext::new(
+        let ctx = MACDAnalyzer::new(
             config.fast_period,
             config.slow_period,
             config.signal_period,
@@ -183,7 +182,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
 }
 
 impl<C: Candle + 'static> MACDStrategyCommon<C> for MACDShortStrategy<C> {
-    fn context(&self) -> &MACDStrategyContext<C> {
+    fn context(&self) -> &MACDAnalyzer<C> {
         &self.ctx
     }
 
