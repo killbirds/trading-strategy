@@ -79,7 +79,7 @@ where
     /// # Returns
     /// * `EMA` - 계산된 EMA 지표
     pub fn from_storage(&mut self, storage: &CandleStore<C>) -> EMA {
-        self.build(&storage.get_reversed_items())
+        self.build(&storage.get_time_ordered_items())
     }
 
     /// 데이터 벡터에서 EMA 지표 생성
@@ -169,49 +169,34 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::TestCandle;
     use chrono::Utc;
-    use trading_chart::{CandleInterval, OhlcvCandle};
 
-    fn create_test_candles() -> Vec<OhlcvCandle> {
+    fn create_test_candles() -> Vec<TestCandle> {
         vec![
-            OhlcvCandle {
-                symbol: "TEST".to_string(),
-                interval: CandleInterval::Minute1,
-                open_time: Utc::now(),
-                close_time: Utc::now(),
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
                 open: 100.0,
                 high: 115.0,
                 low: 95.0,
                 close: 110.0,
-                quote_volume: 1000.0,
                 volume: 1000.0,
-                trade_count: None,
             },
-            OhlcvCandle {
-                symbol: "TEST".to_string(),
-                interval: CandleInterval::Minute1,
-                open_time: Utc::now(),
-                close_time: Utc::now(),
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
                 open: 110.0,
                 high: 125.0,
                 low: 105.0,
                 close: 120.0,
-                quote_volume: 1100.0,
                 volume: 1100.0,
-                trade_count: None,
             },
-            OhlcvCandle {
-                symbol: "TEST".to_string(),
-                interval: CandleInterval::Minute1,
-                open_time: Utc::now(),
-                close_time: Utc::now(),
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
                 open: 120.0,
                 high: 125.0,
                 low: 110.0,
                 close: 115.0,
-                quote_volume: 1200.0,
                 volume: 1200.0,
-                trade_count: None,
             },
         ]
     }
@@ -221,39 +206,82 @@ mod tests {
         let candles = create_test_candles();
         let mut builder = EMABuilder::new(2);
 
+        // 첫 번째 계산
         let ema = builder.build(&candles);
-        assert!(ema.get() > 0.0); // 실제 값은 구현에 따라 다를 수 있음
+        assert_eq!(ema.period(), 2);
+        assert!(ema.get() > 0.0);
 
-        let new_candle = OhlcvCandle {
-            symbol: "TEST".to_string(),
-            interval: CandleInterval::Minute1,
-            open_time: Utc::now(),
-            close_time: Utc::now(),
+        // 새 캔들로 업데이트
+        let new_candle = TestCandle {
+            timestamp: Utc::now().timestamp(),
             open: 115.0,
             high: 130.0,
             low: 115.0,
             close: 125.0,
-            quote_volume: 1300.0,
             volume: 1300.0,
-            trade_count: None,
         };
 
         let updated_ema = builder.next(&new_candle);
-        assert!(updated_ema.get() > ema.get()); // 상승 추세이므로 EMA도 증가해야 함
+        assert_eq!(updated_ema.period(), 2);
+        assert!(updated_ema.get() > 0.0);
     }
 
     #[test]
     #[should_panic(expected = "EMA 기간은 0보다 커야 합니다")]
     fn test_invalid_period() {
-        EMABuilder::<OhlcvCandle>::new(0); // 0 기간은 유효하지 않음
+        EMABuilder::<TestCandle>::new(0);
     }
 
     #[test]
     fn test_empty_data() {
-        let mut builder = EMABuilder::<OhlcvCandle>::new(5);
+        let mut builder = EMABuilder::<TestCandle>::new(5);
         let ema = builder.build(&[]);
 
-        assert_eq!(ema.get(), 0.0); // 비어있는 데이터는 0 반환
-        assert_eq!(ema.period(), 5); // 기간은 유지
+        assert_eq!(ema.get(), 0.0);
+        assert_eq!(ema.period(), 5);
+    }
+
+    #[test]
+    fn test_ema_display() {
+        let ema = EMA {
+            period: 5,
+            ema: 100.0,
+        };
+
+        let display_str = ema.to_string();
+        assert!(display_str.contains("EMA"));
+        assert!(display_str.contains("5"));
+        assert!(display_str.contains("100"));
+    }
+
+    #[test]
+    fn test_ema_trend() {
+        let mut builder = EMABuilder::new(2);
+
+        // 상승 추세 테스트
+        let up_candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 105.0,
+                high: 115.0,
+                low: 100.0,
+                close: 110.0,
+                volume: 1100.0,
+            },
+        ];
+
+        let ema1 = builder.build(&up_candles);
+        let ema2 = builder.next(&up_candles[1]);
+
+        // 상승 추세에서는 EMA 값이 증가해야 함
+        assert!(ema2.get() >= ema1.get());
     }
 }

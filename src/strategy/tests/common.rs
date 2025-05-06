@@ -1,8 +1,9 @@
 use crate::candle_store::CandleStore;
 use crate::model::TradePosition;
 use crate::strategy::Strategy;
+use crate::tests::TestCandle;
 use chrono::{TimeZone, Utc};
-use trading_chart::{Candle, CandleInterval, OhlcvCandle};
+use trading_chart::Candle;
 
 /// 테스트용 캔들 생성 함수
 ///
@@ -15,21 +16,16 @@ use trading_chart::{Candle, CandleInterval, OhlcvCandle};
 ///
 /// # 반환값
 ///
-/// * `OhlcvCandle` - 생성된 캔들 데이터
+/// * `TestCandle` - 생성된 캔들 데이터
 #[allow(dead_code)]
-pub fn create_test_candle(price: f64, timestamp: i64, volume: f64, market: &str) -> OhlcvCandle {
-    OhlcvCandle {
-        symbol: market.to_string(),
-        interval: CandleInterval::Minute1,
-        open_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
-        close_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
+pub fn create_test_candle(price: f64, timestamp: i64, volume: f64, market: &str) -> TestCandle {
+    TestCandle {
+        timestamp,
         open: price,
         high: price,
         low: price,
         close: price,
-        quote_volume: price * volume,
         volume,
-        trade_count: None,
     }
 }
 
@@ -43,12 +39,12 @@ pub fn create_test_candle(price: f64, timestamp: i64, volume: f64, market: &str)
 ///
 /// # 반환값
 ///
-/// * `CandleStore<OhlcvCandle>` - 생성된 캔들 스토리지
+/// * `CandleStore<TestCandle>` - 생성된 캔들 스토리지
 #[allow(dead_code)]
-pub fn create_test_storage(candles: Vec<OhlcvCandle>) -> CandleStore<OhlcvCandle> {
+pub fn create_test_storage(candles: Vec<TestCandle>) -> CandleStore<TestCandle> {
     let mut storage = CandleStore::new(Vec::new(), 1000, false);
     for candle in candles {
-        storage.insert(0, candle);
+        storage.add(candle);
     }
     storage
 }
@@ -65,31 +61,26 @@ pub fn create_test_storage(candles: Vec<OhlcvCandle>) -> CandleStore<OhlcvCandle
 ///
 /// # 반환값
 ///
-/// * `Vec<OhlcvCandle>` - 상승 트렌드 캔들 시퀀스
+/// * `Vec<TestCandle>` - 상승 트렌드 캔들 시퀀스
 #[allow(dead_code)]
 pub fn create_uptrend_candles(
     count: usize,
     base_price: f64,
     price_increment: f64,
-) -> Vec<OhlcvCandle> {
+) -> Vec<TestCandle> {
     let mut candles = Vec::with_capacity(count);
     let now = Utc::now();
 
     for i in 0..count {
         let price = base_price + (i as f64 * price_increment);
         let timestamp = now.timestamp() + (i as i64 * 60); // 1분 간격
-        let candle = OhlcvCandle {
-            symbol: "TEST".to_string(),
-            interval: CandleInterval::Minute1,
-            open_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
-            close_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
+        let candle = TestCandle {
+            timestamp,
             open: price - price_increment / 2.0,
             high: price + price_increment / 4.0,
             low: price - price_increment / 4.0,
             close: price,
-            quote_volume: price * 100.0,
             volume: 100.0,
-            trade_count: None,
         };
         candles.push(candle);
     }
@@ -109,31 +100,26 @@ pub fn create_uptrend_candles(
 ///
 /// # 반환값
 ///
-/// * `Vec<OhlcvCandle>` - 하락 트렌드 캔들 시퀀스
+/// * `Vec<TestCandle>` - 하락 트렌드 캔들 시퀀스
 #[allow(dead_code)]
 pub fn create_downtrend_candles(
     count: usize,
     base_price: f64,
     price_decrement: f64,
-) -> Vec<OhlcvCandle> {
+) -> Vec<TestCandle> {
     let mut candles = Vec::with_capacity(count);
     let now = Utc::now();
 
     for i in 0..count {
         let price = base_price - (i as f64 * price_decrement);
         let timestamp = now.timestamp() + (i as i64 * 60); // 1분 간격
-        let candle = OhlcvCandle {
-            symbol: "TEST".to_string(),
-            interval: CandleInterval::Minute1,
-            open_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
-            close_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
+        let candle = TestCandle {
+            timestamp,
             open: price + price_decrement / 2.0,
             high: price + price_decrement / 4.0,
             low: price - price_decrement / 4.0,
             close: price,
-            quote_volume: price * 100.0,
             volume: 100.0,
-            trade_count: None,
         };
         candles.push(candle);
     }
@@ -153,30 +139,23 @@ pub fn create_downtrend_candles(
 ///
 /// # 반환값
 ///
-/// * `Vec<OhlcvCandle>` - 횡보 트렌드 캔들 시퀀스
+/// * `Vec<TestCandle>` - 횡보 트렌드 캔들 시퀀스
 #[allow(dead_code)]
-pub fn create_sideways_candles(count: usize, base_price: f64, range: f64) -> Vec<OhlcvCandle> {
+pub fn create_sideways_candles(count: usize, base_price: f64, range: f64) -> Vec<TestCandle> {
     let mut candles = Vec::with_capacity(count);
     let now = Utc::now();
 
     for i in 0..count {
-        // 사인 곡선을 사용하여 가격 변동 생성
-        let angle = (i as f64 / count as f64) * std::f64::consts::PI * 4.0; // 2 사이클
-        let price = base_price + (angle.sin() * range);
+        let oscillation = (i % 3) as f64 * range / 3.0;
+        let price = base_price + oscillation;
         let timestamp = now.timestamp() + (i as i64 * 60); // 1분 간격
-
-        let candle = OhlcvCandle {
-            symbol: "TEST".to_string(),
-            interval: CandleInterval::Minute1,
-            open_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
-            close_time: Utc.timestamp_opt(timestamp, 0).unwrap(),
-            open: price - range / 10.0,
-            high: price + range / 5.0,
-            low: price - range / 5.0,
+        let candle = TestCandle {
+            timestamp,
+            open: price,
+            high: price + range / 4.0,
+            low: price - range / 4.0,
             close: price,
-            quote_volume: price * 100.0,
             volume: 100.0,
-            trade_count: None,
         };
         candles.push(candle);
     }

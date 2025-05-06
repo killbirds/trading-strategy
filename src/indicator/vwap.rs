@@ -101,9 +101,7 @@ pub struct VWAPBuilder<C: Candle> {
     /// VWAP 매개변수
     params: VWAPParams,
     /// 총 (가격 * 거래량) 값
-    cumulative_pv: f64,
-    /// 총 거래량
-    cumulative_volume: f64,
+    values: Vec<(f64, f64)>, // (typical_price, volume) 쌍을 저장
     _phantom: PhantomData<C>,
 }
 
@@ -119,10 +117,15 @@ where
     /// # Returns
     /// * `VWAPBuilder` - 새 빌더 인스턴스
     pub fn new(params: VWAPParams) -> Self {
-        VWAPBuilder {
+        let capacity = if params.period > 0 {
+            params.period * 2
+        } else {
+            100 // 기본 용량
+        };
+
+        Self {
             params,
-            cumulative_pv: 0.0,
-            cumulative_volume: 0.0,
+            values: Vec::with_capacity(capacity),
             _phantom: PhantomData,
         }
     }
@@ -135,7 +138,7 @@ where
     /// # Returns
     /// * `VWAP` - 계산된 VWAP
     pub fn from_storage(&mut self, storage: &CandleStore<C>) -> VWAP {
-        self.build(&storage.get_reversed_items())
+        self.build(&storage.get_time_ordered_items())
     }
 
     /// 데이터 벡터에서 VWAP 생성
@@ -146,10 +149,6 @@ where
     /// # Returns
     /// * `VWAP` - 계산된 VWAP
     pub fn build(&mut self, data: &[C]) -> VWAP {
-        // 상태 초기화
-        self.cumulative_pv = 0.0;
-        self.cumulative_volume = 0.0;
-
         if data.is_empty() {
             return VWAP {
                 params: self.params,
@@ -157,27 +156,34 @@ where
             };
         }
 
-        // 사용할 데이터 선택
-        let target_data = if self.params.period > 0 && data.len() > self.params.period {
-            &data[0..self.params.period]
-        } else {
-            data
-        };
-
-        for candle in target_data {
-            // 일반적으로 VWAP는 (high + low + close) / 3를 사용
-            let typical_price =
-                (candle.high_price() + candle.low_price() + candle.close_price()) / 3.0;
-            let volume = candle.acc_trade_volume();
-
-            self.cumulative_pv += typical_price * volume;
-            self.cumulative_volume += volume;
+        // 데이터를 values 배열에 저장
+        self.values.clear();
+        for item in data {
+            let typical_price = (item.high_price() + item.low_price() + item.close_price()) / 3.0;
+            self.values.push((typical_price, item.acc_trade_volume()));
         }
+
+        // 충분한 데이터가 없는 경우
+        if self.params.period > 0 && self.values.len() < self.params.period {
+            let (price, _) = *self.values.last().unwrap_or(&(0.0, 0.0));
+            return VWAP {
+                params: self.params,
+                value: price,
+            };
+        }
+
+        // VWAP 계산
+        let (cumulative_pv, cumulative_volume) = self
+            .values
+            .iter()
+            .fold((0.0, 0.0), |(pv, vol), (price, volume)| {
+                (pv + price * volume, vol + volume)
+            });
 
         VWAP {
             params: self.params,
-            value: if self.cumulative_volume > 0.0 {
-                self.cumulative_pv / self.cumulative_volume
+            value: if cumulative_volume > 0.0 {
+                cumulative_pv / cumulative_volume
             } else {
                 0.0
             },
@@ -192,17 +198,36 @@ where
     /// # Returns
     /// * `VWAP` - 업데이트된 VWAP
     pub fn next(&mut self, data: &C) -> VWAP {
-        // 일반적으로 VWAP는 (high + low + close) / 3를 사용
+        // 새 데이터 추가
         let typical_price = (data.high_price() + data.low_price() + data.close_price()) / 3.0;
-        let volume = data.acc_trade_volume();
+        self.values.push((typical_price, data.acc_trade_volume()));
 
-        self.cumulative_pv += typical_price * volume;
-        self.cumulative_volume += volume;
+        // 필요한 데이터만 유지
+        if self.params.period > 0 && self.values.len() > self.params.period * 2 {
+            let excess = self.values.len() - self.params.period * 2;
+            self.values.drain(0..excess);
+        }
+
+        // 충분한 데이터가 없는 경우
+        if self.params.period > 0 && self.values.len() < self.params.period {
+            return VWAP {
+                params: self.params,
+                value: typical_price,
+            };
+        }
+
+        // VWAP 계산
+        let (cumulative_pv, cumulative_volume) = self
+            .values
+            .iter()
+            .fold((0.0, 0.0), |(pv, vol), (price, volume)| {
+                (pv + price * volume, vol + volume)
+            });
 
         VWAP {
             params: self.params,
-            value: if self.cumulative_volume > 0.0 {
-                self.cumulative_pv / self.cumulative_volume
+            value: if cumulative_volume > 0.0 {
+                cumulative_pv / cumulative_volume
             } else {
                 0.0
             },
@@ -211,8 +236,7 @@ where
 
     /// VWAP 리셋 (일일 계산에 사용)
     pub fn reset(&mut self) {
-        self.cumulative_pv = 0.0;
-        self.cumulative_volume = 0.0;
+        self.values.clear();
     }
 }
 

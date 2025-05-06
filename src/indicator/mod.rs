@@ -128,17 +128,17 @@ where
             .unwrap_or_else(|| panic!("키가 존재하지 않습니다: {:?}", key))
     }
 
-    /// 인덱스로 값 참조 반환
+    /// 인덱스로 키를 찾고, 해당 키로 데이터를 가져옵니다.
     ///
     /// # Arguments
-    /// * `index` - 검색할 인덱스
+    /// * `index` - 키를 찾을 인덱스
     ///
     /// # Returns
-    /// * `&T` - 찾은 값 참조
+    /// * `&T` - 해당 인덱스의 키로 찾은 데이터 참조
     ///
     /// # Panics
-    /// 인덱스가 범위를 벗어난 경우 패닉 발생
-    pub fn get_from_index(&self, index: usize) -> &T {
+    /// * 인덱스가 범위를 벗어난 경우
+    pub fn get_by_key_index(&self, index: usize) -> &T {
         if let Some(key) = &self.keys.get(index) {
             self.get(key)
         } else {
@@ -305,7 +305,7 @@ where
     /// # Returns
     /// * `TAs<K, T>` - 생성된 기술적 지표 컬렉션
     pub fn from_storage(&mut self, storage: &CandleStore<C>) -> TAs<K, T> {
-        self.build(&storage.get_reversed_items())
+        self.build(&storage.get_time_ordered_items())
     }
 
     /// 데이터에서 기술적 지표 컬렉션 생성

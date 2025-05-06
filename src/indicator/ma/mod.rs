@@ -126,3 +126,73 @@ impl MAsBuilderFactory {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestCandle;
+    use chrono::Utc;
+    
+
+    fn create_test_candles() -> Vec<TestCandle> {
+        vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 125.0,
+                low: 105.0,
+                close: 120.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 120.0,
+                high: 125.0,
+                low: 110.0,
+                close: 115.0,
+                volume: 1200.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_ma_trait_implementation() {
+        let candles = create_test_candles();
+
+        // EMA 테스트
+        let mut ema_builder = EMABuilder::new(2);
+        let ema = ema_builder.build(&candles);
+        assert_eq!(ema.period(), 2);
+        assert!(ema.get() > 0.0);
+        assert!(ema.to_string().contains("EMA"));
+
+        // SMA 테스트
+        let mut sma_builder = SMABuilder::new(2);
+        let sma = sma_builder.build(&candles);
+        assert_eq!(sma.period(), 2);
+        assert!(sma.get() > 0.0);
+        assert!(sma.to_string().contains("SMA"));
+
+        // WMA 테스트
+        let mut wma_builder = WMABuilder::new(2);
+        let wma = wma_builder.build(&candles);
+        assert_eq!(wma.period(), 2);
+        assert!(wma.get() > 0.0);
+        assert!(wma.to_string().contains("WMA"));
+    }
+
+    #[test]
+    fn test_ma_type_display() {
+        assert_eq!(MAType::EMA.to_string(), "EMA");
+        assert_eq!(MAType::SMA.to_string(), "SMA");
+        assert_eq!(MAType::WMA.to_string(), "WMA");
+    }
+}

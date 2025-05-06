@@ -105,7 +105,7 @@ impl<C: Candle + 'static> VWAPAnalyzer<C> {
             params: params.to_vec(),
             items: vec![],
         };
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 

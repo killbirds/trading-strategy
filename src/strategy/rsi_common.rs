@@ -190,7 +190,7 @@ pub trait RSIStrategyCommon<C: Candle + 'static>: Strategy<C> {
             .items
             .iter()
             .take(self.config_rsi_count())
-            .all(|item| item.rsi.rsi > self.config_rsi_upper())
+            .all(|item| item.rsi.value > self.config_rsi_upper())
     }
 
     /// RSI가 과매도 영역인지 확인
@@ -204,6 +204,6 @@ pub trait RSIStrategyCommon<C: Candle + 'static>: Strategy<C> {
             .items
             .iter()
             .take(self.config_rsi_count())
-            .all(|item| item.rsi.rsi < self.config_rsi_lower())
+            .all(|item| item.rsi.value < self.config_rsi_lower())
     }
 }

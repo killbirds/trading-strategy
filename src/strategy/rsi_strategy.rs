@@ -187,7 +187,7 @@ impl<C: Candle + 'static> RSIStrategy<C> {
             .items
             .iter()
             .take(self.config.rsi_count)
-            .all(|item| item.rsi.rsi > self.config.rsi_upper)
+            .all(|item| item.rsi.value > self.config.rsi_upper)
     }
 
     /// RSI가 과매도 영역인지 확인
@@ -201,7 +201,7 @@ impl<C: Candle + 'static> RSIStrategy<C> {
             .items
             .iter()
             .take(self.config.rsi_count)
-            .all(|item| item.rsi.rsi < self.config.rsi_lower)
+            .all(|item| item.rsi.value < self.config.rsi_lower)
     }
 }
 

@@ -73,7 +73,7 @@ where
     /// # Returns
     /// * `Volume` - 계산된 볼륨 지표
     pub fn from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
-        self.build(&storage.get_reversed_items())
+        self.build(&storage.get_time_ordered_items())
     }
 
     /// 데이터 벡터에서 볼륨 지표 생성
@@ -232,5 +232,124 @@ impl VolumesBuilderFactory {
     pub fn build_common<C: Candle + 'static>() -> VolumesBuilder<C> {
         let common_periods = vec![10, 20, 50];
         Self::build(&common_periods)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestCandle;
+    use chrono::Utc;
+    
+
+    fn create_test_candles() -> Vec<TestCandle> {
+        vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 120.0,
+                low: 100.0,
+                close: 115.0,
+                volume: 1200.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_volume_builder_new() {
+        let builder = VolumeBuilder::<TestCandle>::new(20);
+        assert_eq!(builder.period, 20);
+    }
+
+    #[test]
+    #[should_panic(expected = "볼륨 계산 기간은 0보다 커야 합니다")]
+    fn test_volume_builder_new_invalid_period() {
+        VolumeBuilder::<TestCandle>::new(0);
+    }
+
+    #[test]
+    fn test_volume_build_empty_data() {
+        let mut builder = VolumeBuilder::<TestCandle>::new(20);
+        let volume = builder.build(&[]);
+        assert_eq!(volume.period, 20);
+        assert_eq!(volume.average_volume, 0.0);
+        assert_eq!(volume.current_volume, 0.0);
+        assert_eq!(volume.volume_ratio, 1.0); // 기본값
+    }
+
+    #[test]
+    fn test_volume_build_with_data() {
+        let mut builder = VolumeBuilder::<TestCandle>::new(3);
+        let candles = create_test_candles();
+        let volume = builder.build(&candles);
+
+        assert_eq!(volume.period, 3);
+        assert_eq!(volume.average_volume, 1100.0); // (1000 + 1100 + 1200) / 3
+        assert_eq!(volume.current_volume, 1200.0); // 마지막 캔들의 거래량
+        assert!(volume.volume_ratio > 1.0); // 현재 거래량이 평균보다 높음
+    }
+
+    #[test]
+    fn test_volume_next() {
+        let mut builder = VolumeBuilder::<TestCandle>::new(3);
+        let candles = create_test_candles();
+        let volume = builder.next(&candles[0]);
+
+        assert_eq!(volume.period, 3);
+        assert_eq!(volume.average_volume, 1000.0); // 첫 번째 캔들만 있음
+        assert_eq!(volume.current_volume, 1000.0);
+        assert_eq!(volume.volume_ratio, 1.0); // 현재 = 평균
+    }
+
+    #[test]
+    fn test_volume_display() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 1200.0,
+            volume_ratio: 1.2,
+        };
+
+        assert_eq!(
+            format!("{}", volume),
+            "Volume(20: avg=1000.00, current=1200.00, ratio=1.20)"
+        );
+    }
+
+    #[test]
+    fn test_volume_data_buffer() {
+        let mut builder = VolumeBuilder::<TestCandle>::new(2);
+        let candles = create_test_candles();
+
+        // 첫 번째 데이터
+        let vol1 = builder.next(&candles[0]);
+        assert_eq!(vol1.average_volume, 1000.0);
+        assert_eq!(vol1.current_volume, 1000.0);
+
+        // 두 번째 데이터
+        let vol2 = builder.next(&candles[1]);
+        assert_eq!(vol2.average_volume, 1050.0); // (1000 + 1100) / 2
+        assert_eq!(vol2.current_volume, 1100.0);
+
+        // 세 번째 데이터 (첫 번째 데이터가 제거됨)
+        let vol3 = builder.next(&candles[2]);
+        assert_eq!(vol3.average_volume, 1150.0); // (1100 + 1200) / 2
+        assert_eq!(vol3.current_volume, 1200.0);
     }
 }

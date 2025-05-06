@@ -204,8 +204,8 @@ impl<C: Candle + 'static> Strategy<C> for MAStrategy<C> {
     fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
         // 단기 이동평균이 장기 이동평균보다 낮아질 때(데드 크로스) 롱 청산
         self.check_cross_condition(|data| {
-            let short_ma = data.mas.get_from_index(0).get();
-            let long_ma = data.mas.get_from_index(2).get();
+            let short_ma = data.mas.get_by_key_index(0).get();
+            let long_ma = data.mas.get_by_key_index(2).get();
             short_ma < long_ma
         })
     }

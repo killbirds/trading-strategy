@@ -64,7 +64,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
             masbuilder,
             items: vec![],
         };
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 
@@ -80,7 +80,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
                 data.is_less_than_target(
                     |data| {
                         data.get_rate_of_return(|data| {
-                            let ma = data.mas.get_from_index(index);
+                            let ma = data.mas.get_by_key_index(index);
                             ma.get()
                         })
                     },
@@ -103,7 +103,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
                 data.is_greater_than_target(
                     |data| {
                         data.get_rate_of_return(|data| {
-                            let ma = data.mas.get_from_index(index);
+                            let ma = data.mas.get_by_key_index(index);
                             ma.get()
                         })
                     },
@@ -136,7 +136,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
 
     /// 특정 인덱스의 이동평균 값 반환
     pub fn get_ma(&self, index: usize) -> f64 {
-        self.get(0, |data| data.mas.get_from_index(index).get())
+        self.get_value(0, |data| data.mas.get_by_key_index(index).get())
     }
 
     /// 단기와 장기 이동평균의 교차 여부 확인
@@ -148,10 +148,10 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
         let current = &self.items[0];
         let previous = &self.items[1];
 
-        let current_short = current.mas.get_from_index(short_index).get();
-        let current_long = current.mas.get_from_index(long_index).get();
-        let previous_short = previous.mas.get_from_index(short_index).get();
-        let previous_long = previous.mas.get_from_index(long_index).get();
+        let current_short = current.mas.get_by_key_index(short_index).get();
+        let current_long = current.mas.get_by_key_index(long_index).get();
+        let previous_short = previous.mas.get_by_key_index(short_index).get();
+        let previous_long = previous.mas.get_by_key_index(long_index).get();
 
         (current_short > current_long) != (previous_short > previous_long)
     }

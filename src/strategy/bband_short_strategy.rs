@@ -150,7 +150,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
     /// 밴드 폭이 충분히 넓은지 확인
     fn is_band_width_sufficient(&self) -> bool {
         self.ctx.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.average(),
+            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
             0.02,
             1,
         )

@@ -238,7 +238,7 @@ impl<C: Candle + 'static> BBandStrategy<C> {
     /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
     fn is_above_middle_band(&self) -> bool {
         if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() > first.bband.average()
+            first.candle.close_price() > first.bband.middle()
         } else {
             false
         }
@@ -247,7 +247,7 @@ impl<C: Candle + 'static> BBandStrategy<C> {
     /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
     fn is_below_middle_band(&self) -> bool {
         if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() < first.bband.average()
+            first.candle.close_price() < first.bband.middle()
         } else {
             false
         }
@@ -256,7 +256,7 @@ impl<C: Candle + 'static> BBandStrategy<C> {
     /// 밴드 폭이 충분히 넓은지 확인
     fn is_band_width_sufficient(&self) -> bool {
         self.ctx.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.average(),
+            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
             0.02,
             1,
         )

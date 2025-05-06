@@ -1,6 +1,6 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
-use crate::indicator::bband::{BBand, BBandBuilder};
+use crate::indicator::bband::{BollingerBands, BollingerBandsBuilder};
 use std::fmt::Display;
 use trading_chart::Candle;
 
@@ -10,12 +10,12 @@ pub struct BBandAnalyzerData<C: Candle> {
     /// 현재 캔들 데이터
     pub candle: C,
     /// 볼린저 밴드
-    pub bband: BBand,
+    pub bband: BollingerBands,
 }
 
 impl<C: Candle> BBandAnalyzerData<C> {
     /// 새 분석기 데이터 생성
-    pub fn new(candle: C, bband: BBand) -> BBandAnalyzerData<C> {
+    pub fn new(candle: C, bband: BollingerBands) -> BBandAnalyzerData<C> {
         BBandAnalyzerData { candle, bband }
     }
 }
@@ -32,7 +32,7 @@ impl<C: Candle> AnalyzerDataOps<C> for BBandAnalyzerData<C> {}
 #[derive(Debug)]
 pub struct BBandAnalyzer<C: Candle> {
     /// 볼린저 밴드 빌더
-    pub bbandbuilder: BBandBuilder<C>,
+    pub bbandbuilder: BollingerBandsBuilder<C>,
     /// 분석기 데이터 히스토리 (최신 데이터가 인덱스 0)
     pub items: Vec<BBandAnalyzerData<C>>,
 }
@@ -45,7 +45,7 @@ impl<C: Candle> Display for BBandAnalyzer<C> {
                 "캔들: {}, 밴드: {{상: {:.2}, 중: {:.2}, 하: {:.2}}}",
                 first.candle,
                 first.bband.upper(),
-                first.bband.average(),
+                first.bband.middle(),
                 first.bband.lower()
             ),
             None => write!(f, "데이터 없음"),
@@ -56,14 +56,21 @@ impl<C: Candle> Display for BBandAnalyzer<C> {
 impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// 새 분석기 컨텍스트 생성
     pub fn new(period: usize, multiplier: f64, storage: &CandleStore<C>) -> BBandAnalyzer<C> {
-        let bbandbuilder = BBandBuilder::new(period, multiplier);
+        let bbandbuilder = BollingerBandsBuilder::new(period, multiplier);
         let mut ctx = BBandAnalyzer {
             bbandbuilder,
             items: vec![],
         };
 
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
+    }
+
+    pub fn get_bband(&self) -> (f64, f64, f64) {
+        match self.items.first() {
+            Some(data) => (data.bband.lower(), data.bband.middle(), data.bband.upper()),
+            None => (0.0, 0.0, 0.0),
+        }
     }
 
     /// 가격이 볼린저 밴드 하한선 아래로 내려갔는지 확인
@@ -87,7 +94,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
     pub fn is_above_middle_band(&self) -> bool {
         if let Some(first) = self.items.first() {
-            first.candle.close_price() > first.bband.average()
+            first.candle.close_price() > first.bband.middle()
         } else {
             false
         }
@@ -96,7 +103,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
     pub fn is_below_middle_band(&self) -> bool {
         if let Some(first) = self.items.first() {
-            first.candle.close_price() < first.bband.average()
+            first.candle.close_price() < first.bband.middle()
         } else {
             false
         }
@@ -105,7 +112,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// 밴드 폭이 충분히 넓은지 확인
     pub fn is_band_width_sufficient(&self) -> bool {
         self.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.average(),
+            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
             0.02,
             1,
         )

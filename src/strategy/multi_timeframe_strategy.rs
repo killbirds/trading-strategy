@@ -237,7 +237,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
     fn next(&mut self, candle: C) {
         // 저장소에 캔들 추가
-        self.storage.insert(0, candle.clone());
+        self.storage.add(candle.clone());
 
         // 각 전략에 캔들 데이터 전달
         for strategy in self.strategies.values_mut() {

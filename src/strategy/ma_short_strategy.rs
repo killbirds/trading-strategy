@@ -179,8 +179,11 @@ impl<C: Candle + 'static> Strategy<C> for MAShortStrategy<C> {
     fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
         // 단기 이동평균이 장기 이동평균보다 높아질 때(골든 크로스) 숏 청산
         self.check_cross_condition(|data| {
-            let short_ma = data.mas.get_from_index(0).get();
-            let long_ma = data.mas.get_from_index(data.mas.get_keys().len() - 1).get();
+            let short_ma = data.mas.get_by_key_index(0).get();
+            let long_ma = data
+                .mas
+                .get_by_key_index(data.mas.get_keys().len() - 1)
+                .get();
             short_ma > long_ma
         })
     }

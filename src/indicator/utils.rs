@@ -1,8 +1,7 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::adx;
 use crate::indicator::adx::ADXsBuilderFactory;
-use crate::indicator::bband;
-use crate::indicator::bband::BBandBuilder;
+use crate::indicator::bband::{BollingerBands, BollingerBandsBuilder};
 use crate::indicator::ichimoku;
 use crate::indicator::ichimoku::IchimokusBuilderFactory;
 use crate::indicator::ma;
@@ -34,7 +33,7 @@ pub struct TechnicalAnalysisResult {
     /// 평균방향지수 (ADX)
     pub adxs: TAs<usize, adx::ADX>,
     /// 볼린저밴드 (BBand)
-    pub bbands: TAs<usize, bband::BBand>,
+    pub bbands: TAs<usize, BollingerBands>,
     /// 이동평균수렴발산 (MACD)
     pub macds: TAs<MACDParams, macd::MACD>,
     /// 최대값 (MAX)
@@ -72,9 +71,9 @@ mod factories {
     /// 볼린저밴드 빌더 생성
     pub fn build_bband_builders<C: Candle + 'static>(
         periods: &[usize],
-    ) -> TAsBuilder<usize, bband::BBand, C> {
+    ) -> TAsBuilder<usize, BollingerBands, C> {
         TAsBuilder::new("bbands".to_owned(), periods, |period| {
-            Box::new(BBandBuilder::<C>::new(*period, 2.0))
+            Box::new(BollingerBandsBuilder::<C>::new(*period, 2.0))
         })
     }
 }
@@ -93,7 +92,7 @@ pub struct TechnicalAnalysisBuilder<C: Candle> {
     /// ADX 빌더
     adx_builder: TAsBuilder<usize, adx::ADX, C>,
     /// 볼린저밴드 빌더
-    bband_builder: TAsBuilder<usize, bband::BBand, C>,
+    bband_builder: TAsBuilder<usize, BollingerBands, C>,
     /// MACD 빌더
     macd_builder: TAsBuilder<MACDParams, macd::MACD, C>,
     /// MAX 빌더
@@ -254,7 +253,7 @@ pub fn quick_analysis<C: Candle>(data: &[C], period: usize) -> (f64, f64, f64) {
     let ema = ema_builder.build(data);
     let rsi = rsi_builder.build(data);
 
-    (sma.get(), ema.get(), rsi.rsi)
+    (sma.get(), ema.get(), rsi.value)
 }
 
 /// 캔들 데이터에서 급격한 가격 변동 감지

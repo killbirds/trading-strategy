@@ -5,6 +5,7 @@ use trading_chart::Candle;
 ///
 /// 지정된 최대 크기를 유지하며 데이터를 저장하는 구조체입니다.
 /// 최대 크기를 초과하면 가장 오래된 데이터가 자동으로 제거됩니다.
+/// 데이터는 datetime 기준으로 내림차순 정렬되어 저장됩니다 (최신 데이터가 먼저 옴).
 pub struct CandleStore<T: Candle> {
     items: Vec<T>,
     pub max_size: usize,
@@ -36,39 +37,45 @@ where
     ///
     /// # Returns
     /// * `CandleStore<T>` - 생성된 저장소 인스턴스
-    pub fn new(items: Vec<T>, max_size: usize, use_duplicated_filter: bool) -> CandleStore<T> {
+    pub fn new(mut items: Vec<T>, max_size: usize, use_duplicated_filter: bool) -> CandleStore<T> {
+        // datetime 기준으로 내림차순 정렬 (최신 데이터가 먼저 오도록)
+        items.sort_by(|a, b| b.datetime().cmp(&a.datetime()));
+
+        // 최대 크기를 초과하는 아이템들 제거
+        if items.len() > max_size {
+            items.truncate(max_size);
+        }
+
         // 최대 크기를 초과하는 아이템은 제거
-        let mut storage = CandleStore {
+        CandleStore {
             items,
             max_size,
             use_duplicated_filter,
-        };
-
-        // 최대 크기를 초과하는 아이템들 제거
-        if storage.items.len() > storage.max_size {
-            storage.items.truncate(storage.max_size);
         }
-
-        storage
     }
 
-    /// 지정된 위치에 데이터를 삽입합니다.
+    /// 데이터를 datetime 기준으로 내림차순 정렬하여 삽입합니다.
     ///
     /// 이미 저장소가 최대 크기에 도달했다면, 가장 오래된 데이터가 제거됩니다.
     /// 중복 필터링이 활성화된 경우, 이미 같은 데이터가 있으면 삽입하지 않습니다.
     ///
     /// # Arguments
-    /// * `index` - 삽입할 위치
     /// * `data` - 삽입할 데이터
-    pub fn insert(&mut self, index: usize, data: T) {
+    pub fn add(&mut self, data: T) {
         // 중복 필터링이 활성화되고 첫 번째 아이템과 동일하면 무시
         if self.use_duplicated_filter && !self.items.is_empty() && is_same_item(&self.items, &data)
         {
             return;
         }
 
+        // datetime 기준으로 내림차순 정렬된 위치 찾기
+        let insert_idx = self
+            .items
+            .binary_search_by(|item| data.datetime().cmp(&item.datetime()))
+            .unwrap_or_else(|idx| idx);
+
         // 데이터 삽입
-        self.items.insert(index, data);
+        self.items.insert(insert_idx, data);
 
         // 최대 크기 초과 시 초과분 제거 (truncate 사용으로 최적화)
         if self.items.len() > self.max_size {
@@ -165,11 +172,11 @@ where
         true
     }
 
-    /// 저장된 캔들을 역순으로 복제하여 반환합니다.
+    /// 저장된 캔들을 시간 순서대로 정렬하여 반환합니다.
     ///
     /// # Returns
-    /// * `Vec<Candle>` - 역순으로 정렬된 캔들 목록
-    pub fn get_reversed_items(&self) -> Vec<T> {
+    /// * `Vec<Candle>` - 시간 순서로 정렬된 캔들 목록
+    pub fn get_time_ordered_items(&self) -> Vec<T> {
         let mut items = self.items.clone();
         items.reverse();
         items

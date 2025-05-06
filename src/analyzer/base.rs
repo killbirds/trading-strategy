@@ -1,4 +1,4 @@
-use crate::indicator::TAs;
+use crate::{candle_store::CandleStore, indicator::TAs};
 use std::hash::Hash;
 use trading_chart::Candle;
 
@@ -271,12 +271,20 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// 전략 데이터 컬렉션 가변 참조 반환
     fn datum_mut(&mut self) -> &mut Vec<Data>;
 
+    fn get(&self, index: usize) -> Option<&Data> {
+        self.datum().get(index)
+    }
+
     /// 초기 캔들 데이터로 컨텍스트 초기화
     ///
     /// # Arguments
     /// * `items` - 초기화할 캔들 데이터 컬렉션
     fn init(&mut self, items: Vec<C>) {
         items.into_iter().for_each(|item| self.next(item));
+    }
+
+    fn init_from_storage(&mut self, storage: &CandleStore<C>) {
+        self.init(storage.get_time_ordered_items())
     }
 
     /// 특정 인덱스의 데이터에서 값 추출
@@ -290,8 +298,8 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     ///
     /// # Panics
     /// * 인덱스가 범위를 벗어나면 패닉 발생
-    fn get(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
-        self.datum().get(index).map(get_value).unwrap()
+    fn get_value(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
+        self.get(index).map(get_value).unwrap()
     }
 
     /// 특정 인덱스 데이터의 수익률 계산
@@ -780,5 +788,98 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
             |data| data.is_reverse_arrangement::<K, T>(&get, &get_value),
             n,
         )
+    }
+
+    /// 최근 n개 캔들 중에서 매수 시그널이 있는지 확인
+    ///
+    /// # Arguments
+    /// * `signal_fn` - 각 데이터에서 매수 시그널이 있는지 확인하는 함수
+    /// * `n` - 검사할 캔들 수
+    /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
+    ///
+    /// # Returns
+    /// * `Option<usize>` - 매수 시그널이 있는 캔들의 인덱스 (없으면 None)
+    fn detect_buy_signal(
+        &self,
+        signal_fn: impl Fn(&Data) -> f64,
+        n: usize,
+        threshold: f64,
+    ) -> Option<usize> {
+        let data = self.datum();
+        if data.len() < n {
+            return None;
+        }
+
+        (0..n.min(data.len())).find(|&i| signal_fn(&data[i]) >= threshold)
+    }
+
+    /// 최근 n개 캔들 중에서 매도 시그널이 있는지 확인
+    ///
+    /// # Arguments
+    /// * `signal_fn` - 각 데이터에서 매도 시그널이 있는지 확인하는 함수
+    /// * `n` - 검사할 캔들 수
+    /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
+    ///
+    /// # Returns
+    /// * `Option<usize>` - 매도 시그널이 있는 캔들의 인덱스 (없으면 None)
+    fn detect_sell_signal(
+        &self,
+        signal_fn: impl Fn(&Data) -> f64,
+        n: usize,
+        threshold: f64,
+    ) -> Option<usize> {
+        let data = self.datum();
+        if data.len() < n {
+            return None;
+        }
+
+        (0..n.min(data.len())).find(|&i| signal_fn(&data[i]) >= threshold)
+    }
+
+    /// 특정 패턴의 시그널을 감지 (범용 패턴 감지)
+    ///
+    /// # Arguments
+    /// * `conditions` - 조건 함수들의 벡터 (각 함수는 특정 조건이 만족하는지 확인)
+    /// * `n` - 검사할 캔들 수
+    ///
+    /// # Returns
+    /// * `bool` - 모든 조건이 충족되면 true
+    fn detect_pattern(&self, conditions: Vec<impl Fn(&Data) -> bool>, n: usize) -> bool {
+        let data = self.datum();
+        if data.len() < n {
+            return false;
+        }
+
+        conditions
+            .iter()
+            .all(|cond| (0..n.min(data.len())).any(|i| cond(&data[i])))
+    }
+
+    /// 지정된 기간 동안 거래량이 급증했는지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 검사할 캔들 수
+    /// * `threshold` - 평균 대비 거래량 증가 비율 (예: 2.0은 평균의 2배)
+    ///
+    /// # Returns
+    /// * `bool` - 거래량 급증이 감지되면 true
+    fn is_volume_spike(&self, n: usize, threshold: f64) -> bool {
+        let data = self.datum();
+        if data.len() <= n {
+            return false;
+        }
+
+        // 최근 n개를 제외한 캔들들의 평균 거래량 계산
+        let avg_volume: f64 = data
+            .iter()
+            .skip(n)
+            .map(|d| d.candle().acc_trade_volume())
+            .sum::<f64>()
+            / (data.len() - n) as f64;
+
+        // 최근 n개 캔들 중 하나라도 평균의 threshold배 이상인지 확인
+        data.iter()
+            .take(n)
+            .any(|d| d.candle().acc_trade_volume() > avg_volume * threshold)
     }
 }

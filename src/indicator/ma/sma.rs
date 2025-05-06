@@ -48,7 +48,7 @@ where
     }
 
     pub fn from_storage(&mut self, storage: &CandleStore<C>) -> SMA {
-        self.build(&storage.get_reversed_items())
+        self.build(&storage.get_time_ordered_items())
     }
 
     pub fn build(&mut self, data: &[C]) -> SMA {
@@ -118,5 +118,88 @@ where
 
     fn next(&mut self, data: &C) -> Box<dyn MA> {
         Box::new(self.next(data))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestCandle;
+    use chrono::Utc;
+
+    fn create_test_candles() -> Vec<TestCandle> {
+        vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 125.0,
+                low: 105.0,
+                close: 120.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 120.0,
+                high: 125.0,
+                low: 110.0,
+                close: 115.0,
+                volume: 1200.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_sma_calculation() {
+        let candles = create_test_candles();
+        let mut builder = SMABuilder::new(2);
+
+        // 첫 번째 계산
+        let sma = builder.build(&candles);
+        assert_eq!(sma.period(), 2);
+        assert!(sma.get() > 0.0);
+
+        // 새 캔들로 업데이트
+        let new_candle = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 115.0,
+            high: 130.0,
+            low: 115.0,
+            close: 125.0,
+            volume: 1300.0,
+        };
+
+        let updated_sma = builder.next(&new_candle);
+        assert_eq!(updated_sma.period(), 2);
+        assert!(updated_sma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_empty_data() {
+        let mut builder = SMABuilder::<TestCandle>::new(5);
+        let sma = builder.build(&[]);
+
+        assert_eq!(sma.get(), 0.0);
+        assert_eq!(sma.period(), 5);
+    }
+
+    #[test]
+    fn test_sma_display() {
+        let sma = SMA {
+            period: 5,
+            sma: 100.0,
+        };
+
+        let display_str = sma.to_string();
+        assert!(display_str.contains("SMA"));
+        assert!(display_str.contains("5"));
+        assert!(display_str.contains("100"));
     }
 }

@@ -139,117 +139,181 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             items: vec![],
         };
 
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 
     /// 매수 신호 강도 계산
+    ///
+    /// # Arguments
+    /// * `rsi_lower` - RSI 과매도 기준값 (예: 30)
+    ///
+    /// # Returns
+    /// * `f64` - 0.0(신호 없음)에서 1.0(강한 신호) 사이의 매수 신호 강도
     pub fn calculate_buy_signal_strength(&self, rsi_lower: f64) -> f64 {
-        if self.items.len() < 2 {
+        if self.items.len() < 3 {
             return 0.0;
         }
 
-        let current = self.items.last().unwrap();
-        let previous = &self.items[self.items.len() - 2];
+        let current = &self.items[0];
+        let previous = &self.items[1];
+        let before_previous = &self.items[2];
 
-        let mut strength = 0.0;
-        let mut count = 0.0;
+        // 가중치 정의
+        const MA_WEIGHT: f64 = 0.25; // 이동평균 기준 신호 가중치
+        const PRICE_MOMENTUM_WEIGHT: f64 = 0.1; // 가격 모멘텀 가중치 
+        const MACD_CROSS_WEIGHT: f64 = 0.3; // MACD 골든크로스 가중치
+        const MACD_HIST_WEIGHT: f64 = 0.15; // MACD 히스토그램 가중치
+        const RSI_WEIGHT: f64 = 0.2; // RSI 가중치
 
-        // 1. 이동평균선 기반 신호
+        let mut signal_strength = 0.0;
+
+        // 1. 이동평균선 기반 신호 (가격이 이동평균선 위에 있는지, 상승추세인지)
         if current.candle.close_price() > current.ma.get() {
-            strength += 1.0;
-            count += 1.0;
+            // 가격이 이동평균 위에 있음 (상승추세 가능성)
+            signal_strength += MA_WEIGHT * 0.6;
+
+            // 이동평균선 자체가 상승 중인지 확인
+            if current.ma.get() > previous.ma.get() {
+                signal_strength += MA_WEIGHT * 0.4;
+            }
         }
 
-        // 2. MACD 기반 신호
-        if current.macd.histogram > 0.0 && previous.macd.histogram < 0.0 {
-            // MACD 히스토그램이 0선을 상향 돌파 (강한 매수 신호)
-            strength += 2.0;
-            count += 1.0;
-        } else if current.macd.histogram > 0.0 {
-            // MACD 히스토그램이 0선 위에 있음 (약한 매수 신호)
-            strength += 0.5;
-            count += 1.0;
+        // 2. 가격 모멘텀 확인 (최근 캔들들의 연속적인 상승)
+        if current.candle.close_price() > previous.candle.close_price()
+            && previous.candle.close_price() > before_previous.candle.close_price()
+        {
+            signal_strength += PRICE_MOMENTUM_WEIGHT;
         }
 
-        // 3. RSI 기반 신호
+        // 3. MACD 기반 신호
+        if current.macd.macd_line > current.macd.signal_line
+            && previous.macd.macd_line <= previous.macd.signal_line
+        {
+            // 골든 크로스 (강한 매수 신호)
+            signal_strength += MACD_CROSS_WEIGHT;
+        }
+
+        // MACD 히스토그램 분석
+        if current.macd.histogram > 0.0 {
+            // 히스토그램이 양수 (상승 추세)
+            let histogram_factor =
+                (current.macd.histogram / current.candle.close_price().abs()).min(0.05) * 20.0;
+            signal_strength += MACD_HIST_WEIGHT * histogram_factor.min(1.0);
+
+            // 히스토그램이 증가 중인지 확인 (모멘텀 가속)
+            if current.macd.histogram > previous.macd.histogram {
+                signal_strength += MACD_HIST_WEIGHT * 0.5;
+            }
+        }
+
+        // 4. RSI 기반 신호
         let rsi = current.rsi.value();
-        if rsi < rsi_lower && rsi > previous.rsi.value() {
-            // RSI가 과매도 상태에서 반등 (강한 매수 신호)
-            strength += 2.0;
-            count += 1.0;
-        } else if rsi > rsi_lower && rsi < 50.0 {
-            // RSI가 과매도 상태를 벗어나 상승 중 (약한 매수 신호)
-            strength += 0.5;
-            count += 1.0;
+
+        if rsi < rsi_lower {
+            // 과매도 상태 (강한 매수 신호)
+            signal_strength += RSI_WEIGHT * (1.0 - rsi / rsi_lower);
+        } else if rsi < 45.0 && rsi > previous.rsi.value() {
+            // RSI가 낮은 상태에서 반등 중 (적절한 매수 신호)
+            signal_strength += RSI_WEIGHT * 0.5 * (45.0 - rsi) / 15.0;
         }
 
-        // 최종 강도 계산 (정규화)
-        if count > 0.0 {
-            strength / (count * 2.0) // 최대 강도를 기준으로 정규화
-        } else {
-            0.0
-        }
+        // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
+        signal_strength.min(1.0).max(0.0)
     }
 
     /// 매도 신호 강도 계산
+    ///
+    /// # Arguments
+    /// * `rsi_upper` - RSI 과매수 기준값 (예: 70)
+    /// * `profit_percentage` - 현재 포지션의 수익률 (%)
+    ///
+    /// # Returns
+    /// * `f64` - 0.0(신호 없음)에서 1.0(강한 신호) 사이의 매도 신호 강도
     pub fn calculate_sell_signal_strength(&self, rsi_upper: f64, profit_percentage: f64) -> f64 {
-        if self.items.len() < 2 {
+        if self.items.len() < 3 {
             return 0.0;
         }
 
-        let current = self.items.last().unwrap();
-        let previous = &self.items[self.items.len() - 2];
+        let current = &self.items[0];
+        let previous = &self.items[1];
+        let before_previous = &self.items[2];
 
-        let mut strength = 0.0;
-        let mut count = 0.0;
+        // 가중치 정의
+        const MA_WEIGHT: f64 = 0.2; // 이동평균 기준 신호 가중치
+        const PRICE_MOMENTUM_WEIGHT: f64 = 0.1; // 가격 모멘텀 가중치
+        const MACD_CROSS_WEIGHT: f64 = 0.25; // MACD 데드크로스 가중치
+        const MACD_HIST_WEIGHT: f64 = 0.15; // MACD 히스토그램 가중치
+        const RSI_WEIGHT: f64 = 0.2; // RSI 가중치
+        const PROFIT_WEIGHT: f64 = 0.1; // 수익률 기반 가중치
 
-        // 1. 이동평균선 기반 신호
+        let mut signal_strength = 0.0;
+
+        // 1. 이동평균선 기반 신호 (가격이 이동평균선 아래에 있는지, 하락추세인지)
         if current.candle.close_price() < current.ma.get() {
-            strength += 1.0;
-            count += 1.0;
+            // 가격이 이동평균 아래에 있음 (하락추세 가능성)
+            signal_strength += MA_WEIGHT * 0.6;
+
+            // 이동평균선 자체가 하락 중인지 확인
+            if current.ma.get() < previous.ma.get() {
+                signal_strength += MA_WEIGHT * 0.4;
+            }
         }
 
-        // 2. MACD 기반 신호
-        if current.macd.histogram < 0.0 && previous.macd.histogram > 0.0 {
-            // MACD 히스토그램이 0선을 하향 돌파 (강한 매도 신호)
-            strength += 2.0;
-            count += 1.0;
-        } else if current.macd.histogram < 0.0 {
-            // MACD 히스토그램이 0선 아래에 있음 (약한 매도 신호)
-            strength += 0.5;
-            count += 1.0;
+        // 2. 가격 모멘텀 확인 (최근 캔들들의 연속적인 하락)
+        if current.candle.close_price() < previous.candle.close_price()
+            && previous.candle.close_price() < before_previous.candle.close_price()
+        {
+            signal_strength += PRICE_MOMENTUM_WEIGHT;
         }
 
-        // 3. RSI 기반 신호
+        // 3. MACD 기반 신호
+        if current.macd.macd_line < current.macd.signal_line
+            && previous.macd.macd_line >= previous.macd.signal_line
+        {
+            // 데드 크로스 (강한 매도 신호)
+            signal_strength += MACD_CROSS_WEIGHT;
+        }
+
+        // MACD 히스토그램 분석
+        if current.macd.histogram < 0.0 {
+            // 히스토그램이 음수 (하락 추세)
+            let histogram_factor =
+                (current.macd.histogram.abs() / current.candle.close_price().abs()).min(0.05)
+                    * 20.0;
+            signal_strength += MACD_HIST_WEIGHT * histogram_factor.min(1.0);
+
+            // 히스토그램이 감소 중인지 확인 (모멘텀 가속)
+            if current.macd.histogram < previous.macd.histogram {
+                signal_strength += MACD_HIST_WEIGHT * 0.5;
+            }
+        }
+
+        // 4. RSI 기반 신호
         let rsi = current.rsi.value();
-        if rsi > rsi_upper && rsi < previous.rsi.value() {
-            // RSI가 과매수 상태에서 하락 (강한 매도 신호)
-            strength += 2.0;
-            count += 1.0;
-        } else if rsi < rsi_upper && rsi > 50.0 {
-            // RSI가 과매수 상태로 접근 중 (약한 매도 신호)
-            strength += 0.5;
-            count += 1.0;
+
+        if rsi > rsi_upper {
+            // 과매수 상태 (강한 매도 신호)
+            signal_strength += RSI_WEIGHT * ((rsi - rsi_upper) / (100.0 - rsi_upper));
+        } else if rsi > 55.0 && rsi < previous.rsi.value() {
+            // RSI가 높은 상태에서 하락 중 (적절한 매도 신호)
+            signal_strength += RSI_WEIGHT * 0.5 * (rsi - 55.0) / 15.0;
         }
 
-        // 4. 수익률 기반 신호
-        if profit_percentage > 5.0 {
-            // 5% 이상 수익 (적절한 매도 신호)
-            strength += 1.0;
-            count += 1.0;
-        } else if profit_percentage < -3.0 {
-            // 3% 이상 손실 (손절 매도 신호)
-            strength += 1.5;
-            count += 1.0;
+        // 5. 수익률 기반 신호
+        if profit_percentage > 7.0 {
+            // 높은 수익 실현 (강한 매도 신호)
+            signal_strength += PROFIT_WEIGHT;
+        } else if profit_percentage > 3.0 {
+            // 적정 수익 실현 (중간 매도 신호)
+            signal_strength += PROFIT_WEIGHT * 0.7;
+        } else if profit_percentage < -5.0 {
+            // 큰 손실 발생 (손절 매도 신호)
+            signal_strength += PROFIT_WEIGHT * 0.8;
         }
 
-        // 최종 강도 계산 (정규화)
-        if count > 0.0 {
-            strength / (count * 2.0) // 최대 강도를 기준으로 정규화
-        } else {
-            0.0
-        }
+        // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
+        signal_strength.min(1.0).max(0.0)
     }
 }
 

@@ -225,9 +225,7 @@ impl<C: Candle + 'static> CopysStrategy<C> {
 
         let ma_type = crate::indicator::ma::MAType::EMA;
         let ma_periods = [10, 20, 60];
-        let mut ctx =
-            CopysStrategyContext::new(config.base.rsi_period, &ma_type, &ma_periods, storage);
-        ctx.init(storage.get_reversed_items());
+        let ctx = CopysStrategyContext::new(config.base.rsi_period, &ma_type, &ma_periods, storage);
 
         Ok(CopysStrategy { config, ctx })
     }
@@ -274,7 +272,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.rsi > self.config.base.rsi_lower,
+                |data: &RSIAnalyzerData<C>| data.rsi.value > self.config.base.rsi_lower,
                 1,
                 self.config_rsi_count(),
             )
@@ -286,7 +284,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.rsi < self.config.base.rsi_upper,
+                |data: &RSIAnalyzerData<C>| data.rsi.value < self.config.base.rsi_upper,
                 1,
                 self.config_rsi_count(),
             )

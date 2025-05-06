@@ -74,7 +74,7 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             adxsbuilder,
             items: vec![],
         };
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 
@@ -107,15 +107,55 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             return false;
         }
 
-        for i in 0..n {
-            let current = self.items[i].get_adx(period);
-            let previous = self.items[i + 1].get_adx(period);
-            if current <= previous {
-                return false;
+        // 최근 n+1개 기간 동안의 ADX와 +DI, -DI 값들
+        let mut adx_values = Vec::new();
+        let mut pdi_values = Vec::new();
+        let mut ndi_values = Vec::new();
+
+        for item in self.items.iter().take(n + 1) {
+            let adx = item.adxs.get(&period).adx;
+            let pdi = item.adxs.get(&period).plus_di;
+            let ndi = item.adxs.get(&period).minus_di;
+            adx_values.push(adx);
+            pdi_values.push(pdi);
+            ndi_values.push(ndi);
+        }
+
+        // 디버그 로깅
+        println!("ADX values: {:?}", adx_values);
+        println!("+DI values: {:?}", pdi_values);
+        println!("-DI values: {:?}", ndi_values);
+
+        // ADX 증가 추세 또는 최대값(100) 유지 확인
+        let mut adx_increasing = true;
+        for i in 1..=n {
+            // 현재 값이 이전 값보다 작고, 이전 값이 100이 아닌 경우 증가 추세가 아님
+            if adx_values[i] < adx_values[i - 1] && adx_values[i - 1] < 100.0 {
+                adx_increasing = false;
+                break;
             }
         }
 
-        true
+        // +DI와 -DI의 상대적 강도 확인
+        let mut di_strength = true;
+        for i in 0..=n {
+            if pdi_values[i] <= ndi_values[i] {
+                di_strength = false;
+                break;
+            }
+        }
+
+        // ADX 최소값 확인 (25 이상)
+        let adx_strong = adx_values.iter().all(|&adx| adx >= 25.0);
+
+        // 디버그 로깅
+        println!(
+            "ADX increasing: {}, DI strength: {}, ADX strong: {}",
+            adx_increasing, di_strength, adx_strong
+        );
+
+        // 모든 조건을 만족해야 추세 강화로 판단
+        adx_increasing && di_strength && adx_strong
     }
 
     /// 추세 강도가 감소하는지 확인 (현재 ADX가 이전 ADX보다 작은지)
@@ -124,15 +164,36 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             return false;
         }
 
+        // 최근 n개 기간 동안의 ADX 값들
+        let adx_values: Vec<f64> = self
+            .items
+            .iter()
+            .take(n + 1)
+            .map(|data| data.get_adx(period))
+            .collect();
+
+        // 디버그 로깅
+        println!("ADX values for trend weakening: {:?}", adx_values);
+
+        // 연속된 감소 횟수 확인
+        let mut decreasing_count = 0;
         for i in 0..n {
-            let current = self.items[i].get_adx(period);
-            let previous = self.items[i + 1].get_adx(period);
-            if current >= previous {
-                return false;
+            if adx_values[i] > adx_values[i + 1] {
+                decreasing_count += 1;
             }
         }
 
-        true
+        // 첫 번째와 마지막 값의 차이로 전체적인 감소 추세 확인
+        let total_change = adx_values[n] - adx_values[0];
+
+        // 디버그 로깅
+        println!(
+            "Decreasing count: {}, Total change: {}",
+            decreasing_count, total_change
+        );
+
+        // n개 중 최소 50% 이상이 감소하고, 전체적으로도 감소했다면 추세 약화로 판단
+        decreasing_count >= (n as f64 * 0.5).ceil() as usize && total_change > 0.0
     }
 
     /// 추세 전환점 확인 (추세 강도가 약해졌다가 다시 강해지는 패턴)
@@ -141,21 +202,71 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             return false;
         }
 
-        // 최근 n개 기간 동안 ADX 증가
-        let is_increasing = (0..n).all(|i| {
-            let current = self.items[i].get_adx(period);
-            let previous = self.items[i + 1].get_adx(period);
-            current > previous
-        });
+        // 최근 n개 기간 동안의 ADX 값들
+        let recent_adx: Vec<f64> = self
+            .items
+            .iter()
+            .take(n)
+            .map(|data| data.get_adx(period))
+            .collect();
 
-        // 이전 m개 기간 동안 ADX 감소
-        let was_decreasing = (n..n + m).all(|i| {
-            let current = self.items[i].get_adx(period);
-            let previous = self.items[i + 1].get_adx(period);
-            current < previous
-        });
+        // 이전 m개 기간 동안의 ADX 값들
+        let previous_adx: Vec<f64> = self
+            .items
+            .iter()
+            .skip(n)
+            .take(m)
+            .map(|data| data.get_adx(period))
+            .collect();
 
-        is_increasing && was_decreasing
+        // 디버그 로깅
+        println!("ADX Trend Reversal Analysis:");
+        println!("Period: {}", period);
+        println!("Recent ADX values ({}): {:?}", n, recent_adx);
+        println!("Previous ADX values ({}): {:?}", m, previous_adx);
+
+        // 최근 n개 기간의 평균 ADX
+        let recent_avg = recent_adx.iter().sum::<f64>() / n as f64;
+
+        // 이전 m개 기간의 평균 ADX
+        let previous_avg = previous_adx.iter().sum::<f64>() / m as f64;
+
+        // 최근 ADX 값의 변화율 계산
+        let recent_change = (recent_adx[0] - recent_adx[n - 1]) / recent_adx[n - 1] * 100.0;
+
+        // 이전 ADX 값의 변화율 계산
+        let previous_change = (previous_adx[0] - previous_adx[m - 1]) / previous_adx[m - 1] * 100.0;
+
+        // ADX 최소값 확인 (20 이상)
+        let recent_min_adx = recent_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        let previous_min_adx = previous_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+
+        // 디버그 로깅
+        println!(
+            "Recent average: {:.2}, Previous average: {:.2}",
+            recent_avg, previous_avg
+        );
+        println!(
+            "Recent change: {:.2}%, Previous change: {:.2}%",
+            recent_change, previous_change
+        );
+        println!(
+            "Recent min ADX: {:.2}, Previous min ADX: {:.2}",
+            recent_min_adx, previous_min_adx
+        );
+
+        // 조건:
+        // 1. 최근 ADX 평균이 이전 ADX 평균보다 높음
+        // 2. 최근 ADX가 이전 ADX보다 증가하는 추세를 보임 (변화율 기준)
+        // 3. 이전 ADX가 증가하는 추세를 보였음 (변화율 기준)
+        // 4. 최근 ADX의 최소값이 20 이상
+        let is_reversal = recent_avg > previous_avg
+            && recent_change > 0.0
+            && previous_change > 0.0
+            && recent_min_adx >= 20.0;
+
+        println!("Is trend reversal: {}", is_reversal);
+        is_reversal
     }
 }
 

@@ -31,12 +31,12 @@ impl<C: Candle> MACDAnalyzerData<C> {
 
     /// MACD가 시그널 라인을 상향 돌파했는지 확인
     pub fn is_macd_above_signal(&self) -> bool {
-        self.macd.macd > self.macd.signal
+        self.macd.macd_line > self.macd.signal_line
     }
 
     /// MACD가 시그널 라인을 하향 돌파했는지 확인
     pub fn is_macd_below_signal(&self) -> bool {
-        self.macd.macd < self.macd.signal
+        self.macd.macd_line < self.macd.signal_line
     }
 }
 
@@ -80,7 +80,7 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
             items: vec![],
         };
 
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 
@@ -95,13 +95,67 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
     }
 
     /// MACD가 시그널 라인을 상향 돌파했는지 확인
-    pub fn is_macd_crossed_above_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_above_signal(), n, m)
+    ///
+    /// # Arguments
+    /// * `n` - 현재 상태가 MACD > 시그널인 연속 캔들 수 (사용되지 않음)
+    /// * `m` - 이전 상태가 MACD < 시그널인 연속 캔들 수 (사용되지 않음)
+    ///
+    /// # Returns
+    /// * `bool` - 상향 돌파 패턴이 확인되면 true
+    pub fn is_macd_crossed_above_signal(&self, _n: usize, _m: usize) -> bool {
+        // 최소 2개의 캔들이 필요
+        if self.items.len() < 2 {
+            return false;
+        }
+
+        // 최신 캔들(items[0])에서 MACD가 시그널보다 위에 있고,
+        // 그 이전 캔들들 중 하나라도 MACD가 시그널보다 아래에 있는지 확인
+        let current_macd_above_signal =
+            self.items[0].macd.macd_line > self.items[0].macd.signal_line;
+
+        // 최근 일부 캔들 중에 하나라도 MACD가 시그널보다 아래에 있는지 확인 (crossover 확인)
+        let mut found_prev_below = false;
+        for i in 1..self.items.len().min(10) {
+            // 10개 캔들까지만 검사
+            if self.items[i].macd.macd_line < self.items[i].macd.signal_line {
+                found_prev_below = true;
+                break;
+            }
+        }
+
+        current_macd_above_signal && found_prev_below
     }
 
     /// MACD가 시그널 라인을 하향 돌파했는지 확인
-    pub fn is_macd_crossed_below_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_below_signal(), n, m)
+    ///
+    /// # Arguments
+    /// * `n` - 현재 상태가 MACD < 시그널인 연속 캔들 수 (사용되지 않음)
+    /// * `m` - 이전 상태가 MACD > 시그널인 연속 캔들 수 (사용되지 않음)
+    ///
+    /// # Returns
+    /// * `bool` - 하향 돌파 패턴이 확인되면 true
+    pub fn is_macd_crossed_below_signal(&self, _n: usize, _m: usize) -> bool {
+        // 최소 2개의 캔들이 필요
+        if self.items.len() < 2 {
+            return false;
+        }
+
+        // 최신 캔들(items[0])에서 MACD가 시그널보다 아래에 있고,
+        // 그 이전 캔들들 중 하나라도 MACD가 시그널보다 위에 있는지 확인
+        let current_macd_below_signal =
+            self.items[0].macd.macd_line < self.items[0].macd.signal_line;
+
+        // 최근 일부 캔들 중에 하나라도 MACD가 시그널보다 위에 있는지 확인 (crossover 확인)
+        let mut found_prev_above = false;
+        for i in 1..self.items.len().min(10) {
+            // 10개 캔들까지만 검사
+            if self.items[i].macd.macd_line > self.items[i].macd.signal_line {
+                found_prev_above = true;
+                break;
+            }
+        }
+
+        current_macd_below_signal && found_prev_above
     }
 }
 

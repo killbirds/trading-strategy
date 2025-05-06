@@ -95,7 +95,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
             volumesbuilder,
             items: vec![],
         };
-        ctx.init(storage.get_reversed_items());
+        ctx.init_from_storage(storage);
         ctx
     }
 
