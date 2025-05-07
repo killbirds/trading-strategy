@@ -40,78 +40,6 @@ fn calculate_rsi(values: &[f64], period: usize) -> f64 {
     100.0 - (100.0 / (1.0 + rs))
 }
 
-// RSI 지표 계산을 위한 내부 구현
-#[derive(Debug)]
-struct RSIIndicator {
-    period: usize,
-    values: Vec<f64>,
-    avg_gain: f64,
-    avg_loss: f64,
-}
-
-impl RSIIndicator {
-    fn new(period: usize) -> Self {
-        Self {
-            period,
-            values: Vec::with_capacity(period * 2),
-            avg_gain: 0.0,
-            avg_loss: 0.0,
-        }
-    }
-
-    fn next(&mut self, value: &impl Candle) -> f64 {
-        let price = value.close_price();
-
-        // 첫 번째 값이면 이전 값과 비교할 수 없으므로 그냥 저장
-        if self.values.is_empty() {
-            self.values.push(price);
-            return 50.0; // 중립값 반환
-        }
-
-        // 가격 변화량 계산
-        let prev_price = self.values.last().unwrap();
-        let change = price - prev_price;
-
-        // 가격 저장
-        self.values.push(price);
-
-        // 필요한 데이터만 유지
-        if self.values.len() > self.period * 2 {
-            let excess = self.values.len() - self.period * 2;
-            self.values.drain(0..excess);
-        }
-
-        // 상승/하락 계산
-        let gain = if change > 0.0 { change } else { 0.0 };
-        let loss = if change < 0.0 { -change } else { 0.0 };
-
-        // 충분한 데이터가 쌓일 때까지는 50 (중립값) 반환
-        if self.values.len() < self.period {
-            return 50.0;
-        }
-
-        // 첫 번째 평균 계산
-        if self.values.len() == self.period {
-            self.avg_gain = gain;
-            self.avg_loss = loss;
-            return 50.0;
-        }
-
-        // 지수이동평균으로 평균 게인/로스 업데이트
-        let smoothing_factor = 1.0 / self.period as f64;
-        self.avg_gain = (self.avg_gain * (1.0 - smoothing_factor)) + (gain * smoothing_factor);
-        self.avg_loss = (self.avg_loss * (1.0 - smoothing_factor)) + (loss * smoothing_factor);
-
-        // RSI 계산
-        if self.avg_loss < 0.000001 {
-            return 100.0; // 분모가 0이면 과매수 상태
-        }
-
-        let rs = self.avg_gain / self.avg_loss;
-        100.0 - (100.0 / (1.0 + rs))
-    }
-}
-
 /// 상대강도지수(RSI) 기술적 지표 빌더
 ///
 /// RSI 지표를 계산하고 업데이트하는 빌더
@@ -369,7 +297,6 @@ mod tests {
     use super::*;
     use crate::tests::TestCandle;
     use chrono::Utc;
-    
 
     fn create_test_candles() -> Vec<TestCandle> {
         vec![
