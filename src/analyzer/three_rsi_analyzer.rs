@@ -110,12 +110,12 @@ impl<C: Candle + 'static> ThreeRSIAnalyzer<C> {
 
     /// RSI 값이 모두 50 미만인지 확인 (약세)
     pub fn is_rsi_all_less_than_50(&self, n: usize) -> bool {
-        self.is_all_less_than_target(|ctx| &ctx.rsis, |rsi| rsi.value, 50.0, n)
+        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value < 50.0), n)
     }
 
     /// RSI 값이 모두 50 이상인지 확인 (강세)
     pub fn is_rsi_all_greater_than_50(&self, n: usize) -> bool {
-        self.is_all_greater_than_target(|ctx| &ctx.rsis, |rsi| rsi.value, 50.0, n)
+        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value > 50.0), n)
     }
 
     /// RSI가 역순 배열인지 확인 (단기가 더 작고 장기가 더 큼)
@@ -146,7 +146,7 @@ impl<C: Candle + 'static> ThreeRSIAnalyzer<C> {
 
     /// ADX가 20 이상인지 확인 (추세 강도)
     pub fn is_adx_greater_than_20(&self, n: usize) -> bool {
-        self.is_greater_than_target(|ctx| ctx.adx.adx, 20.0, n)
+        self.is_all(|ctx| ctx.adx.adx > 20.0, n)
     }
 }
 

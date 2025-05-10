@@ -125,7 +125,7 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
     /// 진입 조건: RSI가 최근에 모두 50 이상으로 돌파했고 다른 조건도 충족
     fn should_enter_by_break_through_rsi_above_50(&self) -> bool {
         self.ctx.is_break_through_by_satisfying(
-            |data| data.rsis.is_all_greater_than(|rsi| rsi.value, 50.0),
+            |data| data.rsis.is_all(|rsi| rsi.value > 50.0),
             2,
             3,
         ) && self.ctx.is_rsi_regular_arrangement(2)
@@ -155,7 +155,7 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
     /// 청산 조건: RSI가 최근에 모두 50 미만으로 돌파했고 다른 조건도 충족
     fn should_exit_by_break_through_rsi_below_50(&self) -> bool {
         self.ctx.is_break_through_by_satisfying(
-            |data| data.rsis.is_all_less_than(|rsi| rsi.value, 50.0),
+            |data| data.rsis.is_all(|rsi| rsi.value < 50.0),
             2,
             3,
         ) && self.ctx.is_rsi_reverse_arrangement(2)

@@ -74,46 +74,50 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     }
 
     /// 가격이 볼린저 밴드 하한선 아래로 내려갔는지 확인
-    pub fn is_below_lower_band(&self) -> bool {
-        if let Some(first) = self.items.first() {
-            first.candle.close_price() < first.bband.lower()
-        } else {
-            false
-        }
+    pub fn is_below_lower_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.lower(), n)
+    }
+
+    /// n개의 연속된 캔들이 하단 밴드 위에 있는지 확인
+    pub fn is_above_lower_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.lower(), n)
     }
 
     /// 가격이 볼린저 밴드 상한선 위로 올라갔는지 확인
-    pub fn is_above_upper_band(&self) -> bool {
-        if let Some(first) = self.items.first() {
-            first.candle.close_price() > first.bband.upper()
-        } else {
-            false
-        }
+    pub fn is_below_upper_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.upper(), n)
+    }
+
+    pub fn is_above_upper_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n)
     }
 
     /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
-    pub fn is_above_middle_band(&self) -> bool {
-        if let Some(first) = self.items.first() {
-            first.candle.close_price() > first.bband.middle()
-        } else {
-            false
-        }
+    pub fn is_above_middle_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.middle(), n)
     }
 
     /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
-    pub fn is_below_middle_band(&self) -> bool {
-        if let Some(first) = self.items.first() {
-            first.candle.close_price() < first.bband.middle()
-        } else {
-            false
-        }
+    pub fn is_below_middle_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.middle(), n)
+    }
+
+    /// 하단 밴드 아래에서 위로 돌파한 경우 (상승 반전 신호) 확인
+    pub fn is_break_through_lower_band_from_below(&self, n: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() > data.bband.lower(),
+            n,
+            3,
+        )
     }
 
     /// 밴드 폭이 충분히 넓은지 확인
     pub fn is_band_width_sufficient(&self) -> bool {
-        self.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
-            0.02,
+        self.is_all(
+            |data| {
+                let band_width = (data.bband.upper() - data.bband.lower()) / data.bband.middle();
+                band_width > 0.02
+            },
             1,
         )
     }

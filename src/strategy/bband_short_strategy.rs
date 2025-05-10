@@ -1,6 +1,6 @@
 use super::Strategy;
 use super::StrategyType;
-use super::bband_common::{BBandAnalyzer, BBandStrategyCommon, BBandStrategyConfigBase};
+use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::config_loader::{ConfigResult, ConfigValidation};
@@ -95,12 +95,6 @@ impl<C: Candle> Display for BBandShortStrategy<C> {
     }
 }
 
-impl<C: Candle + 'static> BBandStrategyCommon<C> for BBandShortStrategy<C> {
-    fn context(&self) -> &BBandAnalyzer<C> {
-        &self.ctx
-    }
-}
-
 impl<C: Candle + 'static> BBandShortStrategy<C> {
     /// 새 볼린저밴드 숏 전략 인스턴스 생성 (JSON 설정 파일 사용)
     ///
@@ -147,15 +141,6 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
         })
     }
 
-    /// 밴드 폭이 충분히 넓은지 확인
-    fn is_band_width_sufficient(&self) -> bool {
-        self.ctx.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
-            0.02,
-            1,
-        )
-    }
-
     /// 설정 파일에서 전략 인스턴스 생성
     pub fn from_config_file(
         storage: &CandleStore<C>,
@@ -180,22 +165,20 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
 
     fn should_enter(&self, _candle: &C) -> bool {
         // 가격이 상단 밴드를 상향 돌파했을 때 숏 진입 신호
-        let is_buy = self.ctx.is_break_through_by_greater_than_candle(
-            |data| data.bband.upper(),
-            |candle| candle.high_price(),
+        let is_buy = self.ctx.is_break_through_by_satisfying(
+            |data| data.candle.high_price() > data.bband.upper(),
             1,
             self.config.count,
         );
 
         // 밴드 폭이 충분히 넓은지 확인
-        is_buy && self.is_band_width_sufficient()
+        is_buy && self.ctx.is_band_width_sufficient()
     }
 
     fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
         // 가격이 하단 밴드를 하향 돌파했을 때 숏 청산 신호
-        self.ctx.is_break_through_by_less_than_candle(
-            |data| data.bband.lower(),
-            |candle| candle.low_price(),
+        self.ctx.is_break_through_by_satisfying(
+            |data| data.candle.low_price() < data.bband.lower(),
             1,
             self.config.count,
         )

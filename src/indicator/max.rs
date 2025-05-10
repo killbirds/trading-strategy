@@ -11,37 +11,6 @@ pub struct MAXBuilder<C: Candle> {
     _phantom: PhantomData<C>,
 }
 
-// Simple implementation for maximum indicator
-#[derive(Debug)]
-struct MaximumIndicator {
-    period: usize,
-    values: Vec<f64>,
-}
-
-impl MaximumIndicator {
-    fn new(period: usize) -> Self {
-        Self {
-            period,
-            values: Vec::with_capacity(period),
-        }
-    }
-
-    fn next(&mut self, value: &impl Candle) -> f64 {
-        let price = value.high_price();
-        if self.values.len() >= self.period {
-            self.values.remove(0);
-        }
-        self.values.push(price);
-
-        if self.values.is_empty() {
-            return 0.0;
-        }
-
-        // Calculate maximum manually since ta-lib doesn't have a direct max function
-        self.values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct MAX {
     period: usize,
@@ -167,7 +136,6 @@ mod tests {
     use super::*;
     use crate::tests::TestCandle;
     use chrono::Utc;
-    
 
     fn create_test_candles() -> Vec<TestCandle> {
         vec![
@@ -244,7 +212,8 @@ mod tests {
         let mut builder = MAXBuilder::<TestCandle>::new(2);
 
         // 상승 추세 데이터
-        let up_candles = [TestCandle {
+        let up_candles = [
+            TestCandle {
                 timestamp: Utc::now().timestamp(),
                 open: 100.0,
                 high: 110.0,
@@ -259,7 +228,8 @@ mod tests {
                 low: 110.0,
                 close: 120.0,
                 volume: 1000.0,
-            }];
+            },
+        ];
 
         let max1 = builder.next(&up_candles[0]);
         let max2 = builder.next(&up_candles[1]);
@@ -271,7 +241,8 @@ mod tests {
         let mut builder = MAXBuilder::<TestCandle>::new(2);
 
         // 횡보장 데이터
-        let consolidation_candles = [TestCandle {
+        let consolidation_candles = [
+            TestCandle {
                 timestamp: Utc::now().timestamp(),
                 open: 100.0,
                 high: 110.0,
@@ -286,7 +257,8 @@ mod tests {
                 low: 100.0,
                 close: 100.0,
                 volume: 1000.0,
-            }];
+            },
+        ];
 
         let max1 = builder.next(&consolidation_candles[0]);
         let max2 = builder.next(&consolidation_candles[1]);

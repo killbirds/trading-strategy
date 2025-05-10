@@ -91,7 +91,7 @@ fn test_bband_below_lower_band() {
         analyzer.items.first().unwrap().bband.lower(),
         analyzer.items.first().unwrap().candle.close_price()
     );
-    assert!(analyzer.is_below_lower_band());
+    assert!(analyzer.is_below_lower_band(1));
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn test_bband_above_upper_band() {
         analyzer.items.first().unwrap().bband.upper(),
         analyzer.items.first().unwrap().candle.close_price()
     );
-    assert!(analyzer.is_above_upper_band());
+    assert!(analyzer.is_above_upper_band(1));
 }
 
 #[test]

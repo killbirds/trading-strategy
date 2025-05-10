@@ -25,38 +25,6 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         (self.candle().close_price() - value) / value
     }
 
-    /// 캔들 가격이 특정 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `get_value` - 비교할 값 추출 함수
-    ///
-    /// # Returns
-    /// * `bool` - 캔들 가격이 비교값보다 크면 true
-    fn is_candle_greater_than(
-        &self,
-        get_candle_price: impl Fn(&C) -> f64,
-        get_value: impl Fn(&Self) -> f64,
-    ) -> bool {
-        self.is_less_than_target(&get_value, get_candle_price(self.candle()))
-    }
-
-    /// 캔들 가격이 특정 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `get_value` - 비교할 값 추출 함수
-    ///
-    /// # Returns
-    /// * `bool` - 캔들 가격이 비교값보다 작으면 true
-    fn is_candle_less_than(
-        &self,
-        get_candle_price: impl Fn(&C) -> f64,
-        get_value: impl Fn(&Self) -> f64,
-    ) -> bool {
-        self.is_greater_than_target(&get_value, get_candle_price(self.candle()))
-    }
-
     /// 두 값을 비교하여 첫 번째 값이 두 번째 값보다 큰지 확인
     ///
     /// # Arguments
@@ -75,35 +43,6 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         lv > rv
     }
 
-    /// 특정 값이 타겟 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `target` - 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 추출된 값이 타겟보다 크면 true
-    fn is_greater_than_target(&self, get_value: impl Fn(&Self) -> f64, target: f64) -> bool {
-        let value = get_value(self);
-        value > target
-    }
-
-    /// 특정 값이 캔들 가격보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    ///
-    /// # Returns
-    /// * `bool` - 추출된 값이 캔들 가격보다 크면 true
-    fn is_greater_than_candle(
-        &self,
-        get_value: impl Fn(&Self) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-    ) -> bool {
-        self.is_greater_than_target(&get_value, get_candle_price(self.candle()))
-    }
-
     /// 두 값을 비교하여 첫 번째 값이 두 번째 값보다 작은지 확인
     ///
     /// # Arguments
@@ -116,35 +55,6 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         let lv = get_lv(self);
         let rv = get_rv(self);
         lv < rv
-    }
-
-    /// 특정 값이 타겟 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `target` - 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 추출된 값이 타겟보다 작으면 true
-    fn is_less_than_target(&self, get_value: impl Fn(&Self) -> f64, target: f64) -> bool {
-        let value = get_value(self);
-        value < target
-    }
-
-    /// 특정 값이 캔들 가격보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    ///
-    /// # Returns
-    /// * `bool` - 추출된 값이 캔들 가격보다 작으면 true
-    fn is_less_than_candle(
-        &self,
-        get_value: impl Fn(&Self) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-    ) -> bool {
-        self.is_less_than_target(&get_value, get_candle_price(self.candle()))
     }
 
     /// 모든 기술적 지표가 특정 값보다 큰지 확인
@@ -166,7 +76,7 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         K: PartialEq + Eq + Hash + std::fmt::Debug,
     {
         let tas = get(self);
-        tas.is_all_greater_than(&get_value, target)
+        tas.is_all(|ta| get_value(ta) > target)
     }
 
     /// 모든 기술적 지표가 특정 값보다 작은지 확인
@@ -188,7 +98,7 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         K: PartialEq + Eq + Hash + std::fmt::Debug,
     {
         let tas = get(self);
-        tas.is_all_less_than(&get_value, target)
+        tas.is_all(|ta| get_value(ta) < target)
     }
 
     /// 기술적 지표가 정규 배열(오름차순)인지 확인
@@ -337,145 +247,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         }
     }
 
-    /// n개의 연속된 데이터에서 캔들 가격이 특정 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_candle_greater_than(
-        &self,
-        get_candle_price: impl Fn(&C) -> f64,
-        get_value: impl Fn(&Data) -> f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| data.is_candle_greater_than(&get_candle_price, &get_value),
-            n,
-        )
-    }
-
-    /// n개의 연속된 데이터에서 캔들 가격이 특정 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_candle_less_than(
-        &self,
-        get_candle_price: impl Fn(&C) -> f64,
-        get_value: impl Fn(&Data) -> f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| data.is_candle_less_than(&get_candle_price, &get_value),
-            n,
-        )
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 타겟 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `target` - 타겟 값
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_less_than_target(&self, get_value: impl Fn(&Data) -> f64, target: f64, n: usize) -> bool {
-        self.is_all(|data| data.is_less_than_target(&get_value, target), n)
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 캔들 가격보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_less_than_candle(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| data.is_less_than_candle(&get_value, &get_candle_price),
-            n,
-        )
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 거래 가격보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_less_than_trade_price(&self, get_value: impl Fn(&Data) -> f64, n: usize) -> bool {
-        self.is_less_than_candle(&get_value, |candle| candle.close_price(), n)
-    }
-
-    /// n개의 연속된 데이터에서 수익률이 타겟 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 기준 가격 추출 함수
-    /// * `rate_of_return` - 비교할 수익률
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_rate_of_return_less_than_target(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        rate_of_return: f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| {
-                data.is_less_than_target(|data| data.get_rate_of_return(&get_value), rate_of_return)
-            },
-            n,
-        )
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 타겟 값보다 큰지 확인
-    fn is_greater_than_target(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        target: f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(|data| data.is_greater_than_target(&get_value, target), n)
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 캔들 가격보다 큰지 확인
-    fn is_greater_than_candle(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| data.is_greater_than_candle(&get_value, &get_candle_price),
-            n,
-        )
-    }
-
-    /// n개의 연속된 데이터에서 특정 값이 거래 가격보다 커지는 돌파 패턴 확인
-    fn is_greater_than_trade_price(&self, get_value: impl Fn(&Data) -> f64, n: usize) -> bool {
-        self.is_greater_than_candle(&get_value, |candle| candle.close_price(), n)
-    }
-
     /// 먼저 n개 데이터는 조건을 만족하고, 이전 m개 데이터는 만족하지 않는 돌파 패턴 확인
     ///
     /// # Arguments
@@ -498,221 +269,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
             let result = heads.iter().all(is_fn);
             result && tails.iter().take(m).all(|data| !is_fn(data))
         }
-    }
-
-    /// n개의 연속된 데이터에서 수익률이 타겟 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 기준 가격 추출 함수
-    /// * `rate_of_return` - 비교할 수익률
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_rate_of_return_greater_than_target(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        rate_of_return: f64,
-        n: usize,
-    ) -> bool {
-        self.is_all(
-            |data| {
-                data.is_greater_than_target(
-                    |data| data.get_rate_of_return(&get_value),
-                    rate_of_return,
-                )
-            },
-            n,
-        )
-    }
-
-    /// 특정 값이 타겟 값보다 작아지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `target` - 타겟 값
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_less_than_target(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        target: f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_satisfying(
-            |data| data.is_less_than_target(&get_value, target),
-            n,
-            m,
-        )
-    }
-
-    /// 특정 값이 캔들 가격보다 작아지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_less_than_candle(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_satisfying(
-            |data| data.is_less_than_candle(&get_value, &get_candle_price),
-            n,
-            m,
-        )
-    }
-
-    /// 특정 값이 거래 가격보다 작아지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_less_than_trade_price(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_less_than_candle(&get_value, |candle| candle.close_price(), n, m)
-    }
-
-    /// 특정 값이 타겟 값보다 커지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `target` - 타겟 값
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_greater_than_target(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        target: f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_satisfying(
-            |data| data.is_greater_than_target(&get_value, target),
-            n,
-            m,
-        )
-    }
-
-    /// 특정 값이 캔들 가격보다 커지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `get_candle_price` - 캔들에서 사용할 가격 추출 함수
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_greater_than_candle(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        get_candle_price: impl Fn(&C) -> f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_satisfying(
-            |data| data.is_greater_than_candle(&get_value, &get_candle_price),
-            n,
-            m,
-        )
-    }
-
-    /// 특정 값이 거래 가격보다 커지는 돌파 패턴 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 비교할 값 추출 함수
-    /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
-    /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 돌파 패턴이 확인되면 true
-    fn is_break_through_by_greater_than_trade_price(
-        &self,
-        get_value: impl Fn(&Data) -> f64,
-        n: usize,
-        m: usize,
-    ) -> bool {
-        self.is_break_through_by_greater_than_candle(
-            &get_value,
-            |candle| candle.close_price(),
-            n,
-            m,
-        )
-    }
-
-    /// n개의 연속 데이터에서 모든 기술적 지표가 타겟 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get` - 기술적 지표 컬렉션 가져오는 함수
-    /// * `get_value` - 개별 지표에서 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_all_greater_than_target<K, T>(
-        &self,
-        get: impl Fn(&Data) -> &TAs<K, T>,
-        get_value: impl Fn(&T) -> f64,
-        target: f64,
-        n: usize,
-    ) -> bool
-    where
-        K: PartialEq + Eq + Hash + std::fmt::Debug,
-    {
-        self.is_all(
-            |data| data.is_all_greater_than_target::<K, T>(&get, &get_value, target),
-            n,
-        )
-    }
-
-    /// n개의 연속 데이터에서 모든 기술적 지표가 타겟 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get` - 기술적 지표 컬렉션 가져오는 함수
-    /// * `get_value` - 개별 지표에서 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    /// * `n` - 확인할 데이터 개수
-    ///
-    /// # Returns
-    /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_all_less_than_target<K, T>(
-        &self,
-        get: impl Fn(&Data) -> &TAs<K, T>,
-        get_value: impl Fn(&T) -> f64,
-        target: f64,
-        n: usize,
-    ) -> bool
-    where
-        K: PartialEq + Eq + Hash + std::fmt::Debug,
-    {
-        self.is_all(
-            |data| data.is_all_less_than_target::<K, T>(&get, &get_value, target),
-            n,
-        )
     }
 
     /// n개의 연속 데이터에서 기술적 지표가 정규 배열인지 확인
@@ -752,30 +308,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
     fn is_reverse_arrangement<K, T>(
-        &self,
-        get: impl Fn(&Data) -> &TAs<K, T>,
-        get_value: impl Fn(&T) -> f64,
-        n: usize,
-    ) -> bool
-    where
-        K: PartialEq + Eq + Hash + std::fmt::Debug,
-    {
-        self.is_all(
-            |data| data.is_reverse_arrangement::<K, T>(&get, &get_value),
-            n,
-        )
-    }
-
-    /// 마지막 n개 데이터에서 기술적 지표가 역(오름차순) 배열인지 확인
-    ///
-    /// # Arguments
-    /// * `get` - 기술적 지표 컬렉션 가져오는 함수
-    /// * `get_value` - 개별 지표에서 값 추출 함수
-    /// * `n` - 확인할 기간 수
-    ///
-    /// # Returns
-    /// * `bool` - 지정된 기간 내 지표가 오름차순으로 정렬되어 있으면 true
-    fn is_n_reverse_arrangement<K, T>(
         &self,
         get: impl Fn(&Data) -> &TAs<K, T>,
         get_value: impl Fn(&T) -> f64,

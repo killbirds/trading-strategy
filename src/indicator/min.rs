@@ -11,37 +11,6 @@ pub struct MINBuilder<C: Candle> {
     _phantom: PhantomData<C>,
 }
 
-// Simple implementation for minimum indicator
-#[derive(Debug)]
-struct MinimumIndicator {
-    period: usize,
-    values: Vec<f64>,
-}
-
-impl MinimumIndicator {
-    fn new(period: usize) -> Self {
-        Self {
-            period,
-            values: Vec::with_capacity(period),
-        }
-    }
-
-    fn next(&mut self, value: &impl Candle) -> f64 {
-        let price = value.low_price();
-        if self.values.len() >= self.period {
-            self.values.remove(0);
-        }
-        self.values.push(price);
-
-        if self.values.is_empty() {
-            return 0.0;
-        }
-
-        // Calculate minimum manually since ta-lib doesn't have a direct min function
-        self.values.iter().fold(f64::INFINITY, |a, &b| a.min(b))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct MIN {
     period: usize,
@@ -167,7 +136,6 @@ mod tests {
     use super::*;
     use crate::tests::TestCandle;
     use chrono::Utc;
-    
 
     fn create_test_candles() -> Vec<TestCandle> {
         vec![
@@ -244,7 +212,8 @@ mod tests {
         let mut builder = MINBuilder::<TestCandle>::new(2);
 
         // 하락 추세 데이터
-        let down_candles = [TestCandle {
+        let down_candles = [
+            TestCandle {
                 timestamp: Utc::now().timestamp(),
                 open: 110.0,
                 high: 110.0,
@@ -259,7 +228,8 @@ mod tests {
                 low: 90.0,
                 close: 90.0,
                 volume: 1000.0,
-            }];
+            },
+        ];
 
         let min1 = builder.next(&down_candles[0]);
         let min2 = builder.next(&down_candles[1]);
@@ -271,7 +241,8 @@ mod tests {
         let mut builder = MINBuilder::<TestCandle>::new(2);
 
         // 횡보장 데이터
-        let consolidation_candles = [TestCandle {
+        let consolidation_candles = [
+            TestCandle {
                 timestamp: Utc::now().timestamp(),
                 open: 100.0,
                 high: 110.0,
@@ -286,7 +257,8 @@ mod tests {
                 low: 90.0,
                 close: 100.0,
                 volume: 1000.0,
-            }];
+            },
+        ];
 
         let min1 = builder.next(&consolidation_candles[0]);
         let min2 = builder.next(&consolidation_candles[1]);

@@ -1,4 +1,3 @@
-use super::Strategy;
 use crate::config_loader::{ConfigError, ConfigResult, ConfigValidation};
 use log::{debug, error, info};
 use serde::Deserialize;
@@ -7,7 +6,6 @@ use serde::de::DeserializeOwned;
 use serde_json;
 use std::collections::HashMap;
 use std::path::Path;
-use trading_chart::Candle;
 
 // analyzer에서 BBandAnalyzer 및 BBandAnalyzerData 가져오기
 pub use crate::analyzer::bband_analyzer::{BBandAnalyzer, BBandAnalyzerData};
@@ -193,36 +191,5 @@ impl BBandStrategyConfigBase {
 
         info!("볼린저 밴드 전략 설정 로드 완료: {:?}", result);
         Ok(result)
-    }
-}
-
-/// 볼린저 밴드 전략을 위한 공통 트레이트
-pub trait BBandStrategyCommon<C: Candle + 'static>: Strategy<C> {
-    /// 분석기 참조 반환
-    fn context(&self) -> &BBandAnalyzer<C>;
-
-    /// 밴드 폭이 충분히 넓은지 확인
-    fn is_band_width_sufficient(&self) -> bool {
-        self.context().is_band_width_sufficient()
-    }
-
-    /// 가격이 볼린저 밴드 하한선 아래로 내려갔는지 확인
-    fn is_below_lower_band(&self) -> bool {
-        self.context().is_below_lower_band()
-    }
-
-    /// 가격이 볼린저 밴드 상한선 위로 올라갔는지 확인
-    fn is_above_upper_band(&self) -> bool {
-        self.context().is_above_upper_band()
-    }
-
-    /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
-    fn is_above_middle_band(&self) -> bool {
-        self.context().is_above_middle_band()
-    }
-
-    /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
-    fn is_below_middle_band(&self) -> bool {
-        self.context().is_below_middle_band()
     }
 }

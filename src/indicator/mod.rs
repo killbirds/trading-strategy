@@ -183,32 +183,9 @@ where
         is_reverse_arrangement(values)
     }
 
-    /// 모든 값이 지정된 타겟보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 모든 값이 타겟보다 큰지 여부
-    pub fn is_all_greater_than(&self, get_value: impl Fn(&T) -> f64, target: f64) -> bool {
+    pub fn is_all(&self, is_fn: impl Fn(&T) -> bool) -> bool {
         let all_ta = self.get_all();
-        let values = all_ta.iter().map(|ta| get_value(ta)).collect::<Vec<_>>();
-        values.iter().all(|v| v > &target)
-    }
-
-    /// 모든 값이 지정된 타겟보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get_value` - 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 모든 값이 타겟보다 작은지 여부
-    pub fn is_all_less_than(&self, get_value: impl Fn(&T) -> f64, target: f64) -> bool {
-        let all_ta = self.get_all();
-        let values = all_ta.iter().map(|ta| get_value(ta)).collect::<Vec<_>>();
-        values.iter().all(|v| v < &target)
+        all_ta.into_iter().all(is_fn)
     }
 }
 

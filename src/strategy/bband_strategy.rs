@@ -1,6 +1,6 @@
 use super::Strategy;
 use super::StrategyType;
-use super::bband_common::{BBandAnalyzer, BBandStrategyCommon, BBandStrategyConfigBase};
+use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::config_loader::{ConfigResult, ConfigValidation};
@@ -94,12 +94,6 @@ impl<C: Candle> Display for BBandStrategy<C> {
             "[볼린저밴드전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}}}, 컨텍스트: {}",
             self.config.period, self.config.multiplier, self.config.count, self.ctx
         )
-    }
-}
-
-impl<C: Candle + 'static> BBandStrategyCommon<C> for BBandStrategy<C> {
-    fn context(&self) -> &BBandAnalyzer<C> {
-        &self.ctx
     }
 }
 
@@ -216,51 +210,6 @@ impl<C: Candle + 'static> BBandStrategy<C> {
 
         Self::new(storage, config)
     }
-
-    /// 가격이 볼린저 밴드 하한선 아래로 내려갔는지 확인
-    fn is_below_lower_band(&self) -> bool {
-        if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() < first.bband.lower()
-        } else {
-            false
-        }
-    }
-
-    /// 가격이 볼린저 밴드 상한선 위로 올라갔는지 확인
-    fn is_above_upper_band(&self) -> bool {
-        if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() > first.bband.upper()
-        } else {
-            false
-        }
-    }
-
-    /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
-    fn is_above_middle_band(&self) -> bool {
-        if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() > first.bband.middle()
-        } else {
-            false
-        }
-    }
-
-    /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
-    fn is_below_middle_band(&self) -> bool {
-        if let Some(first) = self.ctx.items.first() {
-            first.candle.close_price() < first.bband.middle()
-        } else {
-            false
-        }
-    }
-
-    /// 밴드 폭이 충분히 넓은지 확인
-    fn is_band_width_sufficient(&self) -> bool {
-        self.ctx.is_greater_than_target(
-            |data| (data.bband.upper() - data.bband.lower()) / data.bband.middle(),
-            0.02,
-            1,
-        )
-    }
 }
 
 impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
@@ -269,11 +218,11 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
-        self.is_below_lower_band()
+        self.ctx.is_below_lower_band(1)
     }
 
     fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
-        self.is_above_middle_band()
+        self.ctx.is_above_middle_band(1)
     }
 
     fn position(&self) -> PositionType {

@@ -77,15 +77,10 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
     ) -> bool {
         self.is_all(
             |data| {
-                data.is_less_than_target(
-                    |data| {
-                        data.get_rate_of_return(|data| {
-                            let ma = data.mas.get_by_key_index(index);
-                            ma.get()
-                        })
-                    },
-                    rate_of_return,
-                )
+                data.get_rate_of_return(|data| {
+                    let ma = data.mas.get_by_key_index(index);
+                    ma.get()
+                }) < rate_of_return
             },
             n,
         )
@@ -100,15 +95,10 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
     ) -> bool {
         self.is_all(
             |data| {
-                data.is_greater_than_target(
-                    |data| {
-                        data.get_rate_of_return(|data| {
-                            let ma = data.mas.get_by_key_index(index);
-                            ma.get()
-                        })
-                    },
-                    rate_of_return,
-                )
+                data.get_rate_of_return(|data| {
+                    let ma = data.mas.get_by_key_index(index);
+                    ma.get()
+                }) > rate_of_return
             },
             n,
         )
