@@ -105,9 +105,18 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// 하단 밴드 아래에서 위로 돌파한 경우 (상승 반전 신호) 확인
     pub fn is_break_through_lower_band_from_below(&self, n: usize) -> bool {
         self.is_break_through_by_satisfying(
-            |data| data.candle.close_price() > data.bband.lower(),
+            |data| data.candle.low_price() > data.bband.lower(),
+            1,
             n,
-            3,
+        )
+    }
+
+    /// 상단 밴드 아래에서 위로 돌파한 경우 확인
+    pub fn is_break_through_upper_band_from_below(&self, n: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.high_price() > data.bband.upper(),
+            1,
+            n,
         )
     }
 

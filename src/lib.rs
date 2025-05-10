@@ -4,8 +4,46 @@ pub mod indicator;
 pub mod model;
 pub mod strategy;
 
-/// 설정 로더
-pub mod config_loader;
+/// 설정 로드 오류
+#[derive(Debug)]
+pub enum ConfigError {
+    /// 파일 오류
+    FileError(String),
+    /// 파싱 오류
+    ParseError(String),
+    /// 유효성 검사 오류
+    ValidationError(String),
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::FileError(msg) => write!(f, "설정 파일 오류: {}", msg),
+            ConfigError::ParseError(msg) => write!(f, "설정 파싱 오류: {}", msg),
+            ConfigError::ValidationError(msg) => write!(f, "설정 유효성 검사 오류: {}", msg),
+        }
+    }
+}
+
+/// String으로 ConfigError 변환
+impl From<ConfigError> for String {
+    fn from(err: ConfigError) -> Self {
+        match err {
+            ConfigError::FileError(msg) => format!("설정 파일 오류: {}", msg),
+            ConfigError::ParseError(msg) => format!("설정 파싱 오류: {}", msg),
+            ConfigError::ValidationError(msg) => format!("설정 유효성 검사 오류: {}", msg),
+        }
+    }
+}
+
+/// 설정 로드 결과
+pub type ConfigResult<T> = Result<T, ConfigError>;
+
+/// 설정 로더 트레이트
+pub trait ConfigValidation {
+    /// 설정 유효성 검사
+    fn validate(&self) -> ConfigResult<()>;
+}
 
 #[cfg(test)]
 pub mod tests {

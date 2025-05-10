@@ -2,16 +2,15 @@ use super::Strategy;
 use super::StrategyType;
 use crate::analyzer::AnalyzerOps;
 use crate::candle_store::CandleStore;
-use crate::config_loader::{ConfigError, ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
 use crate::strategy::ma_common::{MAAnalyzer, MAStrategyCommon, MAStrategyConfigBase};
+use crate::{ConfigError, ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::Path;
 use trading_chart::Candle;
 
 /// 이동평균(MA) 전략 설정
@@ -168,25 +167,6 @@ impl<C: Candle + 'static> MAStrategy<C> {
         };
 
         Self::new(storage, strategy_config)
-    }
-
-    /// 설정 파일에서 전략 인스턴스 생성
-    pub fn from_config_file(
-        storage: &CandleStore<C>,
-        config_path: &Path,
-    ) -> Result<MAStrategy<C>, String> {
-        // 설정 파일 로드
-        let config = match crate::config_loader::ConfigLoader::load_from_file::<MAStrategyConfig>(
-            config_path,
-            crate::config_loader::ConfigFormat::Auto,
-        ) {
-            Ok(cfg) => cfg,
-            Err(e) => return Err(format!("설정 파일 로드 오류: {}", e)),
-        };
-
-        info!("MA 전략 설정 로드됨: {:?}", config);
-
-        Self::new(storage, config)
     }
 }
 

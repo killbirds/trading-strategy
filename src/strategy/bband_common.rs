@@ -1,11 +1,9 @@
-use crate::config_loader::{ConfigError, ConfigResult, ConfigValidation};
+use crate::{ConfigError, ConfigResult, ConfigValidation};
 use log::{debug, error, info};
 use serde::Deserialize;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json;
 use std::collections::HashMap;
-use std::path::Path;
 
 // analyzer에서 BBandAnalyzer 및 BBandAnalyzerData 가져오기
 pub use crate::analyzer::bband_analyzer::{BBandAnalyzer, BBandAnalyzerData};
@@ -46,18 +44,6 @@ impl ConfigValidation for BBandStrategyConfigBase {
 }
 
 impl BBandStrategyConfigBase {
-    /// 설정 파일에서 로드
-    pub fn from_file<T>(path: &Path) -> ConfigResult<T>
-    where
-        T: DeserializeOwned + ConfigValidation,
-    {
-        debug!("볼린저 밴드 전략 설정 파일 로드 시작: {}", path.display());
-        crate::config_loader::ConfigLoader::load_from_file(
-            path,
-            crate::config_loader::ConfigFormat::Auto,
-        )
-    }
-
     /// JSON 문자열에서 설정 로드
     ///
     /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.

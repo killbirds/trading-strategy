@@ -314,7 +314,6 @@ mod tests {
     use super::*;
     use crate::tests::TestCandle;
     use chrono::Utc;
-    
 
     fn create_test_candles() -> Vec<TestCandle> {
         vec![

@@ -40,6 +40,15 @@ where
     data: HashMap<K, T>,
 }
 
+impl<K, T> Display for TAs<K, T>
+where
+    K: PartialEq + Eq + Hash + std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TAs({})", self.name)
+    }
+}
+
 /// 값들의 배열 정렬 여부를 확인하는 내부 함수
 ///
 /// # Arguments
@@ -186,16 +195,6 @@ where
     pub fn is_all(&self, is_fn: impl Fn(&T) -> bool) -> bool {
         let all_ta = self.get_all();
         all_ta.into_iter().all(is_fn)
-    }
-}
-
-impl<K, T> Display for TAs<K, T>
-where
-    K: Debug + PartialEq + Eq + Hash,
-    T: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:#?}", self.data)
     }
 }
 

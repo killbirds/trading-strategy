@@ -258,7 +258,7 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         let mut cache = self.cache.borrow_mut();
         cache.buy_signal_strength = None;
         cache.sell_signal_strength = None;
-        if let Some(last_item) = self.ctx.items.last() {
+        if self.ctx.items.last().is_some() {
             cache.last_candle_index = self.ctx.items.len();
         }
     }

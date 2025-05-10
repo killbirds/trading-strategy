@@ -1,11 +1,9 @@
 use super::Strategy;
-use crate::config_loader::{ConfigError, ConfigResult, ConfigValidation};
+use crate::{ConfigError, ConfigResult, ConfigValidation};
 use serde::Deserialize;
 use serde::Serialize;
-use serde::de::DeserializeOwned;
 use serde_json;
 use std::collections::HashMap;
-use std::path::Path;
 use trading_chart::Candle;
 
 // analyzer에서 MACDAnalyzer 관련 구조체 가져오기
@@ -58,17 +56,6 @@ impl ConfigValidation for MACDStrategyConfigBase {
 }
 
 impl MACDStrategyConfigBase {
-    /// 설정 파일에서 로드
-    pub fn from_file<T>(path: &Path) -> ConfigResult<T>
-    where
-        T: DeserializeOwned + ConfigValidation,
-    {
-        crate::config_loader::ConfigLoader::load_from_file(
-            path,
-            crate::config_loader::ConfigFormat::Auto,
-        )
-    }
-
     /// JSON 문자열에서 설정 로드
     ///
     /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.

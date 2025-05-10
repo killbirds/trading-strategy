@@ -3,15 +3,14 @@ use super::StrategyType;
 use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
-use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+use crate::{ConfigResult, ConfigValidation};
 use log::{debug, error, info};
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::Path;
 use trading_chart::Candle;
 
 /// 볼린저 밴드 전략 설정
@@ -179,36 +178,6 @@ impl<C: Candle + 'static> BBandStrategy<C> {
         };
 
         Self::new(storage, strategy_config)
-    }
-
-    /// 설정 파일에서 전략 인스턴스 생성
-    pub fn from_config_file(
-        storage: &CandleStore<C>,
-        config_path: &Path,
-    ) -> Result<BBandStrategy<C>, String> {
-        debug!(
-            "볼린저 밴드 전략 초기화 시작 (설정 파일 사용): {}",
-            config_path.display()
-        );
-
-        let config = match BBandStrategyConfigBase::from_file::<BBandStrategyConfig>(config_path) {
-            Ok(cfg) => {
-                debug!("설정 파일 로드 성공: {:?}", cfg);
-                cfg
-            }
-            Err(e) => {
-                error!(
-                    "볼린저 밴드 전략 설정 파일 로드 실패: {} - {}",
-                    config_path.display(),
-                    e
-                );
-                return Err(format!("설정 파일 로드 오류: {}", e));
-            }
-        };
-
-        info!("볼린저밴드 전략 설정 로드됨: {:?}", config);
-
-        Self::new(storage, config)
     }
 }
 

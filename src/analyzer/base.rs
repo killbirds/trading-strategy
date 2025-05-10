@@ -57,50 +57,6 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
         lv < rv
     }
 
-    /// 모든 기술적 지표가 특정 값보다 큰지 확인
-    ///
-    /// # Arguments
-    /// * `get` - 기술적 지표 컬렉션 가져오는 함수
-    /// * `get_value` - 개별 지표에서 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 모든 지표 값이 타겟보다 크면 true
-    fn is_all_greater_than_target<K, T>(
-        &self,
-        get: impl Fn(&Self) -> &TAs<K, T>,
-        get_value: impl Fn(&T) -> f64,
-        target: f64,
-    ) -> bool
-    where
-        K: PartialEq + Eq + Hash + std::fmt::Debug,
-    {
-        let tas = get(self);
-        tas.is_all(|ta| get_value(ta) > target)
-    }
-
-    /// 모든 기술적 지표가 특정 값보다 작은지 확인
-    ///
-    /// # Arguments
-    /// * `get` - 기술적 지표 컬렉션 가져오는 함수
-    /// * `get_value` - 개별 지표에서 값 추출 함수
-    /// * `target` - 비교할 타겟 값
-    ///
-    /// # Returns
-    /// * `bool` - 모든 지표 값이 타겟보다 작으면 true
-    fn is_all_less_than_target<K, T>(
-        &self,
-        get: impl Fn(&Self) -> &TAs<K, T>,
-        get_value: impl Fn(&T) -> f64,
-        target: f64,
-    ) -> bool
-    where
-        K: PartialEq + Eq + Hash + std::fmt::Debug,
-    {
-        let tas = get(self);
-        tas.is_all(|ta| get_value(ta) < target)
-    }
-
     /// 기술적 지표가 정규 배열(오름차순)인지 확인
     ///
     /// # Arguments

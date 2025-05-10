@@ -3,15 +3,14 @@ use super::StrategyType;
 use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
-use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+use crate::{ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::Path;
 use trading_chart::Candle;
 
 /// 볼린저밴드 숏 전략 설정
@@ -140,22 +139,6 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
             ctx,
         })
     }
-
-    /// 설정 파일에서 전략 인스턴스 생성
-    pub fn from_config_file(
-        storage: &CandleStore<C>,
-        config_path: &Path,
-    ) -> Result<BBandShortStrategy<C>, String> {
-        let config =
-            match BBandStrategyConfigBase::from_file::<BBandShortStrategyConfig>(config_path) {
-                Ok(cfg) => cfg,
-                Err(e) => return Err(format!("설정 파일 로드 오류: {}", e)),
-            };
-        info!("볼린저밴드 숏 전략 설정 로드됨: {:?}", config);
-
-        let ctx = BBandAnalyzer::new(config.period, config.multiplier, storage);
-        Ok(BBandShortStrategy { config, ctx })
-    }
 }
 
 impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
@@ -165,11 +148,9 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
 
     fn should_enter(&self, _candle: &C) -> bool {
         // 가격이 상단 밴드를 상향 돌파했을 때 숏 진입 신호
-        let is_buy = self.ctx.is_break_through_by_satisfying(
-            |data| data.candle.high_price() > data.bband.upper(),
-            1,
-            self.config.count,
-        );
+        let is_buy = self
+            .ctx
+            .is_break_through_upper_band_from_below(self.config.count);
 
         // 밴드 폭이 충분히 넓은지 확인
         is_buy && self.ctx.is_band_width_sufficient()
@@ -177,11 +158,8 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
 
     fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
         // 가격이 하단 밴드를 하향 돌파했을 때 숏 청산 신호
-        self.ctx.is_break_through_by_satisfying(
-            |data| data.candle.low_price() < data.bband.lower(),
-            1,
-            self.config.count,
-        )
+        self.ctx
+            .is_break_through_lower_band_from_below(self.config.count)
     }
 
     fn position(&self) -> PositionType {

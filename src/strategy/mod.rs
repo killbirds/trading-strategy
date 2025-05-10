@@ -26,9 +26,9 @@ pub mod three_rsi_strategy;
 mod tests;
 
 use crate::candle_store::CandleStore;
-pub use crate::config_loader::{ConfigError, ConfigResult};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+pub use crate::{ConfigError, ConfigResult};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -308,110 +308,6 @@ impl StrategyFactory {
             StrategyType::HybridShort => PositionType::Short,
             StrategyType::MultiTimeframe => PositionType::Long,
         }
-    }
-
-    /// 설정 파일에서 전략 인스턴스 생성
-    ///
-    /// # Arguments
-    /// * `strategy_type` - 생성할 전략 유형
-    /// * `storage` - 캔들 데이터 저장소
-    /// * `config_path` - 설정 파일 경로
-    ///
-    /// # Returns
-    /// * `Result<Box<dyn Strategy>, String>` - 생성된 전략 인스턴스 또는 에러
-    pub fn build_from_config<C: Candle + 'static>(
-        strategy_type: StrategyType,
-        storage: &CandleStore<C>,
-        config_path: &std::path::Path,
-    ) -> Result<Box<dyn Strategy<C>>, String> {
-        info!(
-            "설정 파일에서 전략 빌드 시작: {}, 파일: {}",
-            strategy_type,
-            config_path.display()
-        );
-        debug!("캔들 데이터 상태: 항목 수={}", storage.len());
-
-        if storage.is_empty() {
-            warn!("캔들 데이터가 비어 있습니다. 전략이 제대로 작동하지 않을 수 있습니다.");
-        }
-
-        if !config_path.exists() {
-            error!("설정 파일이 존재하지 않습니다: {}", config_path.display());
-            return Err(format!(
-                "설정 파일이 존재하지 않습니다: {}",
-                config_path.display()
-            ));
-        }
-
-        let result = match strategy_type {
-            StrategyType::BBand => {
-                debug!(
-                    "볼린저 밴드 전략 초기화 시작 (설정 파일: {})",
-                    config_path.display()
-                );
-                bband_strategy::BBandStrategy::from_config_file(storage, config_path)
-                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            StrategyType::BBandShort => {
-                debug!(
-                    "볼린저 밴드 숏 전략 초기화 시작 (설정 파일: {})",
-                    config_path.display()
-                );
-                bband_short_strategy::BBandShortStrategy::from_config_file(storage, config_path)
-                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            StrategyType::MACD => {
-                debug!(
-                    "MACD 전략 초기화 시작 (설정 파일: {})",
-                    config_path.display()
-                );
-                macd_strategy::MACDStrategy::from_config_file(storage, config_path)
-                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            StrategyType::MACDShort => {
-                debug!(
-                    "MACD 숏 전략 초기화 시작 (설정 파일: {})",
-                    config_path.display()
-                );
-                macd_short_strategy::MACDShortStrategy::from_config_file(storage, config_path)
-                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            StrategyType::MA => {
-                debug!("MA 전략 초기화 시작 (설정 파일: {})", config_path.display());
-                ma_strategy::MAStrategy::from_config_file(storage, config_path)
-                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            StrategyType::MultiTimeframe => {
-                debug!(
-                    "MultiTimeframe 전략 초기화 시작 (설정 파일: {})",
-                    config_path.display()
-                );
-                multi_timeframe_strategy::MultiTimeframeStrategy::from_config_file(
-                    storage,
-                    config_path,
-                )
-                .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
-            }
-            _ => {
-                warn!(
-                    "설정 파일 기반 생성이 구현되지 않은 전략: {}. 기본 설정으로 대체합니다.",
-                    strategy_type
-                );
-
-                Self::build(strategy_type, storage, None)
-            }
-        };
-
-        match &result {
-            Ok(_) => {
-                info!("설정 파일에서 전략 빌드 성공: {}", strategy_type);
-            }
-            Err(e) => {
-                error!("설정 파일에서 전략 빌드 실패: {} - {}", strategy_type, e);
-            }
-        }
-
-        result
     }
 
     /// 기본 설정 파일 경로 생성

@@ -20,9 +20,5 @@ env_logger = "0.10.2"
 name = "trading_strategy"
 path = "src/lib.rs" 
 
-[[bin]]
-name = "load_strategy_config"
-path = "src/bin/load_strategy_config.rs"
-
 [dev-dependencies]
 tempfile = "3.19.1"

@@ -1,15 +1,14 @@
 use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
-use crate::config_loader::{ConfigResult, ConfigValidation};
 use crate::model::PositionType;
 use crate::model::TradePosition;
+use crate::{ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::path::Path;
 use trading_chart::Candle;
 
 // 공통 모듈 가져오기
@@ -143,20 +142,6 @@ impl<C: Candle + 'static> MACDStrategy<C> {
         };
 
         Self::new(storage, strategy_config)
-    }
-
-    /// 설정 파일에서 전략 인스턴스 생성
-    pub fn from_config_file(
-        storage: &CandleStore<C>,
-        config_path: &Path,
-    ) -> Result<MACDStrategy<C>, String> {
-        let config = match MACDStrategyConfigBase::from_file::<MACDStrategyConfig>(config_path) {
-            Ok(cfg) => cfg,
-            Err(e) => return Err(format!("설정 파일 로드 오류: {}", e)),
-        };
-        info!("MACD 전략 설정 로드됨: {:?}", config);
-
-        Self::new(storage, config)
     }
 }
 
