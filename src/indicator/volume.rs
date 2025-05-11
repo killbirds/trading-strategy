@@ -105,12 +105,12 @@ where
         };
 
         for candle in &data[slice_start..] {
-            self.data_buffer.push(candle.acc_trade_volume());
-            self.accumulated_volume += candle.acc_trade_volume();
+            self.data_buffer.push(candle.quote_volume());
+            self.accumulated_volume += candle.quote_volume();
         }
 
         let current_volume = if let Some(last) = data.last() {
-            last.acc_trade_volume()
+            last.quote_volume()
         } else {
             0.0
         };
@@ -151,7 +151,7 @@ where
             self.data_buffer.remove(0);
         }
 
-        let current_volume = data.acc_trade_volume();
+        let current_volume = data.quote_volume();
         self.data_buffer.push(current_volume);
         self.accumulated_volume += current_volume;
 

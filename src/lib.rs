@@ -90,14 +90,17 @@ pub mod tests {
         fn datetime(&self) -> DateTime<Utc> {
             DateTime::from_timestamp(self.timestamp, 0).unwrap()
         }
-        fn candle_interval(&self) -> &CandleInterval {
+        fn interval(&self) -> &CandleInterval {
             &CandleInterval::Minute1
         }
-        fn acc_trade_price(&self) -> f64 {
-            self.volume * self.close
-        }
-        fn acc_trade_volume(&self) -> f64 {
+        fn volume(&self) -> f64 {
             self.volume
+        }
+        fn quote_volume(&self) -> f64 {
+            self.volume
+        }
+        fn trade_count(&self) -> Option<u64> {
+            None
         }
     }
 }

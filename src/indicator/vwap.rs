@@ -160,7 +160,7 @@ where
         self.values.clear();
         for item in data {
             let typical_price = (item.high_price() + item.low_price() + item.close_price()) / 3.0;
-            self.values.push((typical_price, item.acc_trade_volume()));
+            self.values.push((typical_price, item.quote_volume()));
         }
 
         // 충분한 데이터가 없는 경우
@@ -200,7 +200,7 @@ where
     pub fn next(&mut self, data: &C) -> VWAP {
         // 새 데이터 추가
         let typical_price = (data.high_price() + data.low_price() + data.close_price()) / 3.0;
-        self.values.push((typical_price, data.acc_trade_volume()));
+        self.values.push((typical_price, data.quote_volume()));
 
         // 필요한 데이터만 유지
         if self.params.period > 0 && self.values.len() > self.params.period * 2 {
