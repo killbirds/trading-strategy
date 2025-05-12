@@ -2,7 +2,6 @@ use super::Strategy;
 use super::StrategyType;
 use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
 use crate::analyzer::base::AnalyzerOps;
-use crate::analyzer::rsi_analyzer::RSIAnalyzerData;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use crate::model::TradePosition;
@@ -272,7 +271,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.value > self.config.base.rsi_lower,
+                |data| data.rsi.value > self.config.base.rsi_lower,
                 1,
                 self.config_rsi_count(),
             )
@@ -284,7 +283,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
             false
         } else {
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.value < self.config.base.rsi_upper,
+                |data| data.rsi.value < self.config.base.rsi_upper,
                 1,
                 self.config_rsi_count(),
             )

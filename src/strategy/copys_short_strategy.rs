@@ -334,7 +334,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 상한선보다 높으면 숏 진입 (롱 전략과 반대로 높은 값에서 진입)
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.value > self.config.base.rsi_lower,
+                |data| data.rsi.value > self.config.base.rsi_upper,
                 1,
                 self.config.rsi_count,
             )
@@ -348,7 +348,7 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         } else {
             // RSI가 하한선보다 낮으면 숏 청산
             self.ctx.is_break_through_by_satisfying(
-                |data: &RSIAnalyzerData<C>| data.rsi.value < self.config.base.rsi_upper,
+                |data| data.rsi.value < self.config.base.rsi_lower,
                 1,
                 self.config.rsi_count,
             )
