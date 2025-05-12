@@ -3,7 +3,6 @@ use super::StrategyType;
 use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
 use super::split;
 use crate::analyzer::base::AnalyzerOps;
-use crate::analyzer::rsi_analyzer::RSIAnalyzerData;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use crate::model::PositionType;

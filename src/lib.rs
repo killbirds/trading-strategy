@@ -1,5 +1,6 @@
 pub mod analyzer;
 pub mod candle_store;
+pub mod filter;
 pub mod indicator;
 pub mod model;
 pub mod strategy;

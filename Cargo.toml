@@ -15,6 +15,7 @@ ta-lib = "0.1.2"
 once_cell = "1.21.3"
 trading-chart = { path = "../trading-chart" }
 env_logger = "0.10.2"
+anyhow = "1.0.98"
 
 [lib]
 name = "trading_strategy"
