@@ -361,13 +361,13 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         let avg_volume: f64 = data
             .iter()
             .skip(n)
-            .map(|d| d.candle().quote_volume())
+            .map(|d| d.candle().volume())
             .sum::<f64>()
             / (data.len() - n) as f64;
 
         // 최근 n개 캔들 중 하나라도 평균의 threshold배 이상인지 확인
         data.iter()
             .take(n)
-            .any(|d| d.candle().quote_volume() > avg_volume * threshold)
+            .any(|d| d.candle().volume() > avg_volume * threshold)
     }
 }
