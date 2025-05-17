@@ -2,6 +2,7 @@
 // 각종 기술적 분석 지표를 제공합니다.
 
 pub mod adx;
+pub mod atr;
 pub mod bband;
 pub mod ichimoku;
 pub mod ma;
@@ -9,6 +10,7 @@ pub mod macd;
 pub mod max;
 pub mod min;
 pub mod rsi;
+pub mod supertrend;
 pub mod utils;
 pub mod volume;
 pub mod vwap;

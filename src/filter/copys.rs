@@ -1,0 +1,140 @@
+use anyhow::Result;
+use std::fmt;
+use trading_chart::Candle;
+
+use crate::analyzer::base::AnalyzerOps;
+use crate::indicator::ma::MAType;
+use crate::strategy::copys_common::{
+    CopysStrategyCommon, CopysStrategyContext, create_strategy_context_for_filter,
+};
+use crate::strategy::{Strategy, StrategyType};
+
+use super::CopysParams;
+
+/// CopyS 모의 전략 (필터 사용을 위한 임시 객체)
+struct CopysFilter<C: Candle> {
+    ctx: CopysStrategyContext<C>,
+    params: CopysParams,
+}
+
+impl<C: Candle> CopysFilter<C> {
+    fn new(ctx: CopysStrategyContext<C>, params: CopysParams) -> Self {
+        Self { ctx, params }
+    }
+}
+
+// Display 트레이트 구현
+impl<C: Candle> fmt::Display for CopysFilter<C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CopyS Filter [RSI: {}/{}]",
+            self.params.rsi_lower, self.params.rsi_upper
+        )
+    }
+}
+
+impl<C: Candle + 'static> Strategy<C> for CopysFilter<C> {
+    fn next(&mut self, candle: C) {
+        self.ctx.next(candle);
+    }
+
+    fn should_enter(&self, _candle: &C) -> bool {
+        // 전략 트레이트 구현 요구사항
+        false
+    }
+
+    fn should_exit(&self, _holdings: &crate::model::TradePosition, _candle: &C) -> bool {
+        // 전략 트레이트 구현 요구사항
+        false
+    }
+
+    fn position(&self) -> crate::model::PositionType {
+        crate::model::PositionType::Long
+    }
+
+    fn name(&self) -> StrategyType {
+        StrategyType::Copys
+    }
+}
+
+impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysFilter<C> {
+    fn context(&self) -> &CopysStrategyContext<C> {
+        &self.ctx
+    }
+
+    fn config_rsi_lower(&self) -> f64 {
+        self.params.rsi_lower
+    }
+
+    fn config_rsi_upper(&self) -> f64 {
+        self.params.rsi_upper
+    }
+
+    fn config_rsi_count(&self) -> usize {
+        self.params.consecutive_n
+    }
+}
+
+/// CopyS 전략 필터를 적용합니다.
+pub fn filter_copys<C: Candle + 'static>(
+    symbol: &str,
+    params: &CopysParams,
+    candles: &[C],
+) -> Result<bool> {
+    if candles.len() < 60 {
+        log::warn!(
+            "코인 {} CopyS 필터에 필요한 캔들 데이터가 부족합니다. 필요: {} >= 60",
+            symbol,
+            candles.len()
+        );
+        return Ok(false);
+    }
+
+    // MAType 설정
+    let ma_type = MAType::EMA;
+    let ma_periods = vec![10, 20, 60]; // 기본 MA 주기 설정
+
+    // 전략 컨텍스트 생성
+    let ctx = match create_strategy_context_for_filter(
+        symbol,
+        params.rsi_period,
+        &ma_type,
+        &ma_periods,
+        candles,
+    ) {
+        Ok(context) => context,
+        Err(e) => {
+            log::warn!("코인 {} CopyS 필터 컨텍스트 생성 실패: {}", symbol, e);
+            return Ok(false);
+        }
+    };
+
+    // 모의 전략 객체 생성
+    let filter = CopysFilter::new(ctx, params.clone());
+
+    // 전략 신호 체크
+    let result = match params.filter_type {
+        0 => filter.check_buy_signal(params.consecutive_n),
+        1 => filter.check_sell_signal(params.consecutive_n),
+        _ => false,
+    };
+
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_copys_params() {
+        // CopysParams 기본값 테스트
+        let params = CopysParams::default();
+        assert_eq!(params.rsi_period, 14);
+        assert_eq!(params.rsi_upper, 70.0);
+        assert_eq!(params.rsi_lower, 30.0);
+        assert_eq!(params.filter_type, 0);
+        assert_eq!(params.consecutive_n, 1);
+    }
+}

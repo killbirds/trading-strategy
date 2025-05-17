@@ -7,6 +7,7 @@ use trading_chart::Candle;
 // 각 필터 모듈 가져오기
 mod adx;
 mod bollinger_band;
+mod copys;
 mod ichimoku;
 mod macd;
 mod moving_average;
@@ -30,6 +31,8 @@ pub enum TechnicalFilterType {
     Ichimoku,
     /// VWAP 기반 필터 (가격/거래량)
     VWAP,
+    /// CopyS 기반 필터 (복합 전략)
+    Copys,
 }
 
 impl fmt::Display for TechnicalFilterType {
@@ -42,6 +45,7 @@ impl fmt::Display for TechnicalFilterType {
             TechnicalFilterType::MovingAverage => write!(f, "이동평균선"),
             TechnicalFilterType::Ichimoku => write!(f, "이치모쿠"),
             TechnicalFilterType::VWAP => write!(f, "VWAP"),
+            TechnicalFilterType::Copys => write!(f, "COPYS"),
         }
     }
 }
@@ -58,12 +62,12 @@ impl FromStr for TechnicalFilterType {
             "MOVINGAVERAGE" | "MOVING_AVERAGE" | "MA" => Ok(TechnicalFilterType::MovingAverage),
             "ICHIMOKU" => Ok(TechnicalFilterType::Ichimoku),
             "VWAP" => Ok(TechnicalFilterType::VWAP),
+            "COPYS" => Ok(TechnicalFilterType::Copys),
             _ => Err(anyhow::anyhow!("알 수 없는 필터 타입: {}", s)),
         }
     }
 }
 
-// 각 필터 타입별 파라미터 구조체 정의
 /// RSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RSIParams {
@@ -73,7 +77,7 @@ pub struct RSIParams {
     pub oversold: f64,
     /// 과매수 기준점 (기본값: 70)
     pub overbought: f64,
-    /// 필터 유형 (0: 과매수 제거, 1: 과매도 제거, 2: 정상 범위만, 3: 극단 범위만, 4: 상승 추세, 5: 하락 추세)
+    /// 필터 유형 (0: 과매수 제거, 1: 과매도 제거, 2: 정상 범위만, 3: 극단 범위만, 4: 상승 추세, 5: 미구현)
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
@@ -172,11 +176,9 @@ impl Default for ADXParams {
 /// 이동평균선 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovingAverageParams {
-    /// 빠른 이동평균 기간 (기본값: 5)
-    pub fast_period: usize,
-    /// 느린 이동평균 기간 (기본값: 20)
-    pub slow_period: usize,
-    /// 필터 유형 (0: 가격 > 빠른 MA, 1: 가격 > 느린 MA, 2: 가격 > 빠른 MA & 느린 MA, 3: 빠른 MA > 느린 MA, 4: 빠른 MA < 느린 MA, 5: 골든 크로스, 6: 가격이 두 MA 사이)
+    /// 이동평균 기간 목록
+    pub periods: Vec<usize>,
+    /// 필터 유형 (0: 가격 > 첫번째 MA, 1: 가격 > 마지막 MA, 2: 정규 배열, 3: 첫번째 MA > 마지막 MA, 4: 첫번째 MA < 마지막 MA, 5: 골든 크로스, 6: 가격이 첫번째와 마지막 MA 사이)
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
@@ -185,8 +187,7 @@ pub struct MovingAverageParams {
 impl Default for MovingAverageParams {
     fn default() -> Self {
         Self {
-            fast_period: 5,
-            slow_period: 20,
+            periods: vec![5, 20],
             filter_type: 0,
             consecutive_n: 1,
         }
@@ -225,7 +226,7 @@ impl Default for IchimokuParams {
 pub struct VWAPParams {
     /// VWAP 계산 기간 (기본값: 20)
     pub period: usize,
-    /// 필터 유형 (0: 가격 > VWAP, 1: 가격 < VWAP, 2: 가격 ≈ VWAP, 3: VWAP 상향돌파, 4: VWAP 하향돌파, 5: VWAP 리바운드, 6: VWAP 간격 확대, 7: VWAP 간격 축소)
+    /// 필터 유형 (0: 가격 > VWAP, 1: 가격 < VWAP, 2: 가격 ≈ VWAP(미구현), 3: VWAP 상향돌파, 4: VWAP 하향돌파, 5: VWAP 리바운드, 6: VWAP 간격 확대, 7: VWAP 간격 축소)
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
@@ -240,6 +241,33 @@ impl Default for VWAPParams {
             filter_type: 0,
             consecutive_n: 1,
             threshold: 0.05,
+        }
+    }
+}
+
+/// CopyS 필터 파라미터
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CopysParams {
+    /// RSI 계산 기간 (기본값: 14)
+    pub rsi_period: usize,
+    /// RSI 상한 기준점 (기본값: 70)
+    pub rsi_upper: f64,
+    /// RSI 하한 기준점 (기본값: 30)
+    pub rsi_lower: f64,
+    /// 필터 유형 (0: 매수 신호, 1: 매도 신호)
+    pub filter_type: i32,
+    /// 연속 캔들 수 (기본값: 1)
+    pub consecutive_n: usize,
+}
+
+impl Default for CopysParams {
+    fn default() -> Self {
+        Self {
+            rsi_period: 14,
+            rsi_upper: 70.0,
+            rsi_lower: 30.0,
+            filter_type: 0,
+            consecutive_n: 1,
         }
     }
 }
@@ -265,6 +293,9 @@ pub enum TechnicalFilterConfig {
     Ichimoku(IchimokuParams),
     /// VWAP 필터 설정
     VWAP(VWAPParams),
+    /// CopyS 필터 설정
+    #[serde(rename = "COPYS")]
+    Copys(CopysParams),
 }
 
 impl TechnicalFilterConfig {
@@ -278,6 +309,7 @@ impl TechnicalFilterConfig {
             Self::MovingAverage(_) => TechnicalFilterType::MovingAverage,
             Self::Ichimoku(_) => TechnicalFilterType::Ichimoku,
             Self::VWAP(_) => TechnicalFilterType::VWAP,
+            Self::Copys(_) => TechnicalFilterType::Copys,
         }
     }
 }
@@ -285,6 +317,7 @@ impl TechnicalFilterConfig {
 // 각 필터 함수 재노출(re-export)
 pub use adx::filter_adx;
 pub use bollinger_band::filter_bollinger_band;
+pub use copys::filter_copys;
 pub use ichimoku::{IchimokuValues, filter_ichimoku};
 pub use macd::filter_macd;
 pub use moving_average::filter_moving_average;
@@ -313,6 +346,7 @@ impl TechnicalFilter {
             }
             TechnicalFilterConfig::Ichimoku(params) => filter_ichimoku(symbol, params, candles),
             TechnicalFilterConfig::VWAP(params) => filter_vwap(symbol, params, candles),
+            TechnicalFilterConfig::Copys(params) => filter_copys(symbol, params, candles),
         }
     }
 
@@ -432,14 +466,12 @@ mod tests {
 
     /// 이동평균선 필터 생성 유틸리티 함수
     pub fn create_moving_average_filter(
-        fast_period: usize,
-        slow_period: usize,
+        periods: Vec<usize>,
         filter_type: i32,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::MovingAverage(MovingAverageParams {
-            fast_period,
-            slow_period,
+            periods,
             filter_type,
             consecutive_n,
         })
@@ -477,6 +509,23 @@ mod tests {
         })
     }
 
+    /// CopyS 필터 생성 유틸리티 함수
+    pub fn create_copys_filter(
+        rsi_period: usize,
+        rsi_upper: f64,
+        rsi_lower: f64,
+        filter_type: i32,
+        consecutive_n: usize,
+    ) -> TechnicalFilterConfig {
+        TechnicalFilterConfig::Copys(CopysParams {
+            rsi_period,
+            rsi_upper,
+            rsi_lower,
+            filter_type,
+            consecutive_n,
+        })
+    }
+
     #[test]
     fn test_technical_filter_config() {
         // RSI 필터 생성 테스트
@@ -500,6 +549,19 @@ mod tests {
         let bb_filter = create_bollinger_band_filter(20, 2.0, 1, 1);
         assert_eq!(bb_filter.filter_type(), TechnicalFilterType::BollingerBand);
 
+        // CopyS 필터 생성 테스트
+        let copys_filter = create_copys_filter(14, 70.0, 30.0, 0, 1);
+        assert_eq!(copys_filter.filter_type(), TechnicalFilterType::Copys);
+        if let TechnicalFilterConfig::Copys(params) = copys_filter {
+            assert_eq!(params.rsi_period, 14);
+            assert_eq!(params.rsi_upper, 70.0);
+            assert_eq!(params.rsi_lower, 30.0);
+            assert_eq!(params.filter_type, 0);
+            assert_eq!(params.consecutive_n, 1);
+        } else {
+            panic!("잘못된 필터 타입");
+        }
+
         // filter_list 사용 예시 테스트
         test_example_filter_usage();
     }
@@ -511,7 +573,7 @@ mod tests {
             // RSI 과매수 필터 (RSI > 70인 코인 제외)
             create_rsi_filter(14, 30.0, 70.0, 0, 1),
             // 이동평균선 필터 (5일선이 20일선 위에 있을 때)
-            create_moving_average_filter(5, 20, 3, 3),
+            create_moving_average_filter(vec![5, 20], 3, 3),
             // MACD 필터 (MACD가 시그널선 위에 있는 코인만 포함)
             create_macd_filter(12, 26, 9, 0, 2, 0.0),
             // ADX 필터 (추세가 강한 코인만 포함)
@@ -557,10 +619,9 @@ mod tests {
         }
 
         // 이동평균선 필터 파라미터 검증
-        let ma_filter = create_moving_average_filter(5, 20, 3, 1);
+        let ma_filter = create_moving_average_filter(vec![5, 20], 3, 1);
         if let TechnicalFilterConfig::MovingAverage(params) = ma_filter {
-            assert_eq!(params.fast_period, 5);
-            assert_eq!(params.slow_period, 20);
+            assert_eq!(params.periods, vec![5, 20]);
             assert_eq!(params.filter_type, 3);
             assert_eq!(params.consecutive_n, 1);
         } else {
@@ -574,13 +635,15 @@ mod tests {
         let filters = [
             create_rsi_filter(14, 30.0, 70.0, 0, 1),
             create_macd_filter(12, 26, 9, 0, 1, 0.0),
-            create_moving_average_filter(5, 20, 3, 1),
+            create_moving_average_filter(vec![5, 20], 3, 1),
+            create_copys_filter(14, 70.0, 30.0, 0, 1),
         ];
 
-        assert_eq!(filters.len(), 3);
+        assert_eq!(filters.len(), 4);
         assert_eq!(filters[0].filter_type(), TechnicalFilterType::RSI);
         assert_eq!(filters[1].filter_type(), TechnicalFilterType::MACD);
         assert_eq!(filters[2].filter_type(), TechnicalFilterType::MovingAverage);
+        assert_eq!(filters[3].filter_type(), TechnicalFilterType::Copys);
     }
 
     #[test]
@@ -602,9 +665,40 @@ mod tests {
         assert_eq!(macd_params.threshold, 0.0);
 
         let ma_params = MovingAverageParams::default();
-        assert_eq!(ma_params.fast_period, 5);
-        assert_eq!(ma_params.slow_period, 20);
+        assert_eq!(ma_params.periods, vec![5, 20]);
         assert_eq!(ma_params.filter_type, 0);
         assert_eq!(ma_params.consecutive_n, 1);
+    }
+
+    #[test]
+    fn test_copys_filter_usage() {
+        // CopyS 필터 사용 예시
+        let copys_filters = vec![
+            // CopyS 매수 신호 필터
+            create_copys_filter(14, 70.0, 30.0, 0, 2),
+            // CopyS 매도 신호 필터
+            create_copys_filter(14, 70.0, 30.0, 1, 1),
+            // CopyS MA 정배열 필터
+            create_copys_filter(14, 70.0, 30.0, 2, 1),
+        ];
+
+        assert_eq!(copys_filters.len(), 3);
+        assert_eq!(copys_filters[0].filter_type(), TechnicalFilterType::Copys);
+
+        // 첫 번째 필터 파라미터 검증
+        if let TechnicalFilterConfig::Copys(params) = &copys_filters[0] {
+            assert_eq!(params.filter_type, 0); // 매수 신호
+            assert_eq!(params.consecutive_n, 2); // 2개 연속 캔들
+        } else {
+            panic!("잘못된 필터 타입");
+        }
+
+        // 두 번째 필터 파라미터 검증
+        if let TechnicalFilterConfig::Copys(params) = &copys_filters[1] {
+            assert_eq!(params.filter_type, 1); // 매도 신호
+            assert_eq!(params.consecutive_n, 1); // 1개 캔들
+        } else {
+            panic!("잘못된 필터 타입");
+        }
     }
 }

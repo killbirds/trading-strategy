@@ -3,6 +3,7 @@ use crate::model::{PositionType, Signal, TradePosition};
 use crate::strategy::{Strategy, StrategyFactory, StrategyType, split};
 use chrono::Utc;
 use std::collections::HashMap;
+use std::str::FromStr;
 use trading_chart::{Candle, CandleInterval};
 
 /// 멀티 타임프레임 분석 전략
@@ -10,7 +11,6 @@ use trading_chart::{Candle, CandleInterval};
 /// 여러 타임프레임의 데이터를 동시에 분석하여 매매 신호를 생성합니다.
 pub struct MultiTimeframeStrategy<C: Candle + 'static> {
     storage: CandleStore<C>,
-    config: HashMap<String, String>,
     timeframe_weights: HashMap<CandleInterval, f64>,
     base_strategy: StrategyType,
     confirmation_threshold: f64,
@@ -63,24 +63,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 
         // 타임프레임 문자열을 CandleInterval로 변환하고 해시맵에 삽입
         for (i, tf_str) in timeframe_strings.iter().enumerate() {
-            let interval = match tf_str.as_str() {
-                "1m" => CandleInterval::Minute1,
-                "3m" => CandleInterval::Minute3,
-                "5m" => CandleInterval::Minute5,
-                "15m" => CandleInterval::Minute15,
-                "30m" => CandleInterval::Minute30,
-                "1h" => CandleInterval::Hour1,
-                "2h" => CandleInterval::Hour2,
-                "4h" => CandleInterval::Hour4,
-                "6h" => CandleInterval::Hour6,
-                "8h" => CandleInterval::Hour8,
-                "12h" => CandleInterval::Hour12,
-                "1d" => CandleInterval::Day1,
-                "3d" => CandleInterval::Day3,
-                "1w" => CandleInterval::Week1,
-                "1M" => CandleInterval::Month1,
-                _ => return Err(format!("지원되지 않는 타임프레임: {}", tf_str)),
-            };
+            let interval = CandleInterval::from_str(tf_str)?;
 
             timeframe_weights.insert(interval, weights[i]);
             signals.insert(interval, Signal::Hold);
@@ -129,7 +112,6 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 
         Ok(MultiTimeframeStrategy {
             storage: CandleStore::new(Vec::new(), 1000, false),
-            config,
             timeframe_weights,
             base_strategy,
             confirmation_threshold,
@@ -180,6 +162,8 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             price: candle.close_price(),
             quantity: 1.0,
             market: "default".to_string(),
+            position_type: self.position_type,
+            stop_loss: None,
         })
     }
 

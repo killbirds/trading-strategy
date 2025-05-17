@@ -1,4 +1,7 @@
 use super::Strategy;
+use crate::analyzer::base::AnalyzerOps;
+use crate::candle_store::CandleStore;
+use crate::indicator::ma::MAType;
 use serde::Deserialize;
 use serde_json;
 use trading_chart::Candle;
@@ -8,7 +11,7 @@ pub use crate::analyzer::rsi_analyzer::{RSIAnalyzer, RSIAnalyzerData};
 pub type CopysStrategyContext<C> = crate::analyzer::rsi_analyzer::RSIAnalyzer<C>;
 
 /// Copys 전략 공통 설정 기본 구조체
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct CopysStrategyConfigBase {
     /// RSI 계산 기간
     pub rsi_period: usize,
@@ -85,4 +88,54 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
 
     /// RSI 판정 횟수 반환
     fn config_rsi_count(&self) -> usize;
+
+    /// 매수 신호 체크 (for 필터)
+    fn check_buy_signal(&self, consecutive_n: usize) -> bool {
+        // 이동평균선이 역배열이면 진입하지 않음
+        if self.context().is_ma_reverse_arrangement(1) {
+            return false;
+        }
+
+        // RSI가 하한선보다 낮으면 매수 신호
+        self.context().is_break_through_by_satisfying(
+            |data| data.rsi.value < self.config_rsi_lower(),
+            1,
+            consecutive_n,
+        )
+    }
+
+    /// 매도 신호 체크 (for 필터)
+    fn check_sell_signal(&self, consecutive_n: usize) -> bool {
+        // 이동평균선이 정배열이면 청산하지 않음
+        if self.context().is_ma_regular_arrangement(1) {
+            return false;
+        }
+
+        // RSI가 상한선보다 높으면 매도 신호
+        self.context().is_break_through_by_satisfying(
+            |data| data.rsi.value > self.config_rsi_upper(),
+            1,
+            consecutive_n,
+        )
+    }
+}
+
+/// Copys 필터에서 임시로 사용할 컨텍스트 생성 (RSIAnalyzer 활용)
+pub fn create_strategy_context_for_filter<C: Candle + 'static>(
+    _symbol: &str,
+    rsi_period: usize,
+    ma_type: &MAType,
+    ma_periods: &[usize],
+    candles: &[C],
+) -> anyhow::Result<RSIAnalyzer<C>> {
+    // CandleStore를 직접 사용하지 않아 임시 저장소 사용
+    let storage = CandleStore::<C>::new(Vec::new(), 1000, false);
+    let mut analyzer = RSIAnalyzer::new(rsi_period, ma_type, ma_periods, &storage);
+
+    // 캔들 데이터 추가
+    for candle in candles.iter() {
+        analyzer.next(candle.clone());
+    }
+
+    Ok(analyzer)
 }

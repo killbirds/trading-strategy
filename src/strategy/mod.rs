@@ -140,6 +140,15 @@ pub trait Strategy<C: Candle>: Display + Send {
     /// # Returns
     /// * `StrategyType` - 전략의 타입
     fn name(&self) -> StrategyType;
+
+    /// 손절가 설정 (필요한 경우 구현)
+    ///
+    /// # Arguments
+    /// * `holdings` - 현재 보유 자산 정보
+    /// * `candle` - 현재 캔들 데이터
+    fn set_stop_loss(&self, _holdings: &mut TradePosition, _candle: &C) {
+        // 기본 구현은 아무 것도 하지 않음
+    }
 }
 
 /// 전략 팩토리

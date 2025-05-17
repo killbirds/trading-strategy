@@ -1,10 +1,10 @@
 use super::Strategy;
 use super::StrategyType;
 use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
-use super::split;
+use crate::analyzer::atr_analyzer::ATRAnalyzer;
 use crate::analyzer::base::AnalyzerOps;
+use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
 use crate::candle_store::CandleStore;
-use crate::indicator::ma::MAType;
 use crate::model::PositionType;
 use crate::model::TradePosition;
 use log::info;
@@ -20,12 +20,14 @@ pub struct CopysShortStrategyConfig {
     pub base: CopysStrategyConfigBase,
     /// RSI 조건 판정 횟수
     pub rsi_count: usize,
-    /// 볼린저밴드 조건 판정 횟수
-    pub bband_count: usize,
-    /// 이동평균 계산 방식
-    pub ma: MAType,
-    /// 이동평균 기간 목록
-    pub ma_periods: Vec<usize>,
+    /// ATR 계산 기간
+    pub atr_period: usize,
+    /// ATR 배수 (손절가 계산용)
+    pub atr_multiplier: f64,
+    /// 슈퍼트렌드 계산 기간
+    pub st_period: usize,
+    /// 슈퍼트렌드 배수
+    pub st_multiplier: f64,
 }
 
 impl Default for CopysShortStrategyConfig {
@@ -40,9 +42,10 @@ impl Default for CopysShortStrategyConfig {
                 bband_multiplier: 2.0,
             },
             rsi_count: 3,
-            bband_count: 2,
-            ma: MAType::EMA,
-            ma_periods: vec![10, 20, 60],
+            atr_period: 14,
+            atr_multiplier: 1.0,
+            st_period: 10,
+            st_multiplier: 3.0,
         }
     }
 }
@@ -57,12 +60,20 @@ impl CopysShortStrategyConfig {
             return Err("RSI 판정 횟수는 0보다 커야 합니다".to_string());
         }
 
-        if self.bband_count == 0 {
-            return Err("볼린저밴드 판정 횟수는 0보다 커야 합니다".to_string());
+        if self.atr_period == 0 {
+            return Err("ATR 기간은 0보다 커야 합니다".to_string());
         }
 
-        if self.ma_periods.is_empty() {
-            return Err("이동평균 기간이 지정되지 않았습니다".to_string());
+        if self.atr_multiplier <= 0.0 {
+            return Err("ATR 배수는 0보다 커야 합니다".to_string());
+        }
+
+        if self.st_period < 2 {
+            return Err("슈퍼트렌드 기간은 2 이상이어야 합니다".to_string());
+        }
+
+        if self.st_multiplier <= 0.0 {
+            return Err("슈퍼트렌드 배수는 0보다 커야 합니다".to_string());
         }
 
         Ok(())
@@ -82,129 +93,157 @@ impl CopysShortStrategyConfig {
     /// HashMap에서 설정 로드
     fn from_hash_map(config: &HashMap<String, String>) -> Result<CopysShortStrategyConfig, String> {
         // RSI 관련 설정
-        let rsi_count = match config.get("rsi_count") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "RSI 연속 판정 횟수 파싱 오류".to_string())?;
-
-                if value == 0 {
-                    return Err("RSI 연속 판정 횟수는 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("rsi_count 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_lower = match config.get("rsi_lower") {
-            Some(value_str) => value_str
-                .parse::<f64>()
-                .map_err(|_| "RSI 하한 임계값 파싱 오류".to_string())?,
-            None => return Err("rsi_lower 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_upper = match config.get("rsi_upper") {
-            Some(value_str) => value_str
-                .parse::<f64>()
-                .map_err(|_| "RSI 상한 임계값 파싱 오류".to_string())?,
-            None => return Err("rsi_upper 설정이 필요합니다".to_string()),
-        };
-
-        if rsi_lower >= rsi_upper {
-            return Err(format!(
-                "숏 전략에서 RSI 하한값({})은 상한값({})보다 작거나 같아야 합니다",
-                rsi_lower, rsi_upper
-            ));
-        }
-
         let rsi_period = match config.get("rsi_period") {
-            Some(value_str) => {
-                let value = value_str
+            Some(period_str) => {
+                let period = period_str
                     .parse::<usize>()
-                    .map_err(|_| "RSI 계산 기간 파싱 오류".to_string())?;
+                    .map_err(|_| "RSI 기간 파싱 오류".to_string())?;
 
-                if value == 0 {
-                    return Err("RSI 계산 기간은 0보다 커야 합니다".to_string());
+                if period < 2 {
+                    return Err("RSI 기간은 2 이상이어야 합니다".to_string());
                 }
 
-                value
+                period
             }
             None => return Err("rsi_period 설정이 필요합니다".to_string()),
         };
 
-        // 볼린저밴드 관련 설정
-        let bband_count = match config.get("bband_count") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "볼린저밴드 연속 판정 횟수 파싱 오류".to_string())?;
+        let rsi_lower = match config.get("rsi_lower") {
+            Some(lower_str) => {
+                let lower = lower_str
+                    .parse::<f64>()
+                    .map_err(|_| "RSI 하한값 파싱 오류".to_string())?;
 
-                if value == 0 {
-                    return Err("볼린저밴드 연속 판정 횟수는 0보다 커야 합니다".to_string());
+                if !(0.0..=100.0).contains(&lower) {
+                    return Err(format!("RSI 하한값({})은 0과 100 사이여야 합니다", lower));
                 }
 
-                value
+                lower
             }
-            None => return Err("bband_count 설정이 필요합니다".to_string()),
+            None => return Err("rsi_lower 설정이 필요합니다".to_string()),
         };
 
-        let bband_period = match config.get("bband_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "볼린저밴드 계산 기간 파싱 오류".to_string())?;
+        let rsi_upper = match config.get("rsi_upper") {
+            Some(upper_str) => {
+                let upper = upper_str
+                    .parse::<f64>()
+                    .map_err(|_| "RSI 상한값 파싱 오류".to_string())?;
 
-                if value == 0 {
-                    return Err("볼린저밴드 계산 기간은 0보다 커야 합니다".to_string());
+                if !(0.0..=100.0).contains(&upper) {
+                    return Err(format!("RSI 상한값({})은 0과 100 사이여야 합니다", upper));
                 }
 
-                value
+                upper
+            }
+            None => return Err("rsi_upper 설정이 필요합니다".to_string()),
+        };
+
+        let rsi_count = match config.get("rsi_count") {
+            Some(count_str) => {
+                let count = count_str
+                    .parse::<usize>()
+                    .map_err(|_| "RSI 판정 횟수 파싱 오류".to_string())?;
+
+                if count == 0 {
+                    return Err("RSI 판정 횟수는 0보다 커야 합니다".to_string());
+                }
+
+                count
+            }
+            None => return Err("rsi_count 설정이 필요합니다".to_string()),
+        };
+
+        // 볼린저 밴드 관련 설정
+        let bband_period = match config.get("bband_period") {
+            Some(period_str) => {
+                let period = period_str
+                    .parse::<usize>()
+                    .map_err(|_| "볼린저 밴드 기간 파싱 오류".to_string())?;
+
+                if period < 2 {
+                    return Err("볼린저 밴드 기간은 2 이상이어야 합니다".to_string());
+                }
+
+                period
             }
             None => return Err("bband_period 설정이 필요합니다".to_string()),
         };
 
         let bband_multiplier = match config.get("bband_multiplier") {
-            Some(value_str) => {
-                let value = value_str
+            Some(multiplier_str) => {
+                let multiplier = multiplier_str
                     .parse::<f64>()
-                    .map_err(|_| "볼린저밴드 표준편차 승수 파싱 오류".to_string())?;
+                    .map_err(|_| "볼린저 밴드 승수 파싱 오류".to_string())?;
 
-                if value <= 0.0 {
-                    return Err("볼린저밴드 표준편차 승수는 0보다 커야 합니다".to_string());
+                if multiplier <= 0.0 {
+                    return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
                 }
 
-                value
+                multiplier
             }
             None => return Err("bband_multiplier 설정이 필요합니다".to_string()),
         };
 
-        // 이동평균 관련 설정
-        let ma = match config.get("ma").map(|s| s.as_str()) {
-            Some("sma") => MAType::SMA,
-            Some("ema") => MAType::EMA,
-            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {}", unknown)),
-            None => return Err("ma 설정이 필요합니다".to_string()),
+        // ATR 관련 설정
+        let atr_period = match config.get("atr_period") {
+            Some(period_str) => {
+                let period = period_str
+                    .parse::<usize>()
+                    .map_err(|_| "ATR 기간 파싱 오류".to_string())?;
+
+                if period == 0 {
+                    return Err("ATR 기간은 0보다 커야 합니다".to_string());
+                }
+
+                period
+            }
+            None => 14, // 기본값
         };
 
-        let ma_periods = match config.get("ma_periods") {
-            Some(periods_str) => match split(periods_str) {
-                Ok(periods) => {
-                    if periods.is_empty() {
-                        return Err("이동평균 기간이 비어 있습니다".to_string());
-                    }
+        let atr_multiplier = match config.get("atr_multiplier") {
+            Some(multiplier_str) => {
+                let multiplier = multiplier_str
+                    .parse::<f64>()
+                    .map_err(|_| "ATR 배수 파싱 오류".to_string())?;
 
-                    for &period in &periods {
-                        if period == 0 {
-                            return Err("이동평균 기간은 0보다 커야 합니다".to_string());
-                        }
-                    }
-
-                    periods
+                if multiplier <= 0.0 {
+                    return Err("ATR 배수는 0보다 커야 합니다".to_string());
                 }
-                Err(e) => return Err(format!("이동평균 기간 파싱 오류: {}", e)),
-            },
-            None => return Err("ma_periods 설정이 필요합니다".to_string()),
+
+                multiplier
+            }
+            None => 1.0, // 기본값
+        };
+
+        // 슈퍼트렌드 관련 설정
+        let st_period = match config.get("st_period") {
+            Some(period_str) => {
+                let period = period_str
+                    .parse::<usize>()
+                    .map_err(|_| "슈퍼트렌드 기간 파싱 오류".to_string())?;
+
+                if period < 2 {
+                    return Err("슈퍼트렌드 기간은 2 이상이어야 합니다".to_string());
+                }
+
+                period
+            }
+            None => 10, // 기본값
+        };
+
+        let st_multiplier = match config.get("st_multiplier") {
+            Some(multiplier_str) => {
+                let multiplier = multiplier_str
+                    .parse::<f64>()
+                    .map_err(|_| "슈퍼트렌드 배수 파싱 오류".to_string())?;
+
+                if multiplier <= 0.0 {
+                    return Err("슈퍼트렌드 배수는 0보다 커야 합니다".to_string());
+                }
+
+                multiplier
+            }
+            None => 3.0, // 기본값
         };
 
         Ok(CopysShortStrategyConfig {
@@ -216,42 +255,40 @@ impl CopysShortStrategyConfig {
                 bband_multiplier,
             },
             rsi_count,
-            bband_count,
-            ma,
-            ma_periods,
+            atr_period,
+            atr_multiplier,
+            st_period,
+            st_multiplier,
         })
     }
 }
 
 /// Copys 기반 숏 전략
-#[derive(Debug)]
 pub struct CopysShortStrategy<C: Candle> {
     /// 전략 설정
     config: CopysShortStrategyConfig,
     /// 전략 컨텍스트
     ctx: CopysStrategyContext<C>,
+    /// ATR 분석기
+    atr_analyzer: ATRAnalyzer<C>,
+    /// 슈퍼트렌드 분석기
+    supertrend_analyzer: SuperTrendAnalyzer<C>,
 }
 
 impl<C: Candle> Display for CopysShortStrategy<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let periods = self
-            .config
-            .ma_periods
-            .iter()
-            .map(|p| p.to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-
         write!(
             f,
-            "[Copys숏전략] 설정: {{RSI: {}(상:{}/하:{}), BB: {}({}), MA타입: {:?}({})}}, 컨텍스트: {}",
+            "[Copys숏전략] 설정: {{RSI: {}(상:{}/하:{}), BB: {}({}), ATR: {}({}), ST: {}({})}}, 컨텍스트: {}",
             self.config.base.rsi_period,
             self.config.base.rsi_upper,
             self.config.base.rsi_lower,
             self.config.base.bband_period,
             self.config.base.bband_multiplier,
-            self.config.ma,
-            periods,
+            self.config.atr_period,
+            self.config.atr_multiplier,
+            self.config.st_period,
+            self.config.st_multiplier,
             self.ctx
         )
     }
@@ -264,17 +301,7 @@ impl<C: Candle + 'static> CopysShortStrategy<C> {
         json_config: &str,
     ) -> Result<CopysShortStrategy<C>, String> {
         let config = CopysShortStrategyConfig::from_json(json_config)?;
-        info!("코피스 숏 전략 설정: {:?}", config);
-
-        let mut ctx = CopysStrategyContext::new(
-            config.base.rsi_period,
-            &config.ma,
-            &config.ma_periods,
-            storage,
-        );
-        ctx.init_from_storage(storage);
-
-        Ok(CopysShortStrategy { config, ctx })
+        Self::new_with_config_internal(storage, config)
     }
 
     /// 새 코피스 숏 전략 인스턴스 생성 (설정 직접 제공)
@@ -287,19 +314,78 @@ impl<C: Candle + 'static> CopysShortStrategy<C> {
             None => CopysShortStrategyConfig::default(),
         };
 
-        info!("코피스 숏 전략 설정: {:?}", strategy_config);
+        Self::new_with_config_internal(storage, strategy_config)
+    }
 
-        let ctx = CopysStrategyContext::new(
-            strategy_config.base.rsi_period,
-            &strategy_config.ma,
-            &strategy_config.ma_periods,
-            storage,
-        );
+    // 내부 설정 구현
+    fn new_with_config_internal(
+        storage: &CandleStore<C>,
+        config: CopysShortStrategyConfig,
+    ) -> Result<CopysShortStrategy<C>, String> {
+        info!("코피스 숏 전략 설정: {:?}", config);
+
+        let ma_type = crate::indicator::ma::MAType::EMA;
+        let ma_periods = [10, 20, 60];
+        let ctx = CopysStrategyContext::new(config.base.rsi_period, &ma_type, &ma_periods, storage);
+
+        // ATR 분석기 생성
+        let atr_periods = [config.atr_period];
+        let atr_analyzer = ATRAnalyzer::new(&atr_periods, storage);
+
+        // 슈퍼트렌드 분석기 생성
+        let st_settings = [(config.st_period, config.st_multiplier)];
+        let supertrend_analyzer = SuperTrendAnalyzer::new(&st_settings, storage);
 
         Ok(CopysShortStrategy {
-            config: strategy_config,
+            config,
             ctx,
+            atr_analyzer,
+            supertrend_analyzer,
         })
+    }
+
+    /// ATR 분석기 참조 반환
+    pub fn atr_analyzer(&self) -> &ATRAnalyzer<C> {
+        &self.atr_analyzer
+    }
+
+    /// 슈퍼트렌드 분석기 참조 반환
+    pub fn supertrend_analyzer(&self) -> &SuperTrendAnalyzer<C> {
+        &self.supertrend_analyzer
+    }
+
+    /// 슈퍼트렌드 기반 매수 신호 확인 (숏 포지션에서는 청산 신호)
+    pub fn check_supertrend_buy_signal(&self) -> bool {
+        // 슈퍼트렌드가 상승 추세로 전환되었는지 확인
+        self.supertrend_analyzer
+            .is_price_crossing_above_supertrend(&self.config.st_period, &self.config.st_multiplier)
+    }
+
+    /// 슈퍼트렌드 기반 매도 신호 확인 (숏 포지션에서는 진입 신호)
+    pub fn check_supertrend_sell_signal(&self) -> bool {
+        // 슈퍼트렌드가 하락 추세로 전환되었는지 확인
+        self.supertrend_analyzer
+            .is_price_crossing_below_supertrend(&self.config.st_period, &self.config.st_multiplier)
+    }
+
+    /// ATR 이용 손절가 계산
+    pub fn calculate_stop_loss(&self, candle: &C, position_type: PositionType) -> f64 {
+        let atr_value = if !self.atr_analyzer.items.is_empty() {
+            self.atr_analyzer.items[0].get_atr(self.config.atr_period)
+        } else {
+            0.0
+        };
+
+        match position_type {
+            PositionType::Long => {
+                // 롱 포지션의 손절가: 현재가 - (ATR * 배수)
+                candle.close_price() - (atr_value * self.config.atr_multiplier)
+            }
+            PositionType::Short => {
+                // 숏 포지션의 손절가: 현재가 + (ATR * 배수)
+                candle.close_price() + (atr_value * self.config.atr_multiplier)
+            }
+        }
     }
 }
 
@@ -323,35 +409,33 @@ impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysShortStrategy<C> {
 
 impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
     fn next(&mut self, candle: C) {
-        self.ctx.next(candle);
+        self.ctx.next(candle.clone());
+        self.atr_analyzer.next(candle.clone());
+        self.supertrend_analyzer.next(candle);
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
-        // 이동평균선이 정상 배열이면 거래하지 않음 (역배열을 원함)
-        if self.ctx.is_ma_regular_arrangement(1) {
-            false
-        } else {
-            // RSI가 상한선보다 높으면 숏 진입 (롱 전략과 반대로 높은 값에서 진입)
-            self.ctx.is_break_through_by_satisfying(
-                |data| data.rsi.value > self.config.base.rsi_upper,
-                1,
-                self.config.rsi_count,
-            )
-        }
+        // RSI 신호와, 슈퍼트렌드 하락 신호 결합 (둘 중 하나라도 만족하면 진입)
+        self.check_sell_signal(self.config.rsi_count) || self.check_supertrend_sell_signal()
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
-        // 이동평균선이 역배열이면 거래하지 않음 (정상 배열을 원함)
-        if self.ctx.is_ma_reverse_arrangement(1) {
-            false
+    fn should_exit(&self, _holdings: &TradePosition, candle: &C) -> bool {
+        // RSI 신호와 슈퍼트렌드 상승 신호 결합
+        let rsi_signal = self.check_buy_signal(self.config.rsi_count);
+        let st_signal = self.check_supertrend_buy_signal();
+
+        // 손절가 확인
+        let stop_loss_triggered = if let Some(stop_loss) = _holdings.stop_loss {
+            match _holdings.position_type {
+                PositionType::Long => candle.close_price() <= stop_loss,
+                PositionType::Short => candle.close_price() >= stop_loss,
+            }
         } else {
-            // RSI가 하한선보다 낮으면 숏 청산
-            self.ctx.is_break_through_by_satisfying(
-                |data| data.rsi.value < self.config.base.rsi_lower,
-                1,
-                self.config.rsi_count,
-            )
-        }
+            false
+        };
+
+        // 세 조건 중 하나라도 만족하면 청산
+        rsi_signal || st_signal || stop_loss_triggered
     }
 
     fn position(&self) -> PositionType {
@@ -360,5 +444,11 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
 
     fn name(&self) -> StrategyType {
         StrategyType::CopysShort
+    }
+
+    fn set_stop_loss(&self, holdings: &mut TradePosition, candle: &C) {
+        // ATR 기반 손절가 설정
+        let stop_loss = self.calculate_stop_loss(candle, holdings.position_type);
+        holdings.stop_loss = Some(stop_loss);
     }
 }

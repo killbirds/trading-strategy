@@ -95,6 +95,8 @@ pub struct TradePosition {
     pub price: f64,
     pub quantity: f64,
     pub market: String,
+    pub position_type: PositionType,
+    pub stop_loss: Option<f64>,
 }
 
 impl TradePosition {
@@ -117,7 +119,21 @@ impl TradePosition {
             price,
             quantity,
             market,
+            position_type: PositionType::Long, // 기본값은 롱 포지션
+            stop_loss: None,
         }
+    }
+
+    /// 포지션 유형 설정
+    pub fn with_position_type(mut self, position_type: PositionType) -> Self {
+        self.position_type = position_type;
+        self
+    }
+
+    /// 손절가 설정
+    pub fn with_stop_loss(mut self, stop_loss: f64) -> Self {
+        self.stop_loss = Some(stop_loss);
+        self
     }
 
     /// 총 포지션 가치를 계산합니다 (가격 * 수량).
@@ -151,6 +167,8 @@ impl Default for TradePosition {
             price: 1.0,
             quantity: 1.0,
             market: "default".to_string(),
+            position_type: PositionType::Long,
+            stop_loss: None,
         }
     }
 }
