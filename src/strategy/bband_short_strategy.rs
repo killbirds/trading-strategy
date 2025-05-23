@@ -4,7 +4,6 @@ use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use crate::{ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
@@ -156,7 +155,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         is_buy && self.ctx.is_band_width_sufficient()
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // 가격이 하단 밴드를 하향 돌파했을 때 숏 청산 신호
         self.ctx
             .is_break_through_lower_band_from_below(self.config.count)

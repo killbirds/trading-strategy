@@ -4,7 +4,6 @@ use super::hybrid_common::{HybridAnalyzer, HybridStrategyCommon, HybridStrategyC
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use log::{debug, info};
 use serde::Deserialize;
 use std::cell::RefCell;
@@ -465,23 +464,9 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridShortStrategy<C> {
         signal_strength >= self.config.entry_threshold
     }
 
-    fn should_exit(&self, holdings: &TradePosition, candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         if self.ctx.items.is_empty() {
             return false;
-        }
-
-        // 현재 가격
-        let current_price = candle.close_price();
-
-        // 현재 수익률 계산 (숏 포지션이므로 방향이 반대)
-        let profit_percentage = (1.0 - current_price / holdings.price) * 100.0;
-
-        // 손절/이익실현 경계 확인
-        if profit_percentage <= self.config.stop_loss
-            || profit_percentage >= self.config.take_profit
-        {
-            // 손절 또는 이익실현 경계에 도달하면 즉시 청산
-            return true;
         }
 
         // 여러 지표를 종합한 매수 신호를 기반으로 결정

@@ -4,7 +4,6 @@ use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use crate::{ConfigResult, ConfigValidation};
 use log::{debug, error, info};
 use serde::Deserialize;
@@ -190,7 +189,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
         self.ctx.is_below_lower_band(1)
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         self.ctx.is_above_middle_band(1)
     }
 

@@ -2,7 +2,6 @@ use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use crate::{ConfigError, ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
@@ -186,7 +185,7 @@ impl<C: Candle + 'static> Strategy<C> for MACDShortStrategy<C> {
                 .is_histogram_below_threshold(self.config.histogram_threshold, 1)
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // MACD가 시그널 라인을 상향 돌파하면 숏 청산 신호
         self.ctx
             .is_macd_crossed_above_signal(1, self.config.confirm_period)

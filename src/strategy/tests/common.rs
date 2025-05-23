@@ -1,5 +1,4 @@
 use crate::candle_store::CandleStore;
-use crate::model::TradePosition;
 use crate::strategy::Strategy;
 use crate::tests::TestCandle;
 use chrono::{TimeZone, Utc};
@@ -213,11 +212,7 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
         }
         // 포지션이 있는 경우 매도 신호 확인
         else if let Some((entry_price, quantity)) = position {
-            // 임시 홀딩 생성 (실제 홀딩은 거래 시스템에서 관리되므로 간소화)
-            let holdings =
-                TradePosition::new(Utc::now(), entry_price, quantity, "default".to_string());
-
-            if strategy.should_exit(&holdings, candle) {
+            if strategy.should_exit(candle) {
                 let exit_price = candle.close_price();
                 let profit = (exit_price - entry_price) * quantity;
                 let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;

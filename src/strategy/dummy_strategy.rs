@@ -2,7 +2,6 @@ use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -107,7 +106,7 @@ impl<C: Candle> Strategy<C> for DummyStrategy<C> {
         false
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         false
     }
 

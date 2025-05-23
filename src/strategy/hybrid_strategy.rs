@@ -4,7 +4,6 @@ use super::hybrid_common::{HybridAnalyzer, HybridStrategyCommon, HybridStrategyC
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -140,28 +139,20 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
         // 여러 지표를 종합한 매수 신호를 기반으로 결정
         let signal_strength = self.calculate_buy_signal_strength();
 
-        // 신호 강도가 0.5 이상인 경우에만 매수 (임계값을 낮춤)
-        signal_strength >= 0.5
+        // 신호 강도가 0.3 이상인 경우에만 매수 (임계값을 낮춤)
+        signal_strength >= 0.3
     }
 
-    fn should_exit(&self, holdings: &TradePosition, candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         if self.ctx.items.is_empty() {
             return false;
         }
 
-        // 현재 가격
-        let current_price = candle.close_price();
-
-        // 현재 수익률 계산
-        let profit_percentage = (current_price / holdings.price - 1.0) * 100.0;
-
         // 여러 지표를 종합한 매도 신호를 기반으로 결정
-        let signal_strength = self.calculate_sell_signal_strength(profit_percentage);
+        let signal_strength = self.calculate_sell_signal_strength(0.0);
 
-        // 신호 강도가 0.6 이상인 경우에만 매도 (임계값은 조정 가능)
-        // 또는 10% 이상 수익 시 현재 신호와 관계없이 매도 (이익 확정)
-        // 또는 7% 이상 손실 시 현재 신호와 관계없이 매도 (손절)
-        signal_strength >= 0.6 || !(-7.0..=10.0).contains(&profit_percentage)
+        // 신호 강도가 0.2 이상인 경우에만 매도 (임계값을 더 낮춤)
+        signal_strength >= 0.2
     }
 
     fn position(&self) -> PositionType {

@@ -2,7 +2,6 @@ use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -233,7 +232,7 @@ impl<C: Candle + 'static> Strategy<C> for RSIStrategy<C> {
         self.is_rsi_oversold()
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // RSI가 과매수 구간에서 청산
         self.is_rsi_overbought()
     }

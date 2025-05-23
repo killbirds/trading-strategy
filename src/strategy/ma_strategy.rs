@@ -3,7 +3,6 @@ use super::StrategyType;
 use crate::analyzer::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use crate::strategy::ma_common::{MAAnalyzer, MAStrategyCommon, MAStrategyConfigBase};
 use crate::{ConfigError, ConfigResult, ConfigValidation};
 use log::info;
@@ -181,7 +180,7 @@ impl<C: Candle + 'static> Strategy<C> for MAStrategy<C> {
             .is_ma_regular_arrangement_golden_cross(1, self.config.cross_previous_periods)
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // 단기 이동평균이 장기 이동평균보다 낮아질 때(데드 크로스) 롱 청산
         self.check_cross_condition(|data| {
             let short_ma = data.mas.get_by_key_index(0).get();

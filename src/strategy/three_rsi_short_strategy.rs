@@ -6,7 +6,6 @@ use super::three_rsi_common::{
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -209,7 +208,7 @@ impl<C: Candle + 'static> Strategy<C> for ThreeRSIShortStrategy<C> {
             || self.should_enter_by_break_through_below_ma()
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         self.should_exit_by_rsi_above_50_with_regular_arrangement()
             || self.should_exit_by_break_through_rsi_above_50()
             || self.should_exit_by_break_through_above_ma()

@@ -115,11 +115,19 @@ where
         TAs { name, keys, data }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
     /// 키 목록 참조 반환
     ///
     /// # Returns
     /// * `&Vec<K>` - 키 목록 참조
-    pub fn get_keys(&self) -> &Vec<K> {
+    pub fn keys(&self) -> &Vec<K> {
         &self.keys
     }
 

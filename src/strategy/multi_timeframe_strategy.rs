@@ -1,7 +1,6 @@
 use crate::candle_store::CandleStore;
-use crate::model::{PositionType, Signal, TradePosition};
+use crate::model::{PositionType, Signal};
 use crate::strategy::{Strategy, StrategyFactory, StrategyType, split};
-use chrono::Utc;
 use std::collections::HashMap;
 use std::str::FromStr;
 use trading_chart::{Candle, CandleInterval};
@@ -126,20 +125,13 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
     /// # Arguments
     /// * `candle` - 최신 캔들 데이터
     fn update_signals(&mut self, candle: &C) {
-        // 먼저 현재 포지션 정보를 얻어옴
-        let current_position = self.get_current_position(candle);
-
         // 각 타임프레임별로 신호 업데이트
         for (interval, strategy) in &mut self.strategies {
             // 각 타임프레임에 맞게 신호 생성
             let signal = if strategy.should_enter(candle) {
                 Signal::Enter
-            } else if let Some(position) = &current_position {
-                if strategy.should_exit(position, candle) {
-                    Signal::Exit
-                } else {
-                    Signal::Hold
-                }
+            } else if strategy.should_exit(candle) {
+                Signal::Exit
             } else {
                 Signal::Hold
             };
@@ -147,24 +139,6 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             // 신호 저장
             self.signals.insert(*interval, signal);
         }
-    }
-
-    /// 현재 포지션을 생성합니다.
-    ///
-    /// # Arguments
-    /// * `candle` - 현재 캔들 데이터
-    ///
-    /// # Returns
-    /// * `Option<TradePosition>` - 현재 포지션
-    fn get_current_position(&self, candle: &C) -> Option<TradePosition> {
-        Some(TradePosition {
-            datetime: Utc::now(),
-            price: candle.close_price(),
-            quantity: 1.0,
-            market: "default".to_string(),
-            position_type: self.position_type,
-            stop_loss: None,
-        })
     }
 
     /// 가중 평균 신호를 계산합니다.
@@ -237,7 +211,7 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
         self.calculate_weighted_signal() >= self.confirmation_threshold
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // 가중 평균 신호가 임계값보다 작으면 매도
         if self.position() == PositionType::Long {
             self.calculate_weighted_signal() <= -self.confirmation_threshold

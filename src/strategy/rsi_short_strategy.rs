@@ -2,7 +2,6 @@ use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
-use crate::model::TradePosition;
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -173,7 +172,7 @@ impl<C: Candle + 'static> Strategy<C> for RSIShortStrategy<C> {
         self.is_rsi_overbought()
     }
 
-    fn should_exit(&self, _holdings: &TradePosition, _candle: &C) -> bool {
+    fn should_exit(&self, _candle: &C) -> bool {
         // 이동평균이 역배열이면 숏 청산 금지 (하락 추세)
         if self.ctx.is_ma_reverse_arrangement(1) {
             return false;

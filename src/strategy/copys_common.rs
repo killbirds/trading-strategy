@@ -1,5 +1,6 @@
 use super::Strategy;
 use crate::analyzer::base::AnalyzerOps;
+use crate::analyzer::bband_analyzer::BBandAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use serde::Deserialize;
@@ -15,9 +16,9 @@ pub type CopysStrategyContext<C> = crate::analyzer::rsi_analyzer::RSIAnalyzer<C>
 pub struct CopysStrategyConfigBase {
     /// RSI 계산 기간
     pub rsi_period: usize,
-    /// RSI 상한값
+    /// RSI 상한값 (과매수 기준)
     pub rsi_upper: f64,
-    /// RSI 하한값
+    /// RSI 하한값 (과매도 기준)
     pub rsi_lower: f64,
     /// 볼린저밴드 계산 기간
     pub bband_period: usize,
@@ -77,8 +78,11 @@ impl CopysStrategyConfigBase {
 
 /// Copys 전략 공통 트레이트
 pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
-    /// 분석기 참조 반환
+    /// RSI 분석기 참조 반환
     fn context(&self) -> &RSIAnalyzer<C>;
+
+    /// 볼린저밴드 분석기 참조 반환
+    fn bband_analyzer(&self) -> &BBandAnalyzer<C>;
 
     /// 설정의 rsi_lower 반환
     fn config_rsi_lower(&self) -> f64;
@@ -89,34 +93,101 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
     /// RSI 판정 횟수 반환
     fn config_rsi_count(&self) -> usize;
 
-    /// 매수 신호 체크 (for 필터)
-    fn check_buy_signal(&self, consecutive_n: usize) -> bool {
-        // 이동평균선이 역배열이면 진입하지 않음
-        if self.context().is_ma_reverse_arrangement(1) {
-            return false;
-        }
+    /// 볼린저밴드 기간 반환
+    fn config_bband_period(&self) -> usize;
 
-        // RSI가 하한선보다 낮으면 매수 신호
-        self.context().is_break_through_by_satisfying(
-            |data| data.rsi.value < self.config_rsi_lower(),
-            1,
+    /// 볼린저밴드 배수 반환
+    fn config_bband_multiplier(&self) -> f64;
+
+    /// 매수 신호 체크 - RSI 과매도 + 볼린저밴드 하단 터치 + 이평선 지지
+    fn check_buy_signal(&self, consecutive_n: usize) -> bool {
+        // 1. RSI 과매도 신호 (RSI < 30)
+        let rsi_oversold = self.context().is_all(
+            |data| data.rsi.value() < self.config_rsi_lower(),
             consecutive_n,
-        )
+        );
+
+        // 2. 볼린저밴드 하단 터치 반등 신호
+        let bband_support = self.bband_analyzer().is_below_lower_band(1)
+            || self
+                .bband_analyzer()
+                .is_break_through_lower_band_from_below(1);
+
+        // 3. 이동평균선 지지선 역할 확인 (가격이 주요 이평선 근처에서 반등)
+        let ma_support = self.check_ma_support();
+
+        // 세 조건 중 두 개 이상 만족하면 매수 신호
+        let signal_count = [rsi_oversold, bband_support, ma_support]
+            .iter()
+            .filter(|&&x| x)
+            .count();
+        signal_count >= 2
     }
 
-    /// 매도 신호 체크 (for 필터)
+    /// 매도 신호 체크 - RSI 과매수 + 볼린저밴드 상단 터치 + 이평선 저항
     fn check_sell_signal(&self, consecutive_n: usize) -> bool {
-        // 이동평균선이 정배열이면 청산하지 않음
-        if self.context().is_ma_regular_arrangement(1) {
+        // 1. RSI 과매수 신호 (RSI > 70)
+        let rsi_overbought = self.context().is_all(
+            |data| data.rsi.value() > self.config_rsi_upper(),
+            consecutive_n,
+        );
+
+        // 2. 볼린저밴드 상단 터치 반락 신호
+        let bband_resistance = self.bband_analyzer().is_above_upper_band(1);
+
+        // 3. 이동평균선 저항선 역할 확인 (가격이 주요 이평선 근처에서 반락)
+        let ma_resistance = self.check_ma_resistance();
+
+        // 세 조건 중 두 개 이상 만족하면 매도 신호
+        let signal_count = [rsi_overbought, bband_resistance, ma_resistance]
+            .iter()
+            .filter(|&&x| x)
+            .count();
+        signal_count >= 2
+    }
+
+    /// 이동평균선 지지선 확인 (5, 20, 60, 120, 200, 240일선 중 하나라도 지지)
+    fn check_ma_support(&self) -> bool {
+        if self.context().items.is_empty() {
             return false;
         }
 
-        // RSI가 상한선보다 높으면 매도 신호
-        self.context().is_break_through_by_satisfying(
-            |data| data.rsi.value > self.config_rsi_upper(),
-            1,
-            consecutive_n,
-        )
+        let current_price = self.context().items[0].candle.close_price();
+
+        // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 지지 가능)
+        for i in 0..self.context().items[0].mas.len() {
+            let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
+            let distance_percent = ((current_price - ma_value) / ma_value).abs();
+
+            // 이평선과 2% 이내 거리에 있고, 이평선 위에 있으면 지지로 판단
+            if distance_percent <= 0.02 && current_price >= ma_value {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// 이동평균선 저항선 확인 (5, 20, 60, 120, 200, 240일선 중 하나라도 저항)
+    fn check_ma_resistance(&self) -> bool {
+        if self.context().items.is_empty() {
+            return false;
+        }
+
+        let current_price = self.context().items[0].candle.close_price();
+
+        // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 저항 가능)
+        for i in 0..self.context().items[0].mas.len() {
+            let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
+            let distance_percent = ((current_price - ma_value) / ma_value).abs();
+
+            // 이평선과 2% 이내 거리에 있고, 이평선 아래에 있으면 저항으로 판단
+            if distance_percent <= 0.02 && current_price <= ma_value {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
