@@ -132,12 +132,12 @@ impl<C: Candle + 'static> BBandStrategy<C> {
         debug!("볼린저 밴드 전략 초기화 시작 (JSON 설정 사용)");
         let config = match BBandStrategyConfig::from_json(json_config) {
             Ok(cfg) => {
-                debug!("JSON 설정 파싱 성공: {:?}", cfg);
+                debug!("JSON 설정 파싱 성공: {cfg:?}");
                 cfg
             }
             Err(e) => {
-                error!("볼린저 밴드 전략 JSON 설정 파싱 실패: {}", e);
-                return Err(format!("볼린저 밴드 전략 설정 오류: {}", e));
+                error!("볼린저 밴드 전략 JSON 설정 파싱 실패: {e}");
+                return Err(format!("볼린저 밴드 전략 설정 오류: {e}"));
             }
         };
 
@@ -156,7 +156,7 @@ impl<C: Candle + 'static> BBandStrategy<C> {
         storage: &CandleStore<C>,
         config: BBandStrategyConfig,
     ) -> Result<BBandStrategy<C>, String> {
-        info!("볼린저밴드 전략 설정: {:?}", config);
+        info!("볼린저밴드 전략 설정: {config:?}");
         debug!(
             "볼린저 밴드 컨텍스트 초기화 시작 (기간: {}, 승수: {})",
             config.period, config.multiplier
@@ -182,12 +182,12 @@ impl<C: Candle + 'static> BBandStrategy<C> {
                 debug!("HashMap 설정 파싱 시작");
                 match BBandStrategyConfig::from_hash_map(&cfg) {
                     Ok(parsed_config) => {
-                        debug!("HashMap 설정 파싱 성공: {:?}", parsed_config);
+                        debug!("HashMap 설정 파싱 성공: {parsed_config:?}");
                         parsed_config
                     }
                     Err(e) => {
-                        error!("볼린저 밴드 전략 HashMap 설정 파싱 실패: {}", e);
-                        return Err(format!("볼린저 밴드 전략 설정 오류: {}", e));
+                        error!("볼린저 밴드 전략 HashMap 설정 파싱 실패: {e}");
+                        return Err(format!("볼린저 밴드 전략 설정 오류: {e}"));
                     }
                 }
             }

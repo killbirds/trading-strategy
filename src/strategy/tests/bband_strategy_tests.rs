@@ -51,7 +51,7 @@ fn test_bband_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서는 수익이 나야함
-    println!("상승장 BBand 전략 결과: {:?}", result);
+    println!("상승장 BBand 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -73,7 +73,7 @@ fn test_bband_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 BBand 전략 결과: {:?}", result);
+    println!("하락장 BBand 전략 결과: {result:?}");
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn test_bband_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 BBand 전략 결과: {:?}", result);
+    println!("횡보장 BBand 전략 결과: {result:?}");
 
     // 볼린저 밴드는 횡보장에서 수익성이 있을 수도 있고 없을 수도 있음
     // assert!(result.total_profit_percentage >= 0.0);
@@ -127,9 +127,9 @@ fn test_bband_with_different_deviations() {
     let wide_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("좁은 밴드(1.5) 결과: {:?}", narrow_result);
-    println!("기본 밴드(2.0) 결과: {:?}", default_result);
-    println!("넓은 밴드(2.5) 결과: {:?}", wide_result);
+    println!("좁은 밴드(1.5) 결과: {narrow_result:?}");
+    println!("기본 밴드(2.0) 결과: {default_result:?}");
+    println!("넓은 밴드(2.5) 결과: {wide_result:?}");
 }
 
 #[test]
@@ -160,9 +160,9 @@ fn test_bband_with_different_periods() {
     let long_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("짧은 기간(10) 결과: {:?}", short_result);
-    println!("기본 기간(20) 결과: {:?}", default_result);
-    println!("긴 기간(30) 결과: {:?}", long_result);
+    println!("짧은 기간(10) 결과: {short_result:?}");
+    println!("기본 기간(20) 결과: {default_result:?}");
+    println!("긴 기간(30) 결과: {long_result:?}");
 }
 
 #[test]
@@ -195,7 +195,7 @@ fn test_bband_with_different_ma_types() {
     let wma_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("SMA 기반 BBand 결과: {:?}", sma_result);
-    println!("EMA 기반 BBand 결과: {:?}", ema_result);
-    println!("WMA 기반 BBand 결과: {:?}", wma_result);
+    println!("SMA 기반 BBand 결과: {sma_result:?}");
+    println!("EMA 기반 BBand 결과: {ema_result:?}");
+    println!("WMA 기반 BBand 결과: {wma_result:?}");
 }

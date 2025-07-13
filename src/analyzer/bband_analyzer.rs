@@ -406,6 +406,137 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
 
         current_not_squeeze && previous_was_squeeze
     }
+
+    /// 하단 밴드 하향 돌파 신호 확인 (n개 연속 하단 밴드 아래, 이전 m개는 아님)
+    pub fn is_below_lower_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() < data.bband.lower(),
+            n,
+            m,
+        )
+    }
+
+    /// 상단 밴드 상향 돌파 신호 확인 (n개 연속 상단 밴드 위, 이전 m개는 아님)
+    pub fn is_above_upper_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() > data.bband.upper(),
+            n,
+            m,
+        )
+    }
+
+    /// 중간선 상향 돌파 신호 확인 (n개 연속 중간선 위, 이전 m개는 아님)
+    pub fn is_above_middle_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() > data.bband.middle(),
+            n,
+            m,
+        )
+    }
+
+    /// 중간선 하향 돌파 신호 확인 (n개 연속 중간선 아래, 이전 m개는 아님)
+    pub fn is_below_middle_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() < data.bband.middle(),
+            n,
+            m,
+        )
+    }
+
+    /// 스퀴즈 상태 돌파 신호 확인 (n개 연속 스퀴즈 상태, 이전 m개는 아님)
+    pub fn is_squeeze_state_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let band_width = data.bband.upper() - data.bband.lower();
+                let middle = data.bband.middle();
+                if middle == 0.0 {
+                    return false;
+                }
+                let width_ratio = band_width / middle;
+                width_ratio <= threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 밴드폭 확장 신호 확인 (n개 연속 밴드폭 확장, 이전 m개는 아님)
+    pub fn is_band_expansion_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |_data| {
+                if self.items.len() < 2 {
+                    return false;
+                }
+                // 현재 밴드폭이 이전보다 큰지 확인
+                let current_width = self.items[0].bband.upper() - self.items[0].bband.lower();
+                let previous_width = self.items[1].bband.upper() - self.items[1].bband.lower();
+                current_width > previous_width
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 상단 밴드 고가 돌파 신호 확인 (n개 연속 고가가 상단 밴드 돌파, 이전 m개는 아님)
+    pub fn is_high_breaks_upper_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.high_price() > data.bband.upper(),
+            n,
+            m,
+        )
+    }
+
+    /// 종가가 상단 밴드 위 신호 확인 (n개 연속 종가가 상단 밴드 위, 이전 m개는 아님)
+    pub fn is_close_above_upper_band_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.candle.close_price() > data.bband.upper(),
+            n,
+            m,
+        )
+    }
+
+    /// 스퀴즈 브레이크아웃 상단 돌파 신호 확인 (n개 연속 상단 돌파, 이전 m개는 아님)
+    pub fn is_squeeze_breakout_upper_signal(
+        &self,
+        n: usize,
+        m: usize,
+        narrowing_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                // 스퀴즈 브레이크아웃 로직 (기존 is_squeeze_breakout_with_close_above_upper와 유사)
+                if self.items.is_empty() {
+                    return false;
+                }
+                let current_data = &self.items[0];
+                let high_breaks_upper =
+                    current_data.candle.high_price() > current_data.bband.upper();
+                let close_above_upper =
+                    current_data.candle.close_price() > current_data.bband.upper();
+                let narrowing = self.is_band_width_narrowing(narrowing_period);
+                high_breaks_upper && close_above_upper && narrowing
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 밴드폭 임계값 돌파 신호 확인 (n개 연속 밴드폭 임계값 초과, 이전 m개는 아님)
+    pub fn is_band_width_threshold_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let band_width = data.bband.upper() - data.bband.lower();
+                let middle = data.bband.middle();
+                if middle == 0.0 {
+                    return false;
+                }
+                let width_ratio = band_width / middle;
+                width_ratio > threshold
+            },
+            n,
+            m,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<BBandAnalyzerData<C>, C> for BBandAnalyzer<C> {

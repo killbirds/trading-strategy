@@ -19,9 +19,9 @@ pub enum ConfigError {
 impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigError::FileError(msg) => write!(f, "설정 파일 오류: {}", msg),
-            ConfigError::ParseError(msg) => write!(f, "설정 파싱 오류: {}", msg),
-            ConfigError::ValidationError(msg) => write!(f, "설정 유효성 검사 오류: {}", msg),
+            ConfigError::FileError(msg) => write!(f, "설정 파일 오류: {msg}"),
+            ConfigError::ParseError(msg) => write!(f, "설정 파싱 오류: {msg}"),
+            ConfigError::ValidationError(msg) => write!(f, "설정 유효성 검사 오류: {msg}"),
         }
     }
 }
@@ -30,9 +30,9 @@ impl std::fmt::Display for ConfigError {
 impl From<ConfigError> for String {
     fn from(err: ConfigError) -> Self {
         match err {
-            ConfigError::FileError(msg) => format!("설정 파일 오류: {}", msg),
-            ConfigError::ParseError(msg) => format!("설정 파싱 오류: {}", msg),
-            ConfigError::ValidationError(msg) => format!("설정 유효성 검사 오류: {}", msg),
+            ConfigError::FileError(msg) => format!("설정 파일 오류: {msg}"),
+            ConfigError::ParseError(msg) => format!("설정 파싱 오류: {msg}"),
+            ConfigError::ValidationError(msg) => format!("설정 유효성 검사 오류: {msg}"),
         }
     }
 }

@@ -50,7 +50,7 @@ fn test_three_rsi_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서는 수익이 나야함
-    println!("상승장 Three RSI 전략 결과: {:?}", result);
+    println!("상승장 Three RSI 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -72,7 +72,7 @@ fn test_three_rsi_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 Three RSI 전략 결과: {:?}", result);
+    println!("하락장 Three RSI 전략 결과: {result:?}");
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn test_three_rsi_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 Three RSI 전략 결과: {:?}", result);
+    println!("횡보장 Three RSI 전략 결과: {result:?}");
 
     // RSI 기반 전략은 횡보장에서 어느 정도 수익성을 보일 수 있음
     // assert!(result.total_profit_percentage >= 0.0);
@@ -126,9 +126,9 @@ fn test_three_rsi_with_different_periods() {
     let long_periods_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("기본 기간 설정 결과: {:?}", default_result);
-    println!("짧은 기간 설정 결과: {:?}", short_periods_result);
-    println!("긴 기간 설정 결과: {:?}", long_periods_result);
+    println!("기본 기간 설정 결과: {default_result:?}");
+    println!("짧은 기간 설정 결과: {short_periods_result:?}");
+    println!("긴 기간 설정 결과: {long_periods_result:?}");
 }
 
 #[test]
@@ -161,9 +161,9 @@ fn test_three_rsi_different_thresholds() {
     let narrow_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("기본 임계값(30/70) 결과: {:?}", default_result);
-    println!("넓은 임계값(20/80) 결과: {:?}", wide_result);
-    println!("좁은 임계값(40/60) 결과: {:?}", narrow_result);
+    println!("기본 임계값(30/70) 결과: {default_result:?}");
+    println!("넓은 임계값(20/80) 결과: {wide_result:?}");
+    println!("좁은 임계값(40/60) 결과: {narrow_result:?}");
 
     // 거래 횟수 비교 - 좁은 범위가 거래 횟수가 많아야 함
     println!("기본 임계값 거래 횟수: {}", default_result.total_trades);

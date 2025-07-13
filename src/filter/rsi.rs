@@ -110,6 +110,56 @@ pub fn filter_rsi<C: Candle + 'static>(
                 current_rsi < threshold && previous_rsi >= threshold
             }
         }
+        // 5: RSI가 50을 상향 돌파 (상승 추세 시작)
+        5 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi > 50.0 && previous_rsi <= 50.0
+            }
+        }
+        // 6: RSI가 50을 하향 돌파 (하락 추세 시작)
+        6 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi < 50.0 && previous_rsi >= 50.0
+            }
+        }
+        // 7: RSI 상승 추세 (연속적으로 증가)
+        7 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut ascending = true;
+                for i in 0..params.consecutive_n {
+                    if analyzer.items[i].rsi.value() <= analyzer.items[i + 1].rsi.value() {
+                        ascending = false;
+                        break;
+                    }
+                }
+                ascending
+            }
+        }
+        // 8: RSI 하락 추세 (연속적으로 감소)
+        8 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut descending = true;
+                for i in 0..params.consecutive_n {
+                    if analyzer.items[i].rsi.value() >= analyzer.items[i + 1].rsi.value() {
+                        descending = false;
+                        break;
+                    }
+                }
+                descending
+            }
+        }
         _ => false,
     };
 

@@ -611,7 +611,7 @@ mod tests {
         };
 
         let expected = "Ichimoku(9,26,52: T:105.00, K:100.00, SpA:110.00, SpB:90.00, C:105.00)";
-        assert_eq!(format!("{}", ichimoku), expected);
+        assert_eq!(format!("{ichimoku}"), expected);
     }
 
     #[test]
@@ -622,6 +622,6 @@ mod tests {
             senkou_period: 52,
         };
 
-        assert_eq!(format!("{}", params), "Ichimoku(9,26,52)");
+        assert_eq!(format!("{params}"), "Ichimoku(9,26,52)");
     }
 }

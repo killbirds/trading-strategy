@@ -163,7 +163,7 @@ impl StrategyFactory {
         storage: &CandleStore<C>,
         config: Option<HashMap<String, String>>,
     ) -> Result<Box<dyn Strategy<C>>, String> {
-        info!("전략 빌드 시작: {}", strategy_type);
+        info!("전략 빌드 시작: {strategy_type}");
         debug!("캔들 데이터 상태: 항목 수={}", storage.len());
 
         if storage.is_empty() {
@@ -255,10 +255,10 @@ impl StrategyFactory {
 
         match &result {
             Ok(_) => {
-                info!("전략 빌드 성공: {}", strategy_type);
+                info!("전략 빌드 성공: {strategy_type}");
             }
             Err(e) => {
-                error!("전략 빌드 실패: {} - {}", strategy_type, e);
+                error!("전략 빌드 실패: {strategy_type} - {e}");
             }
         }
 
@@ -316,7 +316,7 @@ impl StrategyFactory {
     /// # Returns
     /// * `std::path::PathBuf` - 설정 파일 경로
     pub fn default_config_path(strategy_type: StrategyType) -> std::path::PathBuf {
-        let filename = format!("{}.toml", strategy_type);
+        let filename = format!("{strategy_type}.toml");
         std::path::PathBuf::from("config").join(filename)
     }
 }
@@ -342,7 +342,7 @@ where
             let trimmed = s.trim();
             trimmed
                 .parse::<T>()
-                .map_err(|e| format!("파싱 오류: {}", e))
+                .map_err(|e| format!("파싱 오류: {e}"))
         })
         .collect()
 }
@@ -361,7 +361,7 @@ where
     match split::<T>(input) {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!("분리 오류: {}", e);
+            log::error!("분리 오류: {e}");
             Ok(vec![])
         }
     }

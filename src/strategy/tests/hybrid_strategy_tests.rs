@@ -66,25 +66,24 @@ fn test_hybrid_strategy_signals_uptrend() {
 
             if enter_signal {
                 enter_signals += 1;
-                println!("캔들 {}: 매수 신호 발생", i);
+                println!("캔들 {i}: 매수 신호 발생");
             }
             if exit_signal {
                 exit_signals += 1;
-                println!("캔들 {}: 매도 신호 발생", i);
+                println!("캔들 {i}: 매도 신호 발생");
             }
 
             // 첫 번째 신호 시점에서 상세 정보 출력
             if i == 35 {
                 println!("캔들 35에서 신호 상세:");
-                println!("  매수 신호: {}", enter_signal);
-                println!("  매도 신호: {}", exit_signal);
+                println!("  매수 신호: {enter_signal}");
+                println!("  매도 신호: {exit_signal}");
             }
         }
     }
 
     println!(
-        "총 매수 신호: {}, 총 매도 신호: {}",
-        enter_signals, exit_signals
+        "총 매수 신호: {enter_signals}, 총 매도 신호: {exit_signals}"
     );
 
     // 상승장에서는 적어도 매수 신호가 발생해야 함
@@ -95,8 +94,7 @@ fn test_hybrid_strategy_signals_uptrend() {
 
     // 백테스팅에서는 거래가 완료되지 않을 수 있으므로 매수 신호 발생 여부로만 판단
     println!(
-        "매수 신호 {} 개 발생으로 전략이 정상 동작함을 확인",
-        enter_signals
+        "매수 신호 {enter_signals} 개 발생으로 전략이 정상 동작함을 확인"
     );
 }
 
@@ -117,7 +115,7 @@ fn test_hybrid_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 하이브리드 전략 결과: {:?}", result);
+    println!("하락장 하이브리드 전략 결과: {result:?}");
 }
 
 #[test]
@@ -137,7 +135,7 @@ fn test_hybrid_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 하이브리드 전략 결과: {:?}", result);
+    println!("횡보장 하이브리드 전략 결과: {result:?}");
 }
 
 #[test]
@@ -180,7 +178,7 @@ fn test_hybrid_vs_individual_strategies() {
     let hybrid_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("MA 전략 결과: {:?}", ma_result);
-    println!("RSI 전략 결과: {:?}", rsi_result);
-    println!("하이브리드 전략 결과: {:?}", hybrid_result);
+    println!("MA 전략 결과: {ma_result:?}");
+    println!("RSI 전략 결과: {rsi_result:?}");
+    println!("하이브리드 전략 결과: {hybrid_result:?}");
 }

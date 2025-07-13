@@ -110,7 +110,7 @@ impl HybridStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 
@@ -138,7 +138,7 @@ impl HybridStrategyConfigBase {
         let ma_type = match config.get("ma_type").map(|s| s.as_str()) {
             Some("sma") => MAType::SMA,
             Some("ema") => MAType::EMA,
-            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {}", unknown)),
+            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {unknown}")),
             None => return Err("ma_type 설정이 필요합니다".to_string()),
         };
 
@@ -190,8 +190,7 @@ impl HybridStrategyConfigBase {
 
         if macd_fast_period >= macd_slow_period {
             return Err(format!(
-                "MACD 빠른 기간({})은 느린 기간({})보다 작아야 합니다",
-                macd_fast_period, macd_slow_period
+                "MACD 빠른 기간({macd_fast_period})은 느린 기간({macd_slow_period})보다 작아야 합니다"
             ));
         }
 
@@ -233,7 +232,7 @@ impl HybridStrategyConfigBase {
                     .map_err(|_| "RSI 하한값 파싱 오류".to_string())?;
 
                 if !(0.0..=100.0).contains(&value) {
-                    return Err(format!("RSI 하한값({})은 0과 100 사이여야 합니다", value));
+                    return Err(format!("RSI 하한값({value})은 0과 100 사이여야 합니다"));
                 }
 
                 value
@@ -248,7 +247,7 @@ impl HybridStrategyConfigBase {
                     .map_err(|_| "RSI 상한값 파싱 오류".to_string())?;
 
                 if !(0.0..=100.0).contains(&value) {
-                    return Err(format!("RSI 상한값({})은 0과 100 사이여야 합니다", value));
+                    return Err(format!("RSI 상한값({value})은 0과 100 사이여야 합니다"));
                 }
 
                 value
@@ -258,8 +257,7 @@ impl HybridStrategyConfigBase {
 
         if rsi_lower >= rsi_upper {
             return Err(format!(
-                "RSI 하한값({})은 상한값({})보다 작아야 합니다",
-                rsi_lower, rsi_upper
+                "RSI 하한값({rsi_lower})은 상한값({rsi_upper})보다 작아야 합니다"
             ));
         }
 

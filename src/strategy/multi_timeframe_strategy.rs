@@ -85,8 +85,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             "three_rsi_short" => StrategyType::ThreeRSIShort,
             _ => {
                 return Err(format!(
-                    "지원되지 않는 기본 전략 타입: {}",
-                    base_strategy_str
+                    "지원되지 않는 기본 전략 타입: {base_strategy_str}"
                 ));
             }
         };
@@ -96,7 +95,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             .get("confirmation_threshold")
             .map(|s| s.parse::<f64>())
             .transpose()
-            .map_err(|e| format!("confirmation_threshold 파싱 오류: {}", e))?
+            .map_err(|e| format!("confirmation_threshold 파싱 오류: {e}"))?
             .unwrap_or(0.6);
 
         // 포지션 타입 결정 (기본 전략의 포지션 타입을 따름)
@@ -181,11 +180,11 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
     ) -> Result<MultiTimeframeStrategy<C>, String> {
         // TOML 설정 파일 읽기
         let config_str = std::fs::read_to_string(config_path)
-            .map_err(|e| format!("설정 파일 읽기 오류: {}", e))?;
+            .map_err(|e| format!("설정 파일 읽기 오류: {e}"))?;
 
         // TOML 파싱
         let config: HashMap<String, String> =
-            toml::from_str(&config_str).map_err(|e| format!("TOML 파싱 오류: {}", e))?;
+            toml::from_str(&config_str).map_err(|e| format!("TOML 파싱 오류: {e}"))?;
 
         // 설정으로 인스턴스 생성
         MultiTimeframeStrategy::new_with_config(storage, Some(config))

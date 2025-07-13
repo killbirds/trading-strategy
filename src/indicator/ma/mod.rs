@@ -115,8 +115,7 @@ impl MAsBuilderFactory {
         for i in 1..periods.len() {
             if periods[i] <= periods[i - 1] {
                 panic!(
-                    "이동평균 기간은 오름차순으로 정렬되어야 합니다: {:?}",
-                    periods
+                    "이동평균 기간은 오름차순으로 정렬되어야 합니다: {periods:?}"
                 );
             }
         }

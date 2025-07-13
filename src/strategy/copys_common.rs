@@ -71,7 +71,7 @@ impl CopysStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 }

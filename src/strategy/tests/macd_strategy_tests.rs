@@ -50,7 +50,7 @@ fn test_macd_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서는 수익이 나야함
-    println!("상승장 MACD 전략 결과: {:?}", result);
+    println!("상승장 MACD 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 
@@ -75,7 +75,7 @@ fn test_macd_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 MACD 전략 결과: {:?}", result);
+    println!("하락장 MACD 전략 결과: {result:?}");
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn test_macd_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 MACD 전략 결과: {:?}", result);
+    println!("횡보장 MACD 전략 결과: {result:?}");
 }
 
 #[test]
@@ -130,9 +130,9 @@ fn test_macd_different_parameters() {
     let slow_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("기본 MACD 설정 결과: {:?}", default_result);
-    println!("빠른 MACD 설정 결과: {:?}", fast_result);
-    println!("느린 MACD 설정 결과: {:?}", slow_result);
+    println!("기본 MACD 설정 결과: {default_result:?}");
+    println!("빠른 MACD 설정 결과: {fast_result:?}");
+    println!("느린 MACD 설정 결과: {slow_result:?}");
 }
 
 #[test]
@@ -173,8 +173,8 @@ fn test_macd_price_types() {
     let low_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력 및 비교
-    println!("종가 기반 MACD 결과: {:?}", close_result);
-    println!("시가 기반 MACD 결과: {:?}", open_result);
-    println!("고가 기반 MACD 결과: {:?}", high_result);
-    println!("저가 기반 MACD 결과: {:?}", low_result);
+    println!("종가 기반 MACD 결과: {close_result:?}");
+    println!("시가 기반 MACD 결과: {open_result:?}");
+    println!("고가 기반 MACD 결과: {high_result:?}");
+    println!("저가 기반 MACD 결과: {low_result:?}");
 }

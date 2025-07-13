@@ -144,7 +144,7 @@ where
     pub fn get(&self, key: &K) -> &T {
         self.data
             .get(key)
-            .unwrap_or_else(|| panic!("키가 존재하지 않습니다: {:?}", key))
+            .unwrap_or_else(|| panic!("키가 존재하지 않습니다: {key:?}"))
     }
 
     /// 인덱스로 키를 찾고, 해당 키로 데이터를 가져옵니다.
@@ -161,7 +161,7 @@ where
         if let Some(key) = &self.keys.get(index) {
             self.get(key)
         } else {
-            panic!("인덱스가 범위를 벗어났습니다: {}", index)
+            panic!("인덱스가 범위를 벗어났습니다: {index}")
         }
     }
 

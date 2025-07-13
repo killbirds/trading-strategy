@@ -50,7 +50,7 @@ fn test_rsi_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("상승장 RSI 전략 결과: {:?}", result);
+    println!("상승장 RSI 전략 결과: {result:?}");
 
     // 상승장에서는 RSI가 고평가 영역에 진입한 후 하락할 때 매도 신호가 발생해야 함
     // 이는 수익성 있는 거래가 될 가능성이 높음
@@ -74,7 +74,7 @@ fn test_rsi_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 RSI 전략 결과: {:?}", result);
+    println!("하락장 RSI 전략 결과: {result:?}");
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_rsi_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 RSI 전략 결과: {:?}", result);
+    println!("횡보장 RSI 전략 결과: {result:?}");
 
     // 횡보장에서는 RSI 기반 전략이 효과적일 가능성이 높음
     // RSI가 과매수/과매도 영역에서 반전하는 신호를 활용하기 때문
@@ -137,8 +137,8 @@ fn test_different_rsi_parameters() {
     let sensitive_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("표준 RSI 전략 결과 (14일): {:?}", standard_result);
-    println!("민감한 RSI 전략 결과 (7일): {:?}", sensitive_result);
+    println!("표준 RSI 전략 결과 (14일): {standard_result:?}");
+    println!("민감한 RSI 전략 결과 (7일): {sensitive_result:?}");
     println!("표준 RSI 거래 횟수: {}", standard_result.total_trades);
     println!("민감한 RSI 거래 횟수: {}", sensitive_result.total_trades);
 

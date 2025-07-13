@@ -225,6 +225,104 @@ impl<C: Candle + 'static> IchimokuAnalyzer<C> {
 
         true
     }
+
+    /// 골든 크로스 신호 확인 (n개 연속 골든 크로스, 이전 m개는 아님)
+    pub fn is_golden_cross_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_golden_cross(param), n, m)
+    }
+
+    /// 데드 크로스 신호 확인 (n개 연속 데드 크로스, 이전 m개는 아님)
+    pub fn is_dead_cross_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_dead_cross(param), n, m)
+    }
+
+    /// 구름 상향 돌파 신호 확인 (n개 연속 구름 상향 돌파, 이전 m개는 아님)
+    pub fn is_cloud_breakout_up_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_cloud_breakout_up(param), n, m)
+    }
+
+    /// 구름 하향 돌파 신호 확인 (n개 연속 구름 하향 돌파, 이전 m개는 아님)
+    pub fn is_cloud_breakdown_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_cloud_breakdown(param), n, m)
+    }
+
+    /// 매수 신호 확인 (n개 연속 매수 신호, 이전 m개는 아님)
+    pub fn is_buy_signal_confirmed(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_buy_signal(param), n, m)
+    }
+
+    /// 매도 신호 확인 (n개 연속 매도 신호, 이전 m개는 아님)
+    pub fn is_sell_signal_confirmed(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_sell_signal(param), n, m)
+    }
+
+    /// 구름 위 신호 확인 (n개 연속 가격이 구름 위, 이전 m개는 아님)
+    pub fn is_price_above_cloud_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_above_cloud(param), n, m)
+    }
+
+    /// 구름 아래 신호 확인 (n개 연속 가격이 구름 아래, 이전 m개는 아님)
+    pub fn is_price_below_cloud_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_below_cloud(param), n, m)
+    }
+
+    /// 전환선이 기준선 위 신호 확인 (n개 연속 전환선 > 기준선, 이전 m개는 아님)
+    pub fn is_tenkan_above_kijun_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_tenkan_above_kijun(param), n, m)
+    }
+
+    /// 전환선이 기준선 아래 신호 확인 (n개 연속 전환선 < 기준선, 이전 m개는 아님)
+    pub fn is_tenkan_below_kijun_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_tenkan_below_kijun(param), n, m)
+    }
+
+    /// 강한 상승 신호 확인 (n개 연속 강한 상승, 이전 m개는 아님)
+    pub fn is_strong_bullish_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                // 강한 상승 신호 = 매수 신호 + 가격이 구름 위 + 전환선 > 기준선
+                data.is_buy_signal(param)
+                    && data.is_price_above_cloud(param)
+                    && data.is_tenkan_above_kijun(param)
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 강한 하락 신호 확인 (n개 연속 강한 하락, 이전 m개는 아님)
+    pub fn is_strong_bearish_signal(&self, n: usize, m: usize, param: &IchimokuParams) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                // 강한 하락 신호 = 매도 신호 + 가격이 구름 아래 + 전환선 < 기준선
+                data.is_sell_signal(param)
+                    && data.is_price_below_cloud(param)
+                    && data.is_tenkan_below_kijun(param)
+            },
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 매수 신호인지 확인
+    pub fn is_buy_signal_continuous(&self, n: usize, param: &IchimokuParams) -> bool {
+        self.is_all(|data| data.is_buy_signal(param), n)
+    }
+
+    /// n개의 연속 데이터에서 매도 신호인지 확인
+    pub fn is_sell_signal_continuous(&self, n: usize, param: &IchimokuParams) -> bool {
+        self.is_all(|data| data.is_sell_signal(param), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 구름 위인지 확인
+    pub fn is_price_above_cloud_continuous(&self, n: usize, param: &IchimokuParams) -> bool {
+        self.is_all(|data| data.is_price_above_cloud(param), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 구름 아래인지 확인
+    pub fn is_price_below_cloud_continuous(&self, n: usize, param: &IchimokuParams) -> bool {
+        self.is_all(|data| data.is_price_below_cloud(param), n)
+    }
 }
 
 impl<C: Candle> AnalyzerOps<IchimokuAnalyzerData<C>, C> for IchimokuAnalyzer<C> {

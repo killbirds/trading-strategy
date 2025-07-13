@@ -148,7 +148,7 @@ impl<C: Candle + 'static> RSIStrategy<C> {
         storage: &CandleStore<C>,
         config: RSIStrategyConfig,
     ) -> Result<RSIStrategy<C>, String> {
-        info!("RSI 전략 설정: {:?}", config);
+        info!("RSI 전략 설정: {config:?}");
 
         let ctx = RSIAnalyzer::new(config.rsi_period, &config.ma, &config.ma_periods, storage);
 

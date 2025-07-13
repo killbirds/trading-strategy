@@ -104,6 +104,62 @@ pub fn filter_moving_average<C: Candle + 'static>(
             },
             params.consecutive_n,
         ),
+        // 7: 이동평균선들이 수렴하는 중 (간격 좁아짐)
+        7 => {
+            if analyzer.items.len() < 2 || params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                .abs();
+                let previous_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                .abs();
+                current_gap < previous_gap
+            }
+        }
+        // 8: 이동평균선들이 발산하는 중 (간격 넓어짐)
+        8 => {
+            if analyzer.items.len() < 2 || params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                .abs();
+                let previous_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                .abs();
+                current_gap > previous_gap
+            }
+        }
+        // 9: 가격이 모든 이동평균선 위에 있음 (강한 상승 추세)
+        9 => analyzer.is_all(
+            |data| {
+                let price = data.candle.close_price();
+                for i in 0..params.periods.len() {
+                    let ma = data.mas.get_by_key_index(i).get();
+                    if price <= ma {
+                        return false;
+                    }
+                }
+                true
+            },
+            params.consecutive_n,
+        ),
+        // 10: 가격이 모든 이동평균선 아래에 있음 (강한 하락 추세)
+        10 => analyzer.is_all(
+            |data| {
+                let price = data.candle.close_price();
+                for i in 0..params.periods.len() {
+                    let ma = data.mas.get_by_key_index(i).get();
+                    if price >= ma {
+                        return false;
+                    }
+                }
+                true
+            },
+            params.consecutive_n,
+        ),
         _ => false,
     };
 
@@ -327,7 +383,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 7, // 유효하지 않은 필터 타입
+            filter_type: 99, // 유효하지 않은 필터 타입
             consecutive_n: 1,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
@@ -350,7 +406,7 @@ mod tests {
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
         let is_passed = result.unwrap();
-        println!("하락 추세 테스트 결과 (1연속): {}", is_passed);
+        println!("하락 추세 테스트 결과 (1연속): {is_passed}");
     }
 
     #[test]

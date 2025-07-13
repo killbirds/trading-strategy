@@ -315,6 +315,576 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
         signal_strength.min(1.0).max(0.0)
     }
+
+    /// 향상된 매수 신호 강도 계산 (변동성 및 시장 상황 고려)
+    ///
+    /// # Arguments
+    /// * `rsi_lower` - RSI 과매도 기준값
+    /// * `volatility` - 현재 변동성 (ATR 기반)
+    /// * `volume_factor` - 볼륨 증가 배수
+    ///
+    /// # Returns
+    /// * `f64` - 향상된 매수 신호 강도 (0.0~1.0)
+    pub fn calculate_enhanced_buy_signal_strength(
+        &self,
+        rsi_lower: f64,
+        volatility: f64,
+        volume_factor: f64,
+    ) -> f64 {
+        if self.items.len() < 5 {
+            return 0.0;
+        }
+
+        let base_strength = self.calculate_buy_signal_strength(rsi_lower);
+
+        // 시장 상황별 가중치 조정
+        let market_condition_factor = self.calculate_market_condition_factor();
+        let momentum_factor = self.calculate_momentum_factor();
+        let volatility_factor = self.calculate_volatility_adjustment_factor(volatility);
+        let volume_factor_adj = if volume_factor > 1.5 {
+            1.2
+        } else if volume_factor < 0.8 {
+            0.8
+        } else {
+            1.0
+        };
+        let consensus_factor = self.calculate_indicators_consensus_factor();
+
+        // 최종 조정된 신호 강도
+        let enhanced_strength = base_strength
+            * market_condition_factor
+            * momentum_factor
+            * volatility_factor
+            * volume_factor_adj
+            * consensus_factor;
+
+        enhanced_strength.min(1.0).max(0.0)
+    }
+
+    /// 향상된 매도 신호 강도 계산 (변동성 및 시장 상황 고려)
+    ///
+    /// # Arguments
+    /// * `rsi_upper` - RSI 과매수 기준값
+    /// * `profit_percentage` - 현재 수익률
+    /// * `volatility` - 현재 변동성
+    /// * `volume_factor` - 볼륨 증가 배수
+    ///
+    /// # Returns
+    /// * `f64` - 향상된 매도 신호 강도 (0.0~1.0)
+    pub fn calculate_enhanced_sell_signal_strength(
+        &self,
+        rsi_upper: f64,
+        profit_percentage: f64,
+        volatility: f64,
+        volume_factor: f64,
+    ) -> f64 {
+        if self.items.len() < 5 {
+            return 0.0;
+        }
+
+        let base_strength = self.calculate_sell_signal_strength(rsi_upper, profit_percentage);
+
+        // 시장 상황별 가중치 조정
+        let market_condition_factor = 2.0 - self.calculate_market_condition_factor(); // 역방향 적용
+        let momentum_factor = 2.0 - self.calculate_momentum_factor(); // 역방향 적용
+        let volatility_factor = self.calculate_volatility_adjustment_factor(volatility);
+        let volume_factor_adj = if volume_factor > 1.5 {
+            1.2
+        } else if volume_factor < 0.8 {
+            0.8
+        } else {
+            1.0
+        };
+        let consensus_factor = 2.0 - self.calculate_indicators_consensus_factor(); // 역방향 적용
+
+        // 최종 조정된 신호 강도
+        let enhanced_strength = base_strength
+            * market_condition_factor
+            * momentum_factor
+            * volatility_factor
+            * volume_factor_adj
+            * consensus_factor;
+
+        enhanced_strength.min(1.0).max(0.0)
+    }
+
+    /// 시장 상황 요인 계산
+    fn calculate_market_condition_factor(&self) -> f64 {
+        if self.items.len() < 10 {
+            return 1.0;
+        }
+
+        let recent_items = &self.items[..10];
+
+        // 트렌드 강도 계산
+        let price_trend = self.calculate_price_trend_strength(recent_items);
+        let ma_trend = self.calculate_ma_trend_strength(recent_items);
+
+        // 시장 안정성 계산
+        let stability = self.calculate_market_stability(recent_items);
+
+        // 종합 시장 상황 점수
+        let market_score = (price_trend + ma_trend + stability) / 3.0;
+
+        // 0.5 ~ 1.5 범위로 조정
+        0.5 + market_score
+    }
+
+    /// 가격 트렌드 강도 계산
+    fn calculate_price_trend_strength(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 5 {
+            return 0.0;
+        }
+
+        let mut trend_score = 0.0;
+        for i in 1..items.len() {
+            let current_price = items[i - 1].candle.close_price();
+            let previous_price = items[i].candle.close_price();
+
+            if current_price > previous_price {
+                trend_score += 1.0;
+            } else if current_price < previous_price {
+                trend_score -= 1.0;
+            }
+        }
+
+        (trend_score / (items.len() - 1) as f64).abs()
+    }
+
+    /// 이동평균 트렌드 강도 계산
+    fn calculate_ma_trend_strength(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 3 {
+            return 0.0;
+        }
+
+        let current_ma = items[0].ma.get();
+        let previous_ma = items[1].ma.get();
+        let before_ma = items[2].ma.get();
+
+        if current_ma > previous_ma && previous_ma > before_ma {
+            1.0 // 강한 상승 트렌드
+        } else if current_ma < previous_ma && previous_ma < before_ma {
+            1.0 // 강한 하락 트렌드 (절댓값)
+        } else if current_ma > previous_ma || previous_ma > before_ma {
+            0.5 // 약한 상승 트렌드
+        } else {
+            0.0 // 횡보
+        }
+    }
+
+    /// 시장 안정성 계산
+    fn calculate_market_stability(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 5 {
+            return 0.0;
+        }
+
+        // RSI 변동성 계산
+        let rsi_values: Vec<f64> = items.iter().map(|item| item.rsi.value()).collect();
+        let rsi_volatility = self.calculate_values_volatility(&rsi_values);
+
+        // MACD 변동성 계산
+        let macd_values: Vec<f64> = items.iter().map(|item| item.macd.histogram).collect();
+        let macd_volatility = self.calculate_values_volatility(&macd_values);
+
+        // 안정성 점수 (변동성이 낮을수록 높은 점수)
+        1.0 - (rsi_volatility + macd_volatility) / 2.0
+    }
+
+    /// 값들의 변동성 계산
+    fn calculate_values_volatility(&self, values: &[f64]) -> f64 {
+        if values.len() < 2 {
+            return 0.0;
+        }
+
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
+
+        variance.sqrt() / mean.abs().max(1.0) // 정규화된 변동성
+    }
+
+    /// 모멘텀 요인 계산
+    fn calculate_momentum_factor(&self) -> f64 {
+        if self.items.len() < 5 {
+            return 1.0;
+        }
+
+        let recent_items = &self.items[..5];
+
+        // 가격 모멘텀
+        let price_momentum = self.calculate_price_momentum(recent_items);
+
+        // MACD 모멘텀
+        let macd_momentum = self.calculate_macd_momentum(recent_items);
+
+        // RSI 모멘텀
+        let rsi_momentum = self.calculate_rsi_momentum(recent_items);
+
+        // 종합 모멘텀 점수
+        let momentum_score = (price_momentum + macd_momentum + rsi_momentum) / 3.0;
+
+        // 0.5 ~ 1.5 범위로 조정
+        0.5 + momentum_score
+    }
+
+    /// 가격 모멘텀 계산
+    fn calculate_price_momentum(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 3 {
+            return 0.0;
+        }
+
+        let recent_change = (items[0].candle.close_price() - items[1].candle.close_price())
+            / items[1].candle.close_price();
+        let previous_change = (items[1].candle.close_price() - items[2].candle.close_price())
+            / items[2].candle.close_price();
+
+        if recent_change > previous_change {
+            (recent_change - previous_change).abs().min(1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// MACD 모멘텀 계산
+    fn calculate_macd_momentum(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 3 {
+            return 0.0;
+        }
+
+        let current_hist = items[0].macd.histogram;
+        let previous_hist = items[1].macd.histogram;
+        let before_hist = items[2].macd.histogram;
+
+        if current_hist > previous_hist && previous_hist > before_hist {
+            1.0 // 강한 모멘텀
+        } else if current_hist > previous_hist {
+            0.5 // 약한 모멘텀
+        } else {
+            0.0 // 모멘텀 없음
+        }
+    }
+
+    /// RSI 모멘텀 계산
+    fn calculate_rsi_momentum(&self, items: &[HybridAnalyzerData<C>]) -> f64 {
+        if items.len() < 3 {
+            return 0.0;
+        }
+
+        let current_rsi = items[0].rsi.value();
+        let previous_rsi = items[1].rsi.value();
+
+        if current_rsi > previous_rsi && current_rsi < 70.0 && current_rsi > 30.0 {
+            ((current_rsi - previous_rsi) / 10.0).min(1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// 변동성 조정 요인 계산
+    fn calculate_volatility_adjustment_factor(&self, volatility: f64) -> f64 {
+        // 높은 변동성일 때는 신호 강도를 낮추고, 낮은 변동성일 때는 높임
+        if volatility > 0.05 {
+            0.7 // 높은 변동성
+        } else if volatility > 0.03 {
+            0.85 // 중간 변동성
+        } else if volatility > 0.01 {
+            1.0 // 정상 변동성
+        } else {
+            1.2 // 낮은 변동성
+        }
+    }
+
+    /// 지표 합의 요인 계산
+    fn calculate_indicators_consensus_factor(&self) -> f64 {
+        if self.items.is_empty() {
+            return 1.0;
+        }
+
+        let current = &self.items[0];
+        let mut consensus_score = 0.0;
+        let mut total_indicators = 0.0;
+
+        // MA 신호
+        if current.candle.close_price() > current.ma.get() {
+            consensus_score += 1.0;
+        }
+        total_indicators += 1.0;
+
+        // MACD 신호
+        if current.macd.macd_line > current.macd.signal_line {
+            consensus_score += 1.0;
+        }
+        total_indicators += 1.0;
+
+        // RSI 신호 (중립 영역에서 상승)
+        let rsi = current.rsi.value();
+        if rsi > 30.0 && rsi < 70.0
+            && self.items.len() > 1 && rsi > self.items[1].rsi.value() {
+                consensus_score += 1.0;
+            }
+        total_indicators += 1.0;
+
+        // 합의 점수 (0.5 ~ 1.5 범위)
+        0.5 + (consensus_score / total_indicators)
+    }
+
+    /// 시장 상황 평가
+    pub fn evaluate_market_condition(&self) -> String {
+        if self.items.len() < 10 {
+            return "데이터 부족".to_string();
+        }
+
+        let market_factor = self.calculate_market_condition_factor();
+        let momentum_factor = self.calculate_momentum_factor();
+        let consensus_factor = self.calculate_indicators_consensus_factor();
+
+        let overall_score = (market_factor + momentum_factor + consensus_factor) / 3.0;
+
+        if overall_score > 1.3 {
+            "매우 좋은 시장 상황".to_string()
+        } else if overall_score > 1.1 {
+            "좋은 시장 상황".to_string()
+        } else if overall_score > 0.9 {
+            "보통 시장 상황".to_string()
+        } else if overall_score > 0.7 {
+            "주의 필요한 시장 상황".to_string()
+        } else {
+            "위험한 시장 상황".to_string()
+        }
+    }
+
+    /// 리스크 조정된 신호 강도 계산
+    pub fn calculate_risk_adjusted_signal_strength(
+        &self,
+        signal_type: &str, // "buy" or "sell"
+        base_strength: f64,
+        risk_factor: f64, // 0.0~1.0, 높을수록 위험
+    ) -> f64 {
+        if base_strength == 0.0 {
+            return 0.0;
+        }
+
+        // 리스크 조정 계수 (리스크가 높을수록 신호 강도 감소)
+        let risk_adjustment = 1.0 - (risk_factor * 0.5);
+
+        // 시장 상황 고려
+        let market_adjustment = if signal_type == "buy" {
+            self.calculate_market_condition_factor()
+        } else {
+            2.0 - self.calculate_market_condition_factor()
+        };
+
+        let adjusted_strength = base_strength * risk_adjustment * market_adjustment;
+        adjusted_strength.min(1.0).max(0.0)
+    }
+
+    /// 강한 매수 신호 돌파 확인 (n개 연속 강한 매수 신호, 이전 m개는 아님)
+    pub fn is_strong_buy_signal_confirmed(
+        &self,
+        n: usize,
+        m: usize,
+        rsi_lower: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.calculate_buy_signal_strength(rsi_lower) > threshold,
+            n,
+            m,
+        )
+    }
+
+    /// 강한 매도 신호 돌파 확인 (n개 연속 강한 매도 신호, 이전 m개는 아님)
+    pub fn is_strong_sell_signal_confirmed(
+        &self,
+        n: usize,
+        m: usize,
+        rsi_upper: f64,
+        profit_percentage: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.calculate_sell_signal_strength(rsi_upper, profit_percentage) > threshold,
+            n,
+            m,
+        )
+    }
+
+    /// 강화된 매수 신호 돌파 확인 (n개 연속 강화된 매수 신호, 이전 m개는 아님)
+    pub fn is_enhanced_buy_signal_confirmed(
+        &self,
+        n: usize,
+        m: usize,
+        rsi_lower: f64,
+        volatility: f64,
+        volume_factor: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                self.calculate_enhanced_buy_signal_strength(rsi_lower, volatility, volume_factor)
+                    > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 강화된 매도 신호 돌파 확인 (n개 연속 강화된 매도 신호, 이전 m개는 아님)
+    pub fn is_enhanced_sell_signal_confirmed(
+        &self,
+        n: usize,
+        m: usize,
+        rsi_upper: f64,
+        profit_percentage: f64,
+        volatility: f64,
+        volume_factor: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                self.calculate_enhanced_sell_signal_strength(
+                    rsi_upper,
+                    profit_percentage,
+                    volatility,
+                    volume_factor,
+                ) > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 시장 상황 개선 신호 확인 (n개 연속 시장 상황 개선, 이전 m개는 아님)
+    pub fn is_market_condition_improving_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.calculate_market_condition_factor() > threshold,
+            n,
+            m,
+        )
+    }
+
+    /// 모멘텀 강화 신호 확인 (n개 연속 모멘텀 강화, 이전 m개는 아님)
+    pub fn is_momentum_strengthening_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(|_| self.calculate_momentum_factor() > threshold, n, m)
+    }
+
+    /// 지표 합의 신호 확인 (n개 연속 지표 합의, 이전 m개는 아님)
+    pub fn is_indicators_consensus_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.calculate_indicators_consensus_factor() > threshold,
+            n,
+            m,
+        )
+    }
+
+    /// 리스크 조정 매수 신호 확인 (n개 연속 리스크 조정 매수 신호, 이전 m개는 아님)
+    pub fn is_risk_adjusted_buy_signal(
+        &self,
+        n: usize,
+        m: usize,
+        base_strength: f64,
+        risk_factor: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                self.calculate_risk_adjusted_signal_strength("buy", base_strength, risk_factor)
+                    > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 리스크 조정 매도 신호 확인 (n개 연속 리스크 조정 매도 신호, 이전 m개는 아님)
+    pub fn is_risk_adjusted_sell_signal(
+        &self,
+        n: usize,
+        m: usize,
+        base_strength: f64,
+        risk_factor: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                self.calculate_risk_adjusted_signal_strength("sell", base_strength, risk_factor)
+                    > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 복합 신호 강도 임계값 돌파 확인 (n개 연속 임계값 초과, 이전 m개는 아님)
+    pub fn is_composite_signal_strength_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        signal_type: &str,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                // MA, MACD, RSI의 조합 신호 강도 계산
+                let ma_signal = if signal_type == "buy" {
+                    data.candle.close_price() > data.ma.get()
+                } else {
+                    data.candle.close_price() < data.ma.get()
+                };
+
+                let macd_signal = if signal_type == "buy" {
+                    data.macd.macd_line > data.macd.signal_line && data.macd.histogram > 0.0
+                } else {
+                    data.macd.macd_line < data.macd.signal_line && data.macd.histogram < 0.0
+                };
+
+                let rsi_signal = if signal_type == "buy" {
+                    data.rsi.value() < 30.0 // 과매도에서 반등 신호
+                } else {
+                    data.rsi.value() > 70.0 // 과매수에서 하락 신호
+                };
+
+                let signal_count = [ma_signal, macd_signal, rsi_signal]
+                    .iter()
+                    .filter(|&&x| x)
+                    .count();
+                (signal_count as f64 / 3.0) > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 강한 매수 신호인지 확인
+    pub fn is_strong_buy_signal(&self, n: usize, rsi_lower: f64, threshold: f64) -> bool {
+        self.is_all(
+            |_| self.calculate_buy_signal_strength(rsi_lower) > threshold,
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 강한 매도 신호인지 확인
+    pub fn is_strong_sell_signal(
+        &self,
+        n: usize,
+        rsi_upper: f64,
+        profit_percentage: f64,
+        threshold: f64,
+    ) -> bool {
+        self.is_all(
+            |_| self.calculate_sell_signal_strength(rsi_upper, profit_percentage) > threshold,
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 시장 상황이 좋은지 확인
+    pub fn is_good_market_condition(&self, n: usize, threshold: f64) -> bool {
+        self.is_all(|_| self.calculate_market_condition_factor() > threshold, n)
+    }
+
+    /// n개의 연속 데이터에서 모멘텀이 강한지 확인
+    pub fn is_strong_momentum(&self, n: usize, threshold: f64) -> bool {
+        self.is_all(|_| self.calculate_momentum_factor() > threshold, n)
+    }
 }
 
 impl<C: Candle + Clone> AnalyzerOps<HybridAnalyzerData<C>, C> for HybridAnalyzer<C> {

@@ -44,7 +44,7 @@ pub fn filter_macd<C: Candle + 'static>(
         &candle_store,
     );
 
-    log::debug!("코인 {} MACD", coin,);
+    log::debug!("코인 {coin} MACD",);
 
     let result = match params.filter_type {
         // 0: MACD 라인이 시그널 라인 위에 있는 경우 (상승 추세)
@@ -71,6 +71,55 @@ pub fn filter_macd<C: Candle + 'static>(
         4 => analyzer.is_histogram_above_threshold(params.threshold, params.consecutive_n),
         // 5: 히스토그램이 임계값보다 작은 경우 (강한 하락)
         5 => analyzer.is_histogram_below_threshold(params.threshold, params.consecutive_n),
+        // 6: MACD 라인이 제로라인을 상향 돌파 (강한 상승 신호)
+        6 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let previous_macd = analyzer.items[1].macd.macd_line;
+                current_macd > 0.0 && previous_macd <= 0.0
+            }
+        }
+        // 7: MACD 라인이 제로라인을 하향 돌파 (강한 하락 신호)
+        7 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let previous_macd = analyzer.items[1].macd.macd_line;
+                current_macd < 0.0 && previous_macd >= 0.0
+            }
+        }
+        // 8: 히스토그램이 양수에서 음수로 전환 (모멘텀 약화)
+        8 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_hist = analyzer.items[0].macd.histogram;
+                let previous_hist = analyzer.items[1].macd.histogram;
+                current_hist < 0.0 && previous_hist >= 0.0
+            }
+        }
+        // 9: 히스토그램이 음수에서 양수로 전환 (모멘텀 강화)
+        9 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_hist = analyzer.items[0].macd.histogram;
+                let previous_hist = analyzer.items[1].macd.histogram;
+                current_hist > 0.0 && previous_hist <= 0.0
+            }
+        }
+        // 10: MACD와 시그널 모두 제로라인 위에 있음 (강한 상승 추세)
+        10 => {
+            if analyzer.items.is_empty() {
+                false
+            } else {
+                let current_data = &analyzer.items[0];
+                current_data.macd.macd_line > 0.0 && current_data.macd.signal_line > 0.0
+            }
+        }
         _ => false,
     };
 

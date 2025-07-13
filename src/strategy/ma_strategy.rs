@@ -149,7 +149,7 @@ impl<C: Candle + 'static> MAStrategy<C> {
         storage: &CandleStore<C>,
         config: MAStrategyConfig,
     ) -> Result<MAStrategy<C>, String> {
-        info!("MA 전략 설정: {:?}", config);
+        info!("MA 전략 설정: {config:?}");
         let ctx = MAAnalyzer::new(&config.ma, &config.ma_periods, storage);
 
         Ok(MAStrategy { config, ctx })

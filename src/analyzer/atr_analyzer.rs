@@ -130,6 +130,162 @@ impl<C: Candle> ATRAnalyzer<C> {
 
         current_atr < avg_atr
     }
+
+    /// ATR 임계값 돌파 신호 확인 (n개 연속 ATR > 임계값, 이전 m개는 아님)
+    pub fn is_atr_above_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let atr = data.get_atr(period);
+                atr > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// ATR 임계값 하향 돌파 신호 확인 (n개 연속 ATR < 임계값, 이전 m개는 아님)
+    pub fn is_atr_below_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let atr = data.get_atr(period);
+                atr < threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 고변동성 신호 확인 (n개 연속 고변동성, 이전 m개는 아님)
+    pub fn is_high_volatility_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let atr = data.get_atr(period);
+                atr > threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 저변동성 신호 확인 (n개 연속 저변동성, 이전 m개는 아님)
+    pub fn is_low_volatility_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let atr = data.get_atr(period);
+                atr < threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 변동성 증가 신호 확인 (n개 연속 변동성 증가, 이전 m개는 아님)
+    pub fn is_volatility_increasing_signal(&self, n: usize, m: usize, period: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.len() < 2 {
+                    return false;
+                }
+                let current_atr = self.items[0].get_atr(period);
+                let previous_atr = self.items[1].get_atr(period);
+                current_atr > previous_atr
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 변동성 감소 신호 확인 (n개 연속 변동성 감소, 이전 m개는 아님)
+    pub fn is_volatility_decreasing_signal(&self, n: usize, m: usize, period: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.len() < 2 {
+                    return false;
+                }
+                let current_atr = self.items[0].get_atr(period);
+                let previous_atr = self.items[1].get_atr(period);
+                current_atr < previous_atr
+            },
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 고변동성인지 확인
+    pub fn is_high_volatility(&self, n: usize, period: usize, threshold: f64) -> bool {
+        self.is_all(
+            |data| {
+                let atr = data.get_atr(period);
+                atr > threshold
+            },
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 저변동성인지 확인
+    pub fn is_low_volatility(&self, n: usize, period: usize, threshold: f64) -> bool {
+        self.is_all(
+            |data| {
+                let atr = data.get_atr(period);
+                atr < threshold
+            },
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 변동성이 증가하는지 확인
+    pub fn is_volatility_increasing(&self, n: usize, period: usize) -> bool {
+        if n > self.items.len() {
+            return false;
+        }
+        for i in 0..n - 1 {
+            let current_atr = self.items[i].get_atr(period);
+            let next_atr = self.items[i + 1].get_atr(period);
+            if current_atr <= next_atr {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// n개의 연속 데이터에서 변동성이 감소하는지 확인
+    pub fn is_volatility_decreasing(&self, n: usize, period: usize) -> bool {
+        if n > self.items.len() {
+            return false;
+        }
+        for i in 0..n - 1 {
+            let current_atr = self.items[i].get_atr(period);
+            let next_atr = self.items[i + 1].get_atr(period);
+            if current_atr >= next_atr {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl<C: Candle> AnalyzerOps<ATRAnalyzerData<C>, C> for ATRAnalyzer<C> {

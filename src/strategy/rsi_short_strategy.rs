@@ -106,7 +106,7 @@ impl<C: Candle + 'static> RSIShortStrategy<C> {
     /// 새 RSI 숏 전략 인스턴스 생성 (JSON 설정 파일 사용)
     pub fn new(storage: &CandleStore<C>, json_config: &str) -> Result<RSIShortStrategy<C>, String> {
         let config = RSIShortStrategyConfig::from_json(json_config)?;
-        info!("RSI 숏 전략 설정: {:?}", config);
+        info!("RSI 숏 전략 설정: {config:?}");
 
         let ctx = RSIAnalyzer::new(config.rsi_period, &config.ma, &config.ma_periods, storage);
 
@@ -123,7 +123,7 @@ impl<C: Candle + 'static> RSIShortStrategy<C> {
             None => RSIShortStrategyConfig::default(),
         };
 
-        info!("RSI 숏 전략 설정: {:?}", strategy_config);
+        info!("RSI 숏 전략 설정: {strategy_config:?}");
 
         let ctx = RSIAnalyzer::new(
             strategy_config.rsi_period,

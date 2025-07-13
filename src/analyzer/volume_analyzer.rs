@@ -105,22 +105,182 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         Self::new(&periods, storage)
     }
 
-    /// n개의 연속 데이터에서 모든 볼륨 비율이 평균 이상인지 확인
-    pub fn is_volume_above_average(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_volume_ratio_above_average(), n)
+    /// 평균 이상 볼륨 신호 확인 (n개 연속 평균 이상 볼륨, 이전 m개는 아님)
+    pub fn is_volume_above_average_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_all_volume_ratio_above_average(), n, m)
     }
 
-    /// n개의 연속 데이터에서 모든 볼륨 비율이 지정된 임계값 이상인지 확인
-    pub fn is_volume_significantly_above(&self, threshold: f64, n: usize) -> bool {
-        self.is_all(
-            |data| data.is_all_volume_ratio_significantly_above(threshold),
+    /// 평균 이하 볼륨 신호 확인 (n개 연속 평균 이하 볼륨, 이전 m개는 아님)
+    pub fn is_volume_below_average_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_all_volume_ratio_below_average(), n, m)
+    }
+
+    /// 볼륨 급증 신호 확인 (n개 연속 볼륨 급증, 이전 m개는 아님)
+    pub fn is_volume_surge_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.is_empty() {
+                    return false;
+                }
+
+                let current_ratio = self.items[0].get_volume_ratio(period);
+                current_ratio > threshold
+            },
             n,
+            m,
         )
     }
 
-    /// n개의 연속 데이터에서 모든 볼륨 비율이 평균 미만인지 확인
-    pub fn is_volume_below_average(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_volume_ratio_below_average(), n)
+    /// 볼륨 감소 신호 확인 (n개 연속 볼륨 감소, 이전 m개는 아님)
+    pub fn is_volume_decline_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.is_empty() {
+                    return false;
+                }
+
+                let current_ratio = self.items[0].get_volume_ratio(period);
+                current_ratio < threshold
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 특정 볼륨 비율 임계값 돌파 신호 확인 (n개 연속 임계값 초과, 이전 m개는 아님)
+    pub fn is_volume_ratio_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.get_volume_ratio(period) > threshold, n, m)
+    }
+
+    /// 강한 볼륨 신호 확인 (n개 연속 강한 볼륨, 이전 m개는 아님)
+    pub fn is_significantly_above_volume_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_all_volume_ratio_significantly_above(threshold),
+            n,
+            m,
+        )
+    }
+
+    /// 불리시 볼륨 증가 신호 확인 (n개 연속 양봉과 볼륨 증가, 이전 m개는 아님)
+    pub fn is_bullish_with_increased_volume_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_bullish_with_increased_volume(period),
+            n,
+            m,
+        )
+    }
+
+    /// 베어리시 볼륨 증가 신호 확인 (n개 연속 음봉과 볼륨 증가, 이전 m개는 아님)
+    pub fn is_bearish_with_increased_volume_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_bearish_with_increased_volume(period),
+            n,
+            m,
+        )
+    }
+
+    /// 상승 추세에서 볼륨 증가 신호 확인 (n개 연속 상승 추세 볼륨 증가, 이전 m개는 아님)
+    pub fn is_increasing_volume_in_uptrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        trend_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                // 연속적인 양봉에서 점진적으로 볼륨이 증가하는지 확인
+                if self.items.len() < trend_period {
+                    return false;
+                }
+
+                // 모두 양봉인지 확인
+                for i in 0..trend_period {
+                    if self.items[i].candle.close_price() <= self.items[i].candle.open_price() {
+                        return false;
+                    }
+                }
+
+                // 볼륨이 점진적으로 증가하는지 확인
+                for i in 0..trend_period - 1 {
+                    let current_ratio = self.items[i].get_volume_ratio(period);
+                    let next_ratio = self.items[i + 1].get_volume_ratio(period);
+                    if current_ratio <= next_ratio {
+                        return false;
+                    }
+                }
+
+                true
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 하락 추세에서 볼륨 감소 신호 확인 (n개 연속 하락 추세 볼륨 감소, 이전 m개는 아님)
+    pub fn is_decreasing_volume_in_downtrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        trend_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                // 연속적인 음봉에서 점진적으로 볼륨이 감소하는지 확인
+                if self.items.len() < trend_period {
+                    return false;
+                }
+
+                // 모두 음봉인지 확인
+                for i in 0..trend_period {
+                    if self.items[i].candle.close_price() >= self.items[i].candle.open_price() {
+                        return false;
+                    }
+                }
+
+                // 볼륨이 점진적으로 감소하는지 확인
+                for i in 0..trend_period - 1 {
+                    let current_ratio = self.items[i].get_volume_ratio(period);
+                    let next_ratio = self.items[i + 1].get_volume_ratio(period);
+                    if current_ratio >= next_ratio {
+                        return false;
+                    }
+                }
+
+                true
+            },
+            n,
+            m,
+        )
     }
 
     /// 볼륨 급증 여부 확인 (이전 대비 갑자기 높은 볼륨)
@@ -197,13 +357,45 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         true
     }
 
-    /// 양봉 볼륨 증가 패턴 확인
-    pub fn is_bullish_with_increased_volume(&self, period: usize, n: usize) -> bool {
+    /// 현재 볼륨이 평균 이상인 신호 확인 (n개 연속 현재 볼륨 > 평균, 이전 m개는 아님)
+    pub fn is_current_volume_above_average_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_current_volume_above_average(period),
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 볼륨이 평균 이상인지 확인
+    pub fn is_volume_above_average(&self, n: usize) -> bool {
+        self.is_all(|data| data.is_all_volume_ratio_above_average(), n)
+    }
+
+    /// n개의 연속 데이터에서 볼륨이 평균 이하인지 확인
+    pub fn is_volume_below_average(&self, n: usize) -> bool {
+        self.is_all(|data| data.is_all_volume_ratio_below_average(), n)
+    }
+
+    /// n개의 연속 데이터에서 볼륨이 임계값 이상인지 확인
+    pub fn is_volume_significantly_above(&self, n: usize, threshold: f64) -> bool {
+        self.is_all(
+            |data| data.is_all_volume_ratio_significantly_above(threshold),
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 불리시 볼륨 증가인지 확인
+    pub fn is_bullish_with_increased_volume(&self, n: usize, period: usize) -> bool {
         self.is_all(|data| data.is_bullish_with_increased_volume(period), n)
     }
 
-    /// 음봉 볼륨 증가 패턴 확인
-    pub fn is_bearish_with_increased_volume(&self, period: usize, n: usize) -> bool {
+    /// n개의 연속 데이터에서 베어리시 볼륨 증가인지 확인
+    pub fn is_bearish_with_increased_volume(&self, n: usize, period: usize) -> bool {
         self.is_all(|data| data.is_bearish_with_increased_volume(period), n)
     }
 }

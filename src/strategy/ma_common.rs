@@ -65,7 +65,7 @@ impl MAStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 
@@ -77,7 +77,7 @@ impl MAStrategyConfigBase {
                 "sma" => MAType::SMA,
                 "ema" => MAType::EMA,
                 "wma" => MAType::WMA,
-                _ => return Err(format!("알 수 없는 이동평균 유형: {}", ma_type)),
+                _ => return Err(format!("알 수 없는 이동평균 유형: {ma_type}")),
             },
             None => return Err("ma 설정이 필요합니다".to_string()),
         };
@@ -86,7 +86,7 @@ impl MAStrategyConfigBase {
         let ma_periods = match config.get("ma_periods") {
             Some(periods) => {
                 let periods_vec = split_safe::<usize>(periods)
-                    .map_err(|e| format!("이동평균 기간 파싱 오류: {}", e))?;
+                    .map_err(|e| format!("이동평균 기간 파싱 오류: {e}"))?;
 
                 if periods_vec.is_empty() {
                     return Err("이동평균 기간이 지정되지 않았습니다".to_string());
@@ -96,8 +96,7 @@ impl MAStrategyConfigBase {
                 for i in 1..periods_vec.len() {
                     if periods_vec[i] <= periods_vec[i - 1] {
                         return Err(format!(
-                            "이동평균 기간은 오름차순으로 정렬되어야 합니다: {:?}",
-                            periods_vec
+                            "이동평균 기간은 오름차순으로 정렬되어야 합니다: {periods_vec:?}"
                         ));
                     }
                 }

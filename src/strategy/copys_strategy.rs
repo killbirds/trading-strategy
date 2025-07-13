@@ -78,7 +78,7 @@ impl CopysStrategyConfig {
                     .map_err(|_| "RSI 하한값 파싱 오류".to_string())?;
 
                 if !(0.0..=100.0).contains(&lower) {
-                    return Err(format!("RSI 하한값({})은 0과 100 사이여야 합니다", lower));
+                    return Err(format!("RSI 하한값({lower})은 0과 100 사이여야 합니다"));
                 }
 
                 lower
@@ -93,7 +93,7 @@ impl CopysStrategyConfig {
                     .map_err(|_| "RSI 상한값 파싱 오류".to_string())?;
 
                 if !(0.0..=100.0).contains(&upper) {
-                    return Err(format!("RSI 상한값({})은 0과 100 사이여야 합니다", upper));
+                    return Err(format!("RSI 상한값({upper})은 0과 100 사이여야 합니다"));
                 }
 
                 upper
@@ -103,8 +103,7 @@ impl CopysStrategyConfig {
 
         if rsi_lower >= rsi_upper {
             return Err(format!(
-                "RSI 하한값({})은 상한값({})보다 작아야 합니다",
-                rsi_lower, rsi_upper
+                "RSI 하한값({rsi_lower})은 상한값({rsi_upper})보다 작아야 합니다"
             ));
         }
 
@@ -187,7 +186,7 @@ impl<C: Candle + 'static> CopysStrategy<C> {
         storage: &CandleStore<C>,
         config: CopysStrategyConfig,
     ) -> Result<CopysStrategy<C>, String> {
-        info!("CopyS 전략 설정: {:?}", config);
+        info!("CopyS 전략 설정: {config:?}");
 
         let ma_type = crate::indicator::ma::MAType::EMA;
         // 이미지 참고: 5일/20일/60일/120일/200일/240일 이평선 설정

@@ -54,7 +54,7 @@ fn test_hybrid_short_strategy_performance_in_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 하락장에서 숏 전략 결과를 출력만 함
-    println!("하락장 하이브리드 숏 전략 결과: {:?}", result);
+    println!("하락장 하이브리드 숏 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 
@@ -82,7 +82,7 @@ fn test_hybrid_short_strategy_performance_in_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서 숏 전략은 손실 가능성이 높음 (단순 출력만 수행)
-    println!("상승장 하이브리드 숏 전략 결과: {:?}", result);
+    println!("상승장 하이브리드 숏 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -104,7 +104,7 @@ fn test_hybrid_short_strategy_performance_in_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 횡보장에서는 전략의 세부 구현에 따라 결과가 달라질 수 있음
-    println!("횡보장 하이브리드 숏 전략 결과: {:?}", result);
+    println!("횡보장 하이브리드 숏 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }

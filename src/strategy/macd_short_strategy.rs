@@ -119,7 +119,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
         json_config: &str,
     ) -> Result<MACDShortStrategy<C>, String> {
         let config = MACDShortStrategyConfig::from_json(json_config)?;
-        info!("MACD 숏 전략 설정: {:?}", config);
+        info!("MACD 숏 전략 설정: {config:?}");
 
         let ctx = MACDAnalyzer::new(
             config.fast_period,
@@ -141,7 +141,7 @@ impl<C: Candle + 'static> MACDShortStrategy<C> {
             None => MACDShortStrategyConfig::default(),
         };
 
-        info!("MACD 숏 전략 설정: {:?}", strategy_config);
+        info!("MACD 숏 전략 설정: {strategy_config:?}");
 
         let ctx = MACDAnalyzer::new(
             strategy_config.fast_period,

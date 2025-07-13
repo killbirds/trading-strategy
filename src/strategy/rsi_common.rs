@@ -70,7 +70,7 @@ impl RSIStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 
@@ -123,7 +123,7 @@ impl RSIStrategyConfigBase {
             Some(ma_type) => match ma_type.to_lowercase().as_str() {
                 "sma" => MAType::SMA,
                 "ema" => MAType::EMA,
-                _ => return Err(format!("알 수 없는 이동평균 유형: {}", ma_type)),
+                _ => return Err(format!("알 수 없는 이동평균 유형: {ma_type}")),
             },
             None => return Err("ma 설정이 필요합니다".to_string()),
         };
@@ -132,7 +132,7 @@ impl RSIStrategyConfigBase {
         let ma_periods = match config.get("ma_periods") {
             Some(periods) => {
                 let periods_vec = crate::strategy::split_safe::<usize>(periods)
-                    .map_err(|e| format!("이동평균 기간 파싱 오류: {}", e))?;
+                    .map_err(|e| format!("이동평균 기간 파싱 오류: {e}"))?;
 
                 if periods_vec.is_empty() {
                     return Err("이동평균 기간이 지정되지 않았습니다".to_string());
@@ -146,8 +146,7 @@ impl RSIStrategyConfigBase {
         // 유효성 검사
         if rsi_lower >= rsi_upper {
             return Err(format!(
-                "RSI 하단값({})이 상단값({})보다 크거나 같을 수 없습니다",
-                rsi_lower, rsi_upper
+                "RSI 하단값({rsi_lower})이 상단값({rsi_upper})보다 크거나 같을 수 없습니다"
             ));
         }
 

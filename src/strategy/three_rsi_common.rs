@@ -78,7 +78,7 @@ impl ThreeRSIStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 
@@ -100,7 +100,7 @@ impl ThreeRSIStrategyConfigBase {
                     }
                     periods
                 }
-                Err(e) => return Err(format!("RSI 기간 파싱 오류: {}", e)),
+                Err(e) => return Err(format!("RSI 기간 파싱 오류: {e}")),
             },
             None => return Err("rsi_periods 설정이 필요합니다".to_string()),
         };
@@ -109,7 +109,7 @@ impl ThreeRSIStrategyConfigBase {
         let ma = match config.get("ma").map(|s| s.as_str()) {
             Some("sma") => MAType::SMA,
             Some("ema") => MAType::EMA,
-            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {}", unknown)),
+            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {unknown}")),
             None => return Err("ma 설정이 필요합니다".to_string()),
         };
 

@@ -39,11 +39,7 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
     let (lower, middle, upper) = analyzer.get_bband();
 
     log::debug!(
-        "코인 {} 볼린저 밴드 - 상단: {:.2}, 중간: {:.2}, 하단: {:.2}",
-        coin,
-        upper,
-        middle,
-        lower
+        "코인 {coin} 볼린저 밴드 - 상단: {upper:.2}, 중간: {middle:.2}, 하단: {lower:.2}"
     );
 
     let result = match params.filter_type {
@@ -69,6 +65,16 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
         6 => analyzer.is_band_width_sufficient(),
         // 7: 하단 밴드 아래에서 위로 돌파한 경우 (상승 반전 신호)
         7 => analyzer.is_break_through_lower_band_from_below(params.consecutive_n),
+        // 8: 스퀴즈 돌파 - 밴드가 좁아진 후 상위선을 돌파하는 경우
+        8 => analyzer.is_squeeze_breakout_with_close_above_upper(5),
+        // 9: 향상된 스퀴즈 돌파 - 밴드가 좁아지다가 좁은 상태를 유지한 후 상위선을 돌파
+        9 => analyzer.is_enhanced_squeeze_breakout_with_close_above_upper(3, 2, 0.02),
+        // 10: 스퀴즈 상태 확인 - 밴드 폭이 좁은 상태
+        10 => analyzer.is_band_width_squeeze(params.consecutive_n, 0.02),
+        // 11: 밴드 폭 좁아지는 중 (스퀴즈 진행 중)
+        11 => analyzer.is_band_width_narrowing(params.consecutive_n),
+        // 12: 스퀴즈 상태에서 확장 시작 (변동성 증가 시작)
+        12 => analyzer.is_squeeze_expansion_start(0.02),
         _ => false,
     };
 

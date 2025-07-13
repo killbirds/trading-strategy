@@ -64,7 +64,7 @@ impl<C: Candle> Display for SuperTrendAnalyzer<C> {
         let settings = self
             .periods
             .iter()
-            .map(|(p, m)| format!("({}:{})", p, m))
+            .map(|(p, m)| format!("({p}:{m})"))
             .collect::<Vec<_>>()
             .join(", ");
 
@@ -194,6 +194,182 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
 
         previous_candle.close_price() > previous_st.value
             && current_candle.close_price() < current_st.value
+    }
+
+    /// 가격이 슈퍼트렌드 위 신호 확인 (n개 연속 가격 > 슈퍼트렌드, 이전 m개는 아님)
+    pub fn is_price_above_supertrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let st = data.get_supertrend(&period, &multiplier);
+                data.candle.close_price() > st.value
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 가격이 슈퍼트렌드 아래 신호 확인 (n개 연속 가격 < 슈퍼트렌드, 이전 m개는 아님)
+    pub fn is_price_below_supertrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| {
+                let st = data.get_supertrend(&period, &multiplier);
+                data.candle.close_price() < st.value
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 상승 추세 신호 확인 (n개 연속 상승 추세, 이전 m개는 아님)
+    pub fn is_uptrend_signal(&self, n: usize, m: usize, period: usize, multiplier: f64) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_uptrend(&period, &multiplier), n, m)
+    }
+
+    /// 하락 추세 신호 확인 (n개 연속 하락 추세, 이전 m개는 아님)
+    pub fn is_downtrend_signal(&self, n: usize, m: usize, period: usize, multiplier: f64) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_downtrend(&period, &multiplier), n, m)
+    }
+
+    /// 전체 상승 추세 신호 확인 (n개 연속 모든 슈퍼트렌드 상승, 이전 m개는 아님)
+    pub fn is_all_uptrend_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.is_empty() {
+                    return false;
+                }
+
+                for (period, multiplier) in &self.periods {
+                    let data = &self.items[0];
+                    if !data.is_uptrend(period, multiplier) {
+                        return false;
+                    }
+                }
+                true
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 전체 하락 추세 신호 확인 (n개 연속 모든 슈퍼트렌드 하락, 이전 m개는 아님)
+    pub fn is_all_downtrend_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| {
+                if self.items.is_empty() {
+                    return false;
+                }
+
+                for (period, multiplier) in &self.periods {
+                    let data = &self.items[0];
+                    if !data.is_downtrend(period, multiplier) {
+                        return false;
+                    }
+                }
+                true
+            },
+            n,
+            m,
+        )
+    }
+
+    /// 슈퍼트렌드 상향 돌파 신호 확인 (n개 연속 상향 돌파, 이전 m개는 아님)
+    pub fn is_price_crossing_above_supertrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.is_price_crossing_above_supertrend(&period, &multiplier),
+            n,
+            m,
+        )
+    }
+
+    /// 슈퍼트렌드 하향 돌파 신호 확인 (n개 연속 하향 돌파, 이전 m개는 아님)
+    pub fn is_price_crossing_below_supertrend_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.is_price_crossing_below_supertrend(&period, &multiplier),
+            n,
+            m,
+        )
+    }
+
+    /// 추세 변화 신호 확인 (n개 연속 추세 변화, 이전 m개는 아님)
+    pub fn is_trend_changed_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        multiplier: f64,
+        trend_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.is_trend_changed(&period, &multiplier, trend_period),
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 가격이 슈퍼트렌드 위인지 확인
+    pub fn is_price_above_supertrend_continuous(
+        &self,
+        n: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_all(
+            |data| {
+                let st = data.get_supertrend(&period, &multiplier);
+                data.candle.close_price() > st.value
+            },
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 가격이 슈퍼트렌드 아래인지 확인
+    pub fn is_price_below_supertrend_continuous(
+        &self,
+        n: usize,
+        period: usize,
+        multiplier: f64,
+    ) -> bool {
+        self.is_all(
+            |data| {
+                let st = data.get_supertrend(&period, &multiplier);
+                data.candle.close_price() < st.value
+            },
+            n,
+        )
+    }
+
+    /// n개의 연속 데이터에서 상승 추세인지 확인
+    pub fn is_uptrend(&self, n: usize, period: usize, multiplier: f64) -> bool {
+        self.is_all(|data| data.is_uptrend(&period, &multiplier), n)
+    }
+
+    /// n개의 연속 데이터에서 하락 추세인지 확인
+    pub fn is_downtrend(&self, n: usize, period: usize, multiplier: f64) -> bool {
+        self.is_all(|data| data.is_downtrend(&period, &multiplier), n)
     }
 }
 

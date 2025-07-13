@@ -71,7 +71,7 @@ impl MACDStrategyConfigBase {
     {
         match serde_json::from_str::<T>(json) {
             Ok(config) => Ok(config),
-            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {}", e)),
+            Err(e) => Err(format!("JSON 설정 역직렬화 실패: {e}")),
         }
     }
 
@@ -105,8 +105,7 @@ impl MACDStrategyConfigBase {
 
                 if period <= fast_period {
                     return Err(format!(
-                        "느린 EMA 기간({})은 빠른 EMA 기간({})보다 커야 합니다",
-                        period, fast_period
+                        "느린 EMA 기간({period})은 빠른 EMA 기간({fast_period})보다 커야 합니다"
                     ));
                 }
 
@@ -141,16 +140,14 @@ impl MACDStrategyConfigBase {
                 // 롱 전략인 경우 임계값 검증
                 if is_long_strategy && threshold < 0.0 {
                     return Err(format!(
-                        "롱 전략의 히스토그램 임계값({})은 0 이상이어야 합니다",
-                        threshold
+                        "롱 전략의 히스토그램 임계값({threshold})은 0 이상이어야 합니다"
                     ));
                 }
 
                 // 숏 전략인 경우 임계값 검증
                 if !is_long_strategy && threshold > 0.0 {
                     return Err(format!(
-                        "숏 전략의 히스토그램 임계값({})은 0보다 작아야 합니다",
-                        threshold
+                        "숏 전략의 히스토그램 임계값({threshold})은 0보다 작아야 합니다"
                     ));
                 }
 

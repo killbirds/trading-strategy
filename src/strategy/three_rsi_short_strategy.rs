@@ -93,7 +93,7 @@ impl<C: Candle + 'static> ThreeRSIShortStrategy<C> {
         json_config: &str,
     ) -> Result<ThreeRSIShortStrategy<C>, String> {
         let config = ThreeRSIShortStrategyConfig::from_json(json_config)?;
-        info!("세개 RSI 숏 전략 설정: {:?}", config);
+        info!("세개 RSI 숏 전략 설정: {config:?}");
         let ctx = ThreeRSIAnalyzer::new(
             &config.base.rsi_periods,
             &config.base.ma,
@@ -115,7 +115,7 @@ impl<C: Candle + 'static> ThreeRSIShortStrategy<C> {
             None => ThreeRSIShortStrategyConfig::default(),
         };
 
-        info!("삼중 RSI 숏 전략 설정: {:?}", strategy_config);
+        info!("삼중 RSI 숏 전략 설정: {strategy_config:?}");
         let ctx = ThreeRSIAnalyzer::new(
             &strategy_config.base.rsi_periods,
             &strategy_config.base.ma,

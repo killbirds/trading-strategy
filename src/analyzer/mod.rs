@@ -17,12 +17,19 @@ pub mod adx_analyzer;
 pub mod atr_analyzer;
 pub mod base;
 pub mod bband_analyzer;
+pub mod candle_pattern_analyzer;
 pub mod hybrid_analyzer;
 pub mod ichimoku_analyzer;
 pub mod ma_analyzer;
 pub mod macd_analyzer;
+pub mod market_structure_analyzer;
+pub mod momentum_analyzer;
+pub mod price_action_analyzer;
+pub mod risk_management_analyzer;
 pub mod rsi_analyzer;
+pub mod signal_strength_analyzer;
 pub mod supertrend_analyzer;
+pub mod support_resistance_analyzer;
 pub mod three_rsi_analyzer;
 pub mod volume_analyzer;
 pub mod vwap_analyzer;
@@ -31,12 +38,39 @@ pub use adx_analyzer::{ADXAnalyzer, ADXAnalyzerData};
 pub use atr_analyzer::{ATRAnalyzer, ATRAnalyzerData};
 pub use base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 pub use bband_analyzer::{BBandAnalyzer, BBandAnalyzerData};
+pub use candle_pattern_analyzer::{
+    CandlePatternAnalyzer, CandlePatternAnalyzerData, MultiCandlePattern, PatternAnalysis,
+    PatternReliability, PatternSignal, SingleCandlePattern,
+};
 pub use hybrid_analyzer::{HybridAnalyzer, HybridAnalyzerData};
 pub use ichimoku_analyzer::{IchimokuAnalyzer, IchimokuAnalyzerData};
 pub use ma_analyzer::{MAAnalyzer, MAAnalyzerData};
 pub use macd_analyzer::{MACDAnalyzer, MACDAnalyzerData};
+pub use market_structure_analyzer::{
+    FVGType, FairValueGap, LiquidityPool, LiquidityPoolType, MarketStructure,
+    MarketStructureAnalyzer, MarketStructureAnalyzerData, OrderBlock, OrderBlockType,
+    StructureChange,
+};
+pub use momentum_analyzer::{
+    DivergenceType, MomentumAnalysis, MomentumAnalyzer, MomentumAnalyzerData, MomentumDirection,
+    MomentumDivergence, MomentumIndicators, MomentumState, OverBoughtOverSold,
+};
+pub use price_action_analyzer::{
+    CandlePattern, PriceActionAnalyzer, PriceActionAnalyzerData, PriceTrend, SwingPoint, SwingType,
+};
+pub use risk_management_analyzer::{
+    PositionSizingMethod, PositionType, RiskCalculation, RiskLevel, RiskManagementAnalyzer,
+    RiskManagementAnalyzerData,
+};
 pub use rsi_analyzer::{RSIAnalyzer, RSIAnalyzerData};
+pub use signal_strength_analyzer::{
+    AnalyzerWeights, SignalAnalysis, SignalDirection, SignalQuality, SignalStrengthAnalyzer,
+    SignalStrengthAnalyzerData, SignalStrengthLevel,
+};
 pub use supertrend_analyzer::{SuperTrendAnalyzer, SuperTrendAnalyzerData};
+pub use support_resistance_analyzer::{
+    LevelType, SupportResistanceAnalyzer, SupportResistanceAnalyzerData, SupportResistanceLevel,
+};
 pub use three_rsi_analyzer::{ThreeRSIAnalyzer, ThreeRSIAnalyzerData};
 pub use volume_analyzer::{VolumeAnalyzer, VolumeAnalyzerData};
 pub use vwap_analyzer::{VWAPAnalyzer, VWAPAnalyzerData};

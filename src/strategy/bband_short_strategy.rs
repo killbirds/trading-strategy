@@ -110,7 +110,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
         json_config: &str,
     ) -> Result<BBandShortStrategy<C>, String> {
         let config = BBandShortStrategyConfig::from_json(json_config)?;
-        info!("볼린저밴드 숏 전략 설정: {:?}", config);
+        info!("볼린저밴드 숏 전략 설정: {config:?}");
         let ctx = BBandAnalyzer::new(config.period, config.multiplier, storage);
 
         Ok(BBandShortStrategy { config, ctx })
@@ -133,7 +133,7 @@ impl<C: Candle + 'static> BBandShortStrategy<C> {
             None => BBandShortStrategyConfig::default(),
         };
 
-        info!("볼린저밴드 숏 전략 설정: {:?}", strategy_config);
+        info!("볼린저밴드 숏 전략 설정: {strategy_config:?}");
         let ctx = BBandAnalyzer::new(strategy_config.period, strategy_config.multiplier, storage);
 
         Ok(BBandShortStrategy {

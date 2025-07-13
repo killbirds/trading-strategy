@@ -326,7 +326,7 @@ mod tests {
         };
 
         assert_eq!(
-            format!("{}", volume),
+            format!("{volume}"),
             "Volume(20: avg=1000.00, current=1200.00, ratio=1.20)"
         );
     }

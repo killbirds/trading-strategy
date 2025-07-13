@@ -65,16 +65,12 @@ pub fn filter_adx<C: Candle + 'static>(
     let (_, pdi, mdi) = calculate_directional_indicators(candles, params.period);
 
     if adx.is_nan() {
-        log::debug!("코인 {} ADX 계산 실패", coin);
+        log::debug!("코인 {coin} ADX 계산 실패");
         return Ok(false);
     }
 
     log::debug!(
-        "코인 {} ADX: {:.2}, +DI: {:.2}, -DI: {:.2}",
-        coin,
-        adx,
-        pdi,
-        mdi
+        "코인 {coin} ADX: {adx:.2}, +DI: {pdi:.2}, -DI: {mdi:.2}"
     );
 
     let result = match params.filter_type {
@@ -107,10 +103,60 @@ pub fn filter_adx<C: Candle + 'static>(
         4 => adx > params.threshold && pdi > mdi,
         // 5: ADX가 임계값보다 높고 -DI가 +DI보다 높은 경우 (강한 하락 추세)
         5 => adx > params.threshold && mdi > pdi,
+        // 6: ADX가 상승하는 중 (추세 강화)
+        6 => {
+            if candles.len() < params.period * 2 + 2 {
+                false
+            } else {
+                let prev_candles = &candles[..candles.len() - 1];
+                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
+                !prev_adx.is_nan() && adx > prev_adx
+            }
+        }
+        // 7: ADX가 하락하는 중 (추세 약화)
+        7 => {
+            if candles.len() < params.period * 2 + 2 {
+                false
+            } else {
+                let prev_candles = &candles[..candles.len() - 1];
+                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
+                !prev_adx.is_nan() && adx < prev_adx
+            }
+        }
+        // 8: +DI와 -DI의 간격이 넓어지는 중 (추세 명확화)
+        8 => {
+            if candles.len() < params.period * 2 + 2 {
+                false
+            } else {
+                let prev_candles = &candles[..candles.len() - 1];
+                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
+                let current_gap = (pdi - mdi).abs();
+                let prev_gap = (prev_pdi - prev_mdi).abs();
+                current_gap > prev_gap
+            }
+        }
+        // 9: +DI와 -DI의 간격이 좁아지는 중 (추세 불명확)
+        9 => {
+            if candles.len() < params.period * 2 + 2 {
+                false
+            } else {
+                let prev_candles = &candles[..candles.len() - 1];
+                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
+                let current_gap = (pdi - mdi).abs();
+                let prev_gap = (prev_pdi - prev_mdi).abs();
+                current_gap < prev_gap
+            }
+        }
         _ => false,
     };
 
     Ok(result)
+}
+
+// ADX 값들을 계산하는 헬퍼 함수
+fn calculate_adx_values<C: Candle>(candles: &[C], period: usize) -> (f64, f64, f64) {
+    let (dx, pdi, mdi) = calculate_directional_indicators(candles, period);
+    (dx, pdi, mdi)
 }
 
 // 방향 지표(+DI, -DI) 계산 함수

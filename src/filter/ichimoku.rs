@@ -56,7 +56,7 @@ pub fn filter_ichimoku<C: Candle + 'static>(
     // IchimokuAnalyzer 생성
     let analyzer = IchimokuAnalyzer::new(&indicator_params, &candle_store);
 
-    log::debug!("코인 {} 이치모쿠", coin);
+    log::debug!("코인 {coin} 이치모쿠");
 
     let result = match params.filter_type {
         // 0: 가격이 구름대 위에 있는 경우 (상승 추세)
@@ -79,6 +79,18 @@ pub fn filter_ichimoku<C: Candle + 'static>(
         8 => analyzer.is_sell_signal(&ichimoku_params, params.consecutive_n),
         // 9: 구름이 두꺼워지는 추세
         9 => analyzer.is_cloud_thickening(&ichimoku_params, params.consecutive_n),
+        // 10: 이치모쿠 완벽 정렬 (가격이 모든 선 위에 있음)
+        10 => {
+            analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n)
+                && analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n)
+        }
+        // 11: 이치모쿠 완벽 역배열 (가격이 모든 선 아래에 있음)
+        11 => {
+            analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n)
+                && !analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n)
+        }
+        // 12: 강한 매수 신호 (여러 조건 만족)
+        12 => analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n),
         _ => false,
     };
 

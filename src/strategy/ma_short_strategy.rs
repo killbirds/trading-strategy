@@ -144,7 +144,7 @@ impl<C: Candle + 'static> MAShortStrategy<C> {
         storage: &CandleStore<C>,
         config: MAShortStrategyConfig,
     ) -> Result<MAShortStrategy<C>, String> {
-        info!("MA 숏 전략 설정: {:?}", config);
+        info!("MA 숏 전략 설정: {config:?}");
         let ctx = MAAnalyzer::new(&config.ma, &config.ma_periods, storage);
 
         Ok(MAShortStrategy { config, ctx })

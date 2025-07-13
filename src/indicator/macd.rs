@@ -412,7 +412,7 @@ mod tests {
             histogram: 0.5,
         };
 
-        assert_eq!(format!("{}", macd), "MACD(12,26,9: 1.50, 1.00, 0.50)");
+        assert_eq!(format!("{macd}"), "MACD(12,26,9: 1.50, 1.00, 0.50)");
     }
 
     #[test]
@@ -423,7 +423,7 @@ mod tests {
             signal_period: 9,
         };
 
-        assert_eq!(format!("{}", params), "MACD(12,26,9)");
+        assert_eq!(format!("{params}"), "MACD(12,26,9)");
     }
 
     #[test]
@@ -546,9 +546,7 @@ mod tests {
         // 두 번째 하락에서 히스토그램의 하락폭이 첫 번째 하락보다 작아야 함
         assert!(
             histogram_change2 > histogram_change1,
-            "histogram_change2 ({}) should be greater than histogram_change1 ({})",
-            histogram_change2,
-            histogram_change1
+            "histogram_change2 ({histogram_change2}) should be greater than histogram_change1 ({histogram_change1})"
         );
     }
 }

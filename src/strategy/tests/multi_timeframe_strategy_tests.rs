@@ -70,7 +70,7 @@ fn test_multi_timeframe_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서는 수익이 나야함
-    println!("상승장 멀티 타임프레임 전략 결과: {:?}", result);
+    println!("상승장 멀티 타임프레임 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -92,7 +92,7 @@ fn test_multi_timeframe_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 멀티 타임프레임 전략 결과: {:?}", result);
+    println!("하락장 멀티 타임프레임 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -114,7 +114,7 @@ fn test_multi_timeframe_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 멀티 타임프레임 전략 결과: {:?}", result);
+    println!("횡보장 멀티 타임프레임 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -139,7 +139,7 @@ fn test_multi_timeframe_strategy_with_different_weights() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("단기 타임프레임 중시 결과: {:?}", result);
+    println!("단기 타임프레임 중시 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }

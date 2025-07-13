@@ -216,6 +216,148 @@ impl<C: Candle + 'static> VWAPAnalyzer<C> {
 
         true
     }
+
+    /// VWAP 위 신호 확인 (n개 연속 가격 > VWAP, 이전 m개는 아님)
+    pub fn is_price_above_vwap_signal(&self, n: usize, m: usize, param: &VWAPParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_above_vwap(param), n, m)
+    }
+
+    /// VWAP 아래 신호 확인 (n개 연속 가격 < VWAP, 이전 m개는 아님)
+    pub fn is_price_below_vwap_signal(&self, n: usize, m: usize, param: &VWAPParams) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_below_vwap(param), n, m)
+    }
+
+    /// 모든 VWAP 위 신호 확인 (n개 연속 모든 VWAP 위, 이전 m개는 아님)
+    pub fn is_price_above_all_vwaps_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_above_all_vwaps(), n, m)
+    }
+
+    /// 모든 VWAP 아래 신호 확인 (n개 연속 모든 VWAP 아래, 이전 m개는 아님)
+    pub fn is_price_below_all_vwaps_signal(&self, n: usize, m: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_below_all_vwaps(), n, m)
+    }
+
+    /// VWAP 근처 신호 확인 (n개 연속 VWAP 근처, 이전 m개는 아님)
+    pub fn is_price_near_vwap_signal(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_price_near_vwap(param, threshold), n, m)
+    }
+
+    /// VWAP에서 멀리 신호 확인 (n개 연속 VWAP에서 멀리, 이전 m개는 아님)
+    pub fn is_price_far_from_vwap_signal(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_price_far_from_vwap(param, threshold),
+            n,
+            m,
+        )
+    }
+
+    /// VWAP 상향 돌파 신호 확인 (n개 연속 상향 돌파, 이전 m개는 아님)
+    pub fn is_vwap_breakout_up_signal(&self, n: usize, m: usize, param: &VWAPParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_vwap_breakout_up(param), n, m)
+    }
+
+    /// VWAP 하향 돌파 신호 확인 (n개 연속 하향 돌파, 이전 m개는 아님)
+    pub fn is_vwap_breakdown_signal(&self, n: usize, m: usize, param: &VWAPParams) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_vwap_breakdown(param), n, m)
+    }
+
+    /// VWAP 리바운드 신호 확인 (n개 연속 리바운드, 이전 m개는 아님)
+    pub fn is_vwap_rebound_signal(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|_| self.is_vwap_rebound(param, threshold), n, m)
+    }
+
+    /// VWAP에서 발산 신호 확인 (n개 연속 발산, 이전 m개는 아님)
+    pub fn is_diverging_from_vwap_signal(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        diverge_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.is_diverging_from_vwap(param, diverge_period),
+            n,
+            m,
+        )
+    }
+
+    /// VWAP로 수렴 신호 확인 (n개 연속 수렴, 이전 m개는 아님)
+    pub fn is_converging_to_vwap_signal(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        converge_period: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.is_converging_to_vwap(param, converge_period),
+            n,
+            m,
+        )
+    }
+
+    /// VWAP 가격 비율 임계값 돌파 신호 확인 (n개 연속 임계값 초과, 이전 m개는 아님)
+    pub fn is_vwap_price_ratio_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        param: &VWAPParams,
+        threshold: f64,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.price_to_vwap_percent(param).abs() > threshold,
+            n,
+            m,
+        )
+    }
+
+    /// n개의 연속 데이터에서 가격이 VWAP 위인지 확인
+    pub fn is_price_above_vwap_continuous(&self, n: usize, param: &VWAPParams) -> bool {
+        self.is_all(|data| data.is_price_above_vwap(param), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 VWAP 아래인지 확인
+    pub fn is_price_below_vwap_continuous(&self, n: usize, param: &VWAPParams) -> bool {
+        self.is_all(|data| data.is_price_below_vwap(param), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 모든 VWAP 위인지 확인
+    pub fn is_price_above_all_vwaps_continuous(&self, n: usize) -> bool {
+        self.is_all(|data| data.is_price_above_all_vwaps(), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 모든 VWAP 아래인지 확인
+    pub fn is_price_below_all_vwaps_continuous(&self, n: usize) -> bool {
+        self.is_all(|data| data.is_price_below_all_vwaps(), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 VWAP 근처인지 확인
+    pub fn is_price_near_vwap(&self, n: usize, param: &VWAPParams, threshold: f64) -> bool {
+        self.is_all(|data| data.is_price_near_vwap(param, threshold), n)
+    }
+
+    /// n개의 연속 데이터에서 가격이 VWAP에서 멀리 있는지 확인
+    pub fn is_price_far_from_vwap(&self, n: usize, param: &VWAPParams, threshold: f64) -> bool {
+        self.is_all(|data| data.is_price_far_from_vwap(param, threshold), n)
+    }
 }
 
 impl<C: Candle> AnalyzerOps<VWAPAnalyzerData<C>, C> for VWAPAnalyzer<C> {

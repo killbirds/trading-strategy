@@ -118,7 +118,7 @@ impl HybridShortStrategyConfig {
             .get("entry_threshold")
             .map(|s| {
                 s.parse::<f64>()
-                    .map_err(|e| format!("진입 임계값 파싱 오류: {}", e))
+                    .map_err(|e| format!("진입 임계값 파싱 오류: {e}"))
             })
             .transpose()?
             .unwrap_or_else(default_entry_threshold);
@@ -127,7 +127,7 @@ impl HybridShortStrategyConfig {
             .get("exit_threshold")
             .map(|s| {
                 s.parse::<f64>()
-                    .map_err(|e| format!("청산 임계값 파싱 오류: {}", e))
+                    .map_err(|e| format!("청산 임계값 파싱 오류: {e}"))
             })
             .transpose()?
             .unwrap_or_else(default_exit_threshold);
@@ -136,7 +136,7 @@ impl HybridShortStrategyConfig {
             .get("stop_loss")
             .map(|s| {
                 s.parse::<f64>()
-                    .map_err(|e| format!("손절 수준 파싱 오류: {}", e))
+                    .map_err(|e| format!("손절 수준 파싱 오류: {e}"))
             })
             .transpose()?
             .unwrap_or_else(default_stop_loss);
@@ -145,7 +145,7 @@ impl HybridShortStrategyConfig {
             .get("take_profit")
             .map(|s| {
                 s.parse::<f64>()
-                    .map_err(|e| format!("이익 실현 수준 파싱 오류: {}", e))
+                    .map_err(|e| format!("이익 실현 수준 파싱 오류: {e}"))
             })
             .transpose()?
             .unwrap_or_else(default_take_profit);
@@ -203,7 +203,7 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         json_config: &str,
     ) -> Result<HybridShortStrategy<C>, String> {
         let config = HybridShortStrategyConfig::from_json(json_config)?;
-        info!("하이브리드 숏 전략 설정: {:?}", config);
+        info!("하이브리드 숏 전략 설정: {config:?}");
         debug!("캔들 데이터 상태: 항목 수={}", storage.len());
         let ctx = HybridAnalyzer::new(
             &config.base.ma_type,

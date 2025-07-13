@@ -118,7 +118,7 @@ impl<C: Candle + 'static> MACDStrategy<C> {
         storage: &CandleStore<C>,
         config: MACDStrategyConfig,
     ) -> Result<MACDStrategy<C>, String> {
-        info!("MACD 전략 설정: {:?}", config);
+        info!("MACD 전략 설정: {config:?}");
 
         let ctx = MACDAnalyzer::new(
             config.fast_period,

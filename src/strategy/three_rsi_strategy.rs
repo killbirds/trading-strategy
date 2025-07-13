@@ -88,7 +88,7 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
         storage: &CandleStore<C>,
         config: ThreeRSIStrategyConfig,
     ) -> Result<ThreeRSIStrategy<C>, String> {
-        info!("세개 RSI 전략 설정: {:?}", config);
+        info!("세개 RSI 전략 설정: {config:?}");
         let ctx = ThreeRSIAnalyzer::new(
             &config.base.rsi_periods,
             &config.base.ma,

@@ -47,7 +47,7 @@ fn test_ma_strategy_signals_uptrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 상승장에서는 수익이 나야함
-    println!("상승장 MA 전략 결과: {:?}", result);
+    println!("상승장 MA 전략 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
 }
@@ -69,7 +69,7 @@ fn test_ma_strategy_signals_downtrend() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("하락장 MA 전략 결과: {:?}", result);
+    println!("하락장 MA 전략 결과: {result:?}");
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn test_ma_strategy_signals_sideways() {
     let result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("횡보장 MA 전략 결과: {:?}", result);
+    println!("횡보장 MA 전략 결과: {result:?}");
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn test_different_ma_types() {
     let wma_result = backtest_strategy(strategy, candles, 10000.0);
 
     // 결과 출력
-    println!("SMA 전략 결과: {:?}", sma_result);
-    println!("EMA 전략 결과: {:?}", ema_result);
-    println!("WMA 전략 결과: {:?}", wma_result);
+    println!("SMA 전략 결과: {sma_result:?}");
+    println!("EMA 전략 결과: {ema_result:?}");
+    println!("WMA 전략 결과: {wma_result:?}");
 }

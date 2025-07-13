@@ -92,7 +92,7 @@ impl<C: Candle + Clone + 'static> HybridStrategy<C> {
         storage: &CandleStore<C>,
         config: HybridStrategyConfig,
     ) -> Result<HybridStrategy<C>, String> {
-        info!("하이브리드 전략 설정: {:?}", config);
+        info!("하이브리드 전략 설정: {config:?}");
         let ctx = HybridAnalyzer::new(
             &config.base.ma_type,
             config.base.ma_period,
