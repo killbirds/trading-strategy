@@ -21,6 +21,12 @@ pub struct BBandStrategyConfig {
     pub period: usize,
     /// 볼린저 밴드 승수 (표준편차 배수)
     pub multiplier: f64,
+    /// 밴드 폭 감소 확인 기간
+    pub narrowing_period: usize,
+    /// 좁은 상태 유지 기간
+    pub squeeze_period: usize,
+    /// 스퀴즈 조건을 위한 최소 밴드 폭 (비율)
+    pub squeeze_threshold: f64,
 }
 
 impl ConfigValidation for BBandStrategyConfig {
@@ -29,6 +35,9 @@ impl ConfigValidation for BBandStrategyConfig {
             count: self.count,
             period: self.period,
             multiplier: self.multiplier,
+            narrowing_period: self.narrowing_period,
+            squeeze_period: self.squeeze_period,
+            squeeze_threshold: self.squeeze_threshold,
         };
         base.validate()
     }
@@ -41,6 +50,9 @@ impl Default for BBandStrategyConfig {
             count: 2,
             period: 20,
             multiplier: 2.0,
+            narrowing_period: 5,
+            squeeze_period: 5,
+            squeeze_threshold: 0.02,
         }
     }
 }
@@ -69,6 +81,9 @@ impl BBandStrategyConfig {
             count: base_config.count,
             period: base_config.period,
             multiplier: base_config.multiplier,
+            narrowing_period: base_config.narrowing_period,
+            squeeze_period: base_config.squeeze_period,
+            squeeze_threshold: base_config.squeeze_threshold,
         };
 
         result.validate()?;
@@ -89,8 +104,14 @@ impl<C: Candle> Display for BBandStrategy<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[볼린저밴드전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}}}, 컨텍스트: {}",
-            self.config.period, self.config.multiplier, self.config.count, self.ctx
+            "[볼린저밴드전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}, 감소기간: {}, 스퀴즈기간: {}, 임계값: {}}}, 컨텍스트: {}",
+            self.config.period,
+            self.config.multiplier,
+            self.config.count,
+            self.config.narrowing_period,
+            self.config.squeeze_period,
+            self.config.squeeze_threshold,
+            self.ctx
         )
     }
 }
@@ -186,7 +207,17 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
-        self.ctx.is_below_lower_band(1)
+        // 향상된 볼린저 밴드 스퀴즈 돌파 조건 체크:
+        // 1. 밴드 폭이 좁아지다가 (narrowing_period 동안)
+        // 2. 좁은 상태를 유지하다가 (squeeze_period 동안)
+        // 3. 상단을 돌파하는 캔들이 나오고 (고가가 상단 돌파)
+        // 4. 종가가 상단 위에 위치
+        self.ctx
+            .is_enhanced_squeeze_breakout_with_close_above_upper(
+                self.config.narrowing_period,
+                self.config.squeeze_period,
+                self.config.squeeze_threshold,
+            )
     }
 
     fn should_exit(&self, _candle: &C) -> bool {

@@ -1,0 +1,8 @@
+{
+  "count": 2,
+  "period": 20,
+  "multiplier": 2.0,
+  "narrowing_period": 6,
+  "squeeze_period": 6,
+  "squeeze_threshold": 0.02
+} 

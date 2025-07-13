@@ -130,6 +130,282 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             1,
         )
     }
+
+    /// 볼린저 밴드 폭이 좁아지는지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 캔들 수
+    ///
+    /// # Returns
+    /// * `bool` - 밴드 폭이 연속적으로 감소하면 true
+    pub fn is_band_width_narrowing(&self, n: usize) -> bool {
+        if self.items.len() < n + 1 {
+            return false;
+        }
+
+        // 최근 n개 캔들의 밴드 폭이 이전 대비 감소하는지 확인
+        for i in 0..n {
+            let current_width = self.items[i].bband.upper() - self.items[i].bband.lower();
+            let previous_width = self.items[i + 1].bband.upper() - self.items[i + 1].bband.lower();
+
+            if current_width >= previous_width {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// 고가가 볼린저 밴드 상단을 돌파하는지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 캔들 수
+    ///
+    /// # Returns
+    /// * `bool` - 고가가 상단을 돌파하면 true
+    pub fn is_high_break_through_upper_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.high_price() > data.bband.upper(), n)
+    }
+
+    /// 종가가 볼린저 밴드 상단 위에 있는지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 캔들 수
+    ///
+    /// # Returns
+    /// * `bool` - 종가가 상단 위에 있으면 true
+    pub fn is_close_above_upper_band(&self, n: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n)
+    }
+
+    /// 볼린저 밴드 스퀴즈 돌파 패턴 확인
+    ///
+    /// 조건:
+    /// 1. 이전 n개 캔들에서 밴드 폭이 좁아지다가
+    /// 2. 현재 캔들의 고가가 상단을 돌파하고
+    /// 3. 현재 캔들의 종가가 상단 위에 위치
+    ///
+    /// # Arguments
+    /// * `narrowing_period` - 밴드 폭 감소를 확인할 기간
+    ///
+    /// # Returns
+    /// * `bool` - 모든 조건이 만족되면 true
+    pub fn is_squeeze_breakout_with_close_above_upper(&self, narrowing_period: usize) -> bool {
+        if self.items.is_empty() {
+            return false;
+        }
+
+        // 현재 캔들의 고가가 상단을 돌파하고 종가가 상단 위에 있는지 확인
+        let current_data = &self.items[0];
+        let high_breaks_upper = current_data.candle.high_price() > current_data.bband.upper();
+        let close_above_upper = current_data.candle.close_price() > current_data.bband.upper();
+
+        // 이전 캔들들에서 밴드 폭이 좁아지는지 확인
+        let band_narrowing = if self.items.len() > narrowing_period {
+            self.is_band_width_narrowing_from_index(1, narrowing_period)
+        } else {
+            false
+        };
+
+        high_breaks_upper && close_above_upper && band_narrowing
+    }
+
+    /// 특정 인덱스부터 밴드 폭이 좁아지는지 확인하는 헬퍼 메서드
+    ///
+    /// # Arguments
+    /// * `start_index` - 확인 시작 인덱스
+    /// * `n` - 확인할 캔들 수
+    ///
+    /// # Returns
+    /// * `bool` - 밴드 폭이 연속적으로 감소하면 true
+    fn is_band_width_narrowing_from_index(&self, start_index: usize, n: usize) -> bool {
+        if self.items.len() < start_index + n + 1 {
+            return false;
+        }
+
+        for i in 0..n {
+            let current_idx = start_index + i;
+            let previous_idx = start_index + i + 1;
+
+            let current_width =
+                self.items[current_idx].bband.upper() - self.items[current_idx].bband.lower();
+            let previous_width =
+                self.items[previous_idx].bband.upper() - self.items[previous_idx].bband.lower();
+
+            if current_width >= previous_width {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// 현재 밴드 폭 반환
+    ///
+    /// # Returns
+    /// * `f64` - 현재 밴드 폭 (상단 - 하단)
+    pub fn get_current_band_width(&self) -> f64 {
+        if let Some(data) = self.items.first() {
+            data.bband.upper() - data.bband.lower()
+        } else {
+            0.0
+        }
+    }
+
+    /// 밴드 폭의 변화율 반환
+    ///
+    /// # Returns
+    /// * `f64` - 밴드 폭 변화율 (현재 - 이전) / 이전 * 100
+    pub fn get_band_width_change_rate(&self) -> f64 {
+        if self.items.len() < 2 {
+            return 0.0;
+        }
+
+        let current_width = self.items[0].bband.upper() - self.items[0].bband.lower();
+        let previous_width = self.items[1].bband.upper() - self.items[1].bband.lower();
+
+        if previous_width == 0.0 {
+            return 0.0;
+        }
+
+        ((current_width - previous_width) / previous_width) * 100.0
+    }
+
+    /// 볼린저 밴드 폭이 좁은 상태인지 확인 (스퀴즈 상태)
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 캔들 수
+    /// * `threshold` - 좁은 상태 판정 임계값 (밴드 폭 / 중간값 비율)
+    ///
+    /// # Returns
+    /// * `bool` - 밴드 폭이 임계값 이하로 좁으면 true
+    pub fn is_band_width_squeeze(&self, n: usize, threshold: f64) -> bool {
+        self.is_all(
+            |data| {
+                let band_width = data.bband.upper() - data.bband.lower();
+                let middle = data.bband.middle();
+                if middle == 0.0 {
+                    return false;
+                }
+                let width_ratio = band_width / middle;
+                width_ratio <= threshold
+            },
+            n,
+        )
+    }
+
+    /// 현재 밴드 폭 비율 반환 (밴드 폭 / 중간값)
+    ///
+    /// # Returns
+    /// * `f64` - 밴드 폭 비율
+    pub fn get_band_width_ratio(&self) -> f64 {
+        if let Some(data) = self.items.first() {
+            let band_width = data.bband.upper() - data.bband.lower();
+            let middle = data.bband.middle();
+            if middle == 0.0 {
+                return 0.0;
+            }
+            band_width / middle
+        } else {
+            0.0
+        }
+    }
+
+    /// 밴드 폭이 좁아지다가 좁은 상태를 유지하는 패턴 확인
+    ///
+    /// # Arguments
+    /// * `narrowing_period` - 밴드 폭 감소 확인 기간
+    /// * `squeeze_period` - 좁은 상태 유지 기간
+    /// * `threshold` - 좁은 상태 판정 임계값
+    ///
+    /// # Returns
+    /// * `bool` - 패턴이 확인되면 true
+    pub fn is_narrowing_then_squeeze_pattern(
+        &self,
+        narrowing_period: usize,
+        squeeze_period: usize,
+        threshold: f64,
+    ) -> bool {
+        if self.items.len() < narrowing_period + squeeze_period + 1 {
+            return false;
+        }
+
+        // 최근 squeeze_period 동안 좁은 상태 유지
+        let recent_squeeze = self.is_band_width_squeeze(squeeze_period, threshold);
+
+        // 그 이전에 narrowing_period 동안 밴드 폭 감소
+        let previous_narrowing =
+            self.is_band_width_narrowing_from_index(squeeze_period, narrowing_period);
+
+        recent_squeeze && previous_narrowing
+    }
+
+    /// 향상된 스퀴즈 돌파 패턴 확인 (좁아지다가 좁은 상태 유지 후 돌파)
+    ///
+    /// 조건:
+    /// 1. 이전에 밴드 폭이 좁아지다가
+    /// 2. 좁은 상태를 유지하다가
+    /// 3. 현재 캔들의 고가가 상단을 돌파하고
+    /// 4. 현재 캔들의 종가가 상단 위에 위치
+    ///
+    /// # Arguments
+    /// * `narrowing_period` - 밴드 폭 감소 확인 기간
+    /// * `squeeze_period` - 좁은 상태 유지 기간
+    /// * `threshold` - 좁은 상태 판정 임계값
+    ///
+    /// # Returns
+    /// * `bool` - 모든 조건이 만족되면 true
+    pub fn is_enhanced_squeeze_breakout_with_close_above_upper(
+        &self,
+        narrowing_period: usize,
+        squeeze_period: usize,
+        threshold: f64,
+    ) -> bool {
+        if self.items.is_empty() {
+            return false;
+        }
+
+        // 현재 캔들의 고가가 상단을 돌파하고 종가가 상단 위에 있는지 확인
+        let current_data = &self.items[0];
+        let high_breaks_upper = current_data.candle.high_price() > current_data.bband.upper();
+        let close_above_upper = current_data.candle.close_price() > current_data.bband.upper();
+
+        // 좁아지다가 좁은 상태를 유지하는 패턴 확인
+        let narrowing_squeeze_pattern =
+            self.is_narrowing_then_squeeze_pattern(narrowing_period, squeeze_period, threshold);
+
+        high_breaks_upper && close_above_upper && narrowing_squeeze_pattern
+    }
+
+    /// 스퀴즈 상태에서 밴드 폭 확대 시작 확인
+    ///
+    /// # Arguments
+    /// * `threshold` - 좁은 상태 판정 임계값
+    ///
+    /// # Returns
+    /// * `bool` - 스퀴즈 상태에서 확대가 시작되면 true
+    pub fn is_squeeze_expansion_start(&self, threshold: f64) -> bool {
+        if self.items.len() < 2 {
+            return false;
+        }
+
+        // 현재는 스퀴즈 상태가 아니고
+        let current_not_squeeze = !self.is_band_width_squeeze(1, threshold);
+
+        // 이전에는 스퀴즈 상태였는지 확인
+        let previous_was_squeeze = if self.items.len() >= 2 {
+            let previous_data = &self.items[1];
+            let band_width = previous_data.bband.upper() - previous_data.bband.lower();
+            let middle = previous_data.bband.middle();
+            if middle == 0.0 {
+                return false;
+            }
+            let width_ratio = band_width / middle;
+            width_ratio <= threshold
+        } else {
+            false
+        };
+
+        current_not_squeeze && previous_was_squeeze
+    }
 }
 
 impl<C: Candle> AnalyzerOps<BBandAnalyzerData<C>, C> for BBandAnalyzer<C> {

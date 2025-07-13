@@ -40,6 +40,9 @@ impl ConfigValidation for BBandShortStrategyConfig {
             count: self.count,
             period: self.period,
             multiplier: self.multiplier,
+            narrowing_period: 5,     // 기본값
+            squeeze_period: 5,       // 기본값
+            squeeze_threshold: 0.02, // 기본값
         };
         base.validate()
     }
