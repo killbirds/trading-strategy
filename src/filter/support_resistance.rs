@@ -53,7 +53,7 @@ pub struct SupportResistanceFilter;
 impl SupportResistanceFilter {
     /// SupportResistance 필터 확인
     pub fn check_filter<C: Candle + 'static>(
-        symbol: &str,
+        _symbol: &str,
         candles: &[C],
         lookback_period: usize,
         touch_threshold: f64,
@@ -102,7 +102,7 @@ impl SupportResistanceFilter {
 
         // 연속적인 조건 확인
         let mut consecutive_count = 0;
-        for i in 0..analyzer.items.len() {
+        for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 SupportResistanceFilterType::SupportBreakdown => {
                     analyzer.is_support_breakdown_signal(consecutive_n, 1)

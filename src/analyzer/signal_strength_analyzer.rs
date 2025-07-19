@@ -383,7 +383,7 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
         };
 
         let is_bullish = candles[0].close_price() > candles[0].open_price();
-        let volume_strength = (volume_ratio - 1.0).max(0.0).min(1.0);
+        let volume_strength = (volume_ratio - 1.0).clamp(0.0, 1.0);
 
         let buy_signal = if is_bullish && volume_ratio > 1.2 {
             volume_strength
@@ -506,7 +506,8 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
         &self,
         analyzer_signals: &[(f64, f64)],
     ) -> Vec<(String, f64)> {
-        let analyzer_names = ["Trend",
+        let analyzer_names = [
+            "Trend",
             "Momentum",
             "Volatility",
             "Volume",
@@ -514,7 +515,8 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
             "Price Action",
             "Market Structure",
             "Risk Management",
-            "Candle Pattern"];
+            "Candle Pattern",
+        ];
 
         let mut contributions = Vec::new();
         for (i, (buy, sell)) in analyzer_signals.iter().enumerate() {
@@ -880,7 +882,8 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<SignalStrengthAnalyzerData<C>, C>
         ];
 
         // 가중치 적용하여 종합 신호 계산
-        let weights = [self.weights.trend_weight,
+        let weights = [
+            self.weights.trend_weight,
             self.weights.momentum_weight,
             self.weights.volatility_weight,
             self.weights.volume_weight,
@@ -888,7 +891,8 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<SignalStrengthAnalyzerData<C>, C>
             self.weights.price_action_weight,
             self.weights.market_structure_weight,
             self.weights.risk_management_weight,
-            self.weights.candle_pattern_weight];
+            self.weights.candle_pattern_weight,
+        ];
 
         let weighted_buy_signal = analyzer_signals
             .iter()

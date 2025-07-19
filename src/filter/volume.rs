@@ -49,7 +49,7 @@ pub struct VolumeFilter;
 impl VolumeFilter {
     /// Volume 필터 확인
     pub fn check_filter<C: Candle + 'static>(
-        symbol: &str,
+        _symbol: &str,
         candles: &[C],
         period: usize,
         threshold: f64,
@@ -90,7 +90,7 @@ impl VolumeFilter {
 
         // 연속적인 조건 확인
         let mut consecutive_count = 0;
-        for i in 0..analyzer.items.len() {
+        for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 VolumeFilterType::VolumeAboveAverage => {
                     analyzer.is_volume_above_average(consecutive_n)

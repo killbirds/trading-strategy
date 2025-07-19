@@ -49,7 +49,7 @@ pub struct SuperTrendFilter;
 impl SuperTrendFilter {
     /// SuperTrend 필터 확인
     pub fn check_filter<C: Candle + 'static>(
-        symbol: &str,
+        _symbol: &str,
         candles: &[C],
         period: usize,
         multiplier: f64,
@@ -90,7 +90,7 @@ impl SuperTrendFilter {
 
         // 연속적인 조건 확인
         let mut consecutive_count = 0;
-        for i in 0..analyzer.items.len() {
+        for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 SuperTrendFilterType::AllUptrend => analyzer.is_all_uptrend(),
                 SuperTrendFilterType::AllDowntrend => analyzer.is_all_downtrend(),

@@ -1,7 +1,7 @@
 use crate::candle_store::CandleStore;
 use crate::strategy::Strategy;
 use crate::tests::TestCandle;
-use chrono::{TimeZone, Utc};
+use chrono::Utc;
 use trading_chart::Candle;
 
 /// 테스트용 캔들 생성 함수
@@ -17,7 +17,7 @@ use trading_chart::Candle;
 ///
 /// * `TestCandle` - 생성된 캔들 데이터
 #[allow(dead_code)]
-pub fn create_test_candle(price: f64, timestamp: i64, volume: f64, market: &str) -> TestCandle {
+pub fn create_test_candle(price: f64, timestamp: i64, volume: f64, _market: &str) -> TestCandle {
     TestCandle {
         timestamp,
         open: price,

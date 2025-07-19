@@ -45,7 +45,7 @@ pub struct ATRFilter;
 impl ATRFilter {
     /// ATR 필터 확인
     pub fn check_filter<C: Candle + 'static>(
-        symbol: &str,
+        _symbol: &str,
         candles: &[C],
         period: usize,
         threshold: f64,

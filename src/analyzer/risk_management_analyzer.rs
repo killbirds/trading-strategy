@@ -545,7 +545,6 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
                     risk_amount / risk_per_unit
                 }
                 PositionSizingMethod::VolatilityBased => {
-                    
                     data.optimal_position_size * account_balance / entry_price
                 }
                 PositionSizingMethod::ATRBased => {
@@ -558,7 +557,7 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
                     let avg_win_loss_ratio = 1.5; // 실제로는 백테스트 결과에서 계산
                     let kelly_fraction: f64 =
                         (win_rate * avg_win_loss_ratio - (1.0 - win_rate)) / avg_win_loss_ratio;
-                    let safe_kelly = kelly_fraction.max(0.0).min(0.25) * 0.5; // 안전을 위해 절반만 사용
+                    let safe_kelly = kelly_fraction.clamp(0.0, 0.25) * 0.5; // 안전을 위해 절반만 사용
                     safe_kelly * account_balance / entry_price
                 }
             };
@@ -587,7 +586,7 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
                 risk_reward_ratio,
                 expected_return,
                 volatility_score: data.volatility_percentage,
-                confidence_score: data.sharpe_ratio.max(0.0).min(1.0),
+                confidence_score: data.sharpe_ratio.clamp(0.0, 1.0),
             })
         } else {
             None

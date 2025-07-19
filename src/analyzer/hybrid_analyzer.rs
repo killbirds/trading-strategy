@@ -219,7 +219,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         }
 
         // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
-        signal_strength.min(1.0).max(0.0)
+        signal_strength.clamp(0.0, 1.0)
     }
 
     /// 매도 신호 강도 계산
@@ -313,7 +313,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         }
 
         // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
-        signal_strength.min(1.0).max(0.0)
+        signal_strength.clamp(0.0, 1.0)
     }
 
     /// 향상된 매수 신호 강도 계산 (변동성 및 시장 상황 고려)
@@ -358,7 +358,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             * volume_factor_adj
             * consensus_factor;
 
-        enhanced_strength.min(1.0).max(0.0)
+        enhanced_strength.clamp(0.0, 1.0)
     }
 
     /// 향상된 매도 신호 강도 계산 (변동성 및 시장 상황 고려)
@@ -405,7 +405,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             * volume_factor_adj
             * consensus_factor;
 
-        enhanced_strength.min(1.0).max(0.0)
+        enhanced_strength.clamp(0.0, 1.0)
     }
 
     /// 시장 상황 요인 계산
@@ -617,10 +617,9 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
 
         // RSI 신호 (중립 영역에서 상승)
         let rsi = current.rsi.value();
-        if rsi > 30.0 && rsi < 70.0
-            && self.items.len() > 1 && rsi > self.items[1].rsi.value() {
-                consensus_score += 1.0;
-            }
+        if rsi > 30.0 && rsi < 70.0 && self.items.len() > 1 && rsi > self.items[1].rsi.value() {
+            consensus_score += 1.0;
+        }
         total_indicators += 1.0;
 
         // 합의 점수 (0.5 ~ 1.5 범위)
@@ -674,7 +673,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         };
 
         let adjusted_strength = base_strength * risk_adjustment * market_adjustment;
-        adjusted_strength.min(1.0).max(0.0)
+        adjusted_strength.clamp(0.0, 1.0)
     }
 
     /// 강한 매수 신호 돌파 확인 (n개 연속 강한 매수 신호, 이전 m개는 아님)

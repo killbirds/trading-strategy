@@ -61,7 +61,7 @@ pub struct MomentumFilter;
 impl MomentumFilter {
     /// Momentum 필터 확인
     pub fn check_filter<C: Candle + Clone + 'static>(
-        symbol: &str,
+        _symbol: &str,
         candles: &[C],
         rsi_period: usize,
         stoch_period: usize,
@@ -120,7 +120,7 @@ impl MomentumFilter {
 
         // 연속적인 조건 확인
         let mut consecutive_count = 0;
-        for i in 0..analyzer.items.len() {
+        for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 MomentumFilterType::StrongPositiveMomentum => {
                     analyzer.is_strong_positive_momentum_signal(consecutive_n, 1)
