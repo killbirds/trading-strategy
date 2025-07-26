@@ -21,6 +21,78 @@ use crate::indicator::volume::VolumesBuilderFactory;
 use crate::indicator::{TAs, TAsBuilder};
 use trading_chart::Candle;
 
+/// 공통 이동평균 계산 함수들
+pub mod moving_average {
+    /// 단순이동평균(SMA) 계산 - 공통 유틸리티 함수
+    ///
+    /// # Arguments
+    /// * `values` - 가격 데이터 배열
+    /// * `period` - 계산 기간
+    ///
+    /// # Returns
+    /// * `f64` - 계산된 SMA 값
+    pub fn calculate_sma(values: &[f64], period: usize) -> f64 {
+        if values.is_empty() || period == 0 {
+            return 0.0;
+        }
+
+        if values.len() >= period {
+            let start_idx = values.len() - period;
+            let slice = &values[start_idx..];
+            slice.iter().sum::<f64>() / period as f64
+        } else {
+            values.iter().sum::<f64>() / values.len() as f64
+        }
+    }
+
+    /// 단순이동평균(SMA) 계산 - 충분한 데이터가 없을 때 기본값 사용
+    ///
+    /// # Arguments
+    /// * `values` - 가격 데이터 배열
+    /// * `period` - 계산 기간
+    /// * `default_value` - 데이터가 충분하지 않을 때 사용할 기본값
+    ///
+    /// # Returns
+    /// * `f64` - 계산된 SMA 값 또는 기본값
+    pub fn calculate_sma_or_default(values: &[f64], period: usize, default_value: f64) -> f64 {
+        if values.is_empty() || period == 0 {
+            return default_value;
+        }
+
+        if values.len() >= period {
+            let start_idx = values.len() - period;
+            let slice = &values[start_idx..];
+            slice.iter().sum::<f64>() / period as f64
+        } else {
+            default_value
+        }
+    }
+
+    /// 지수이동평균(EMA) 계산을 위한 알파값 계산
+    ///
+    /// # Arguments
+    /// * `period` - EMA 기간
+    ///
+    /// # Returns
+    /// * `f64` - 알파값 (평활화 계수)
+    pub fn calculate_ema_alpha(period: usize) -> f64 {
+        2.0 / (period + 1) as f64
+    }
+
+    /// 지수이동평균(EMA) 한 스텝 계산
+    ///
+    /// # Arguments
+    /// * `current_price` - 현재 가격
+    /// * `previous_ema` - 이전 EMA 값
+    /// * `alpha` - 평활화 계수
+    ///
+    /// # Returns
+    /// * `f64` - 계산된 EMA 값
+    pub fn calculate_ema_step(current_price: f64, previous_ema: f64, alpha: f64) -> f64 {
+        alpha * current_price + (1.0 - alpha) * previous_ema
+    }
+}
+
 /// 일반적으로 사용되는 모든 기술적 지표를 포함하는 분석 결과
 #[derive(Debug)]
 pub struct TechnicalAnalysisResult {

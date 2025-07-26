@@ -69,9 +69,7 @@ pub fn filter_adx<C: Candle + 'static>(
         return Ok(false);
     }
 
-    log::debug!(
-        "코인 {coin} ADX: {adx:.2}, +DI: {pdi:.2}, -DI: {mdi:.2}"
-    );
+    log::debug!("코인 {coin} ADX: {adx:.2}, +DI: {pdi:.2}, -DI: {mdi:.2}");
 
     let result = match params.filter_type {
         // 0: ADX가 임계값보다 낮은 경우 (약한 추세)

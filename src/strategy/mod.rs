@@ -340,9 +340,7 @@ where
         .split(',')
         .map(|s| {
             let trimmed = s.trim();
-            trimmed
-                .parse::<T>()
-                .map_err(|e| format!("파싱 오류: {e}"))
+            trimmed.parse::<T>().map_err(|e| format!("파싱 오류: {e}"))
         })
         .collect()
 }

@@ -1,9 +1,9 @@
 use crate::candle_store::CandleStore;
+use crate::indicator::utils::moving_average;
 use crate::indicator::{TABuilder, TAs, TAsBuilder};
 use std::cmp;
 use std::fmt::Display;
 use std::marker::PhantomData;
-use ta_lib::simple_moving_average;
 use trading_chart::Candle;
 
 /// 일목균형표(Ichimoku Cloud) 구성요소를 위한 구조체
@@ -280,23 +280,17 @@ where
             };
         }
 
-        // 전환선 (Tenkan-sen) 계산
-        let (tenkan_result, _) =
-            simple_moving_average(&self.values, Some(self.tenkan_period)).unwrap();
-        let tenkan = *tenkan_result.last().unwrap_or(&0.0);
+        // 전환선 (Tenkan-sen) 계산 - SMA
+        let tenkan = moving_average::calculate_sma(&self.values, self.tenkan_period);
 
-        // 기준선 (Kijun-sen) 계산
-        let (kijun_result, _) =
-            simple_moving_average(&self.values, Some(self.kijun_period)).unwrap();
-        let kijun = *kijun_result.last().unwrap_or(&0.0);
+        // 기준선 (Kijun-sen) 계산 - SMA
+        let kijun = moving_average::calculate_sma(&self.values, self.kijun_period);
 
         // 선행스팬 A (Senkou Span A) 계산
         let senkou_span_a = (tenkan + kijun) / 2.0;
 
-        // 선행스팬 B (Senkou Span B) 계산
-        let (senkou_result, _) =
-            simple_moving_average(&self.values, Some(self.senkou_period)).unwrap();
-        let senkou_span_b = *senkou_result.last().unwrap_or(&0.0);
+        // 선행스팬 B (Senkou Span B) 계산 - SMA
+        let senkou_span_b = moving_average::calculate_sma(&self.values, self.senkou_period);
 
         // 후행스팬 (Chikou Span) 계산
         let chikou = *self.values.first().unwrap_or(&0.0);
@@ -345,23 +339,17 @@ where
             };
         }
 
-        // 전환선 (Tenkan-sen) 계산
-        let (tenkan_result, _) =
-            simple_moving_average(&self.values, Some(self.tenkan_period)).unwrap();
-        let tenkan = *tenkan_result.last().unwrap_or(&0.0);
+        // 전환선 (Tenkan-sen) 계산 - SMA
+        let tenkan = moving_average::calculate_sma(&self.values, self.tenkan_period);
 
-        // 기준선 (Kijun-sen) 계산
-        let (kijun_result, _) =
-            simple_moving_average(&self.values, Some(self.kijun_period)).unwrap();
-        let kijun = *kijun_result.last().unwrap_or(&0.0);
+        // 기준선 (Kijun-sen) 계산 - SMA
+        let kijun = moving_average::calculate_sma(&self.values, self.kijun_period);
 
         // 선행스팬 A (Senkou Span A) 계산
         let senkou_span_a = (tenkan + kijun) / 2.0;
 
-        // 선행스팬 B (Senkou Span B) 계산
-        let (senkou_result, _) =
-            simple_moving_average(&self.values, Some(self.senkou_period)).unwrap();
-        let senkou_span_b = *senkou_result.last().unwrap_or(&0.0);
+        // 선행스팬 B (Senkou Span B) 계산 - SMA
+        let senkou_span_b = moving_average::calculate_sma(&self.values, self.senkou_period);
 
         // 후행스팬 (Chikou Span) 계산
         let chikou = *self.values.first().unwrap_or(&0.0);

@@ -38,9 +38,7 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
     // 기존 볼린저 밴드 계산 결과도 가져옴 (로깅용)
     let (lower, middle, upper) = analyzer.get_bband();
 
-    log::debug!(
-        "코인 {coin} 볼린저 밴드 - 상단: {upper:.2}, 중간: {middle:.2}, 하단: {lower:.2}"
-    );
+    log::debug!("코인 {coin} 볼린저 밴드 - 상단: {upper:.2}, 중간: {middle:.2}, 하단: {lower:.2}");
 
     let result = match params.filter_type {
         // 0: 가격이 상단밴드 위에 있는 경우 (과매수 상태)

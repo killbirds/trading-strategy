@@ -1,9 +1,9 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
+use crate::indicator::utils::moving_average;
 use std::fmt::Display;
 use std::marker::PhantomData;
-use ta_lib::simple_moving_average;
 use trading_chart::Candle;
 
 #[derive(Debug)]
@@ -65,9 +65,8 @@ where
             self.values.push(item.close_price());
         }
 
-        // ta-lib으로 SMA 계산
-        let (result, _) = simple_moving_average(&self.values, Some(self.period)).unwrap();
-        let sma = *result.last().unwrap_or(&0.0);
+        // SMA 계산
+        let sma = moving_average::calculate_sma(&self.values, self.period);
 
         SMA {
             period: self.period,
@@ -85,17 +84,9 @@ where
             self.values.drain(0..excess);
         }
 
-        // 충분한 데이터가 없는 경우
-        if self.values.len() < self.period {
-            return SMA {
-                period: self.period,
-                sma: data.close_price(),
-            };
-        }
-
-        // ta-lib으로 SMA 계산
-        let (result, _) = simple_moving_average(&self.values, Some(self.period)).unwrap();
-        let sma = *result.last().unwrap_or(&0.0);
+        // SMA 계산
+        let sma =
+            moving_average::calculate_sma_or_default(&self.values, self.period, data.close_price());
 
         SMA {
             period: self.period,

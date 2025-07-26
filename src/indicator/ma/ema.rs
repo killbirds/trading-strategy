@@ -1,9 +1,9 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
+use crate::indicator::utils::moving_average;
 use std::fmt::Display;
 use std::marker::PhantomData;
-use ta_lib::exponential_moving_average;
 use trading_chart::Candle;
 
 /// 지수이동평균(EMA) 계산 빌더
@@ -15,6 +15,8 @@ pub struct EMABuilder<C: Candle> {
     pub period: usize,
     /// 가격 데이터 저장용 배열
     values: Vec<f64>,
+    /// 이전 EMA 값
+    previous_ema: Option<f64>,
     _phantom: PhantomData<C>,
 }
 
@@ -49,6 +51,33 @@ impl<C> EMABuilder<C>
 where
     C: Candle,
 {
+    /// 시리즈 전체에서 EMA 계산
+    fn calculate_ema_from_series(&self, values: &[f64]) -> f64 {
+        if values.is_empty() {
+            return 0.0;
+        }
+
+        let alpha = moving_average::calculate_ema_alpha(self.period);
+        let mut ema = values[0]; // 첫 번째 값으로 초기화
+
+        // 충분한 데이터가 있으면 SMA로 시작
+        if values.len() >= self.period {
+            let initial_slice = &values[0..self.period];
+            ema = initial_slice.iter().sum::<f64>() / self.period as f64;
+
+            // 나머지 값들에 대해 EMA 계산
+            for &value in &values[self.period..] {
+                ema = moving_average::calculate_ema_step(value, ema, alpha);
+            }
+        } else {
+            // 데이터가 부족하면 모든 값에 대해 EMA 계산
+            for &value in &values[1..] {
+                ema = moving_average::calculate_ema_step(value, ema, alpha);
+            }
+        }
+
+        ema
+    }
     /// 새 EMA 빌더 생성
     ///
     /// # Arguments
@@ -67,6 +96,7 @@ where
         EMABuilder {
             period,
             values: Vec::with_capacity(period * 2),
+            previous_ema: None,
             _phantom: PhantomData,
         }
     }
@@ -103,9 +133,8 @@ where
             self.values.push(item.close_price());
         }
 
-        // ta-lib으로 EMA 계산
-        let (result, _) = exponential_moving_average(&self.values, Some(self.period)).unwrap();
-        let ema = *result.last().unwrap_or(&0.0);
+        // EMA 계산
+        let ema = self.calculate_ema_from_series(&self.values);
 
         EMA {
             period: self.period,
@@ -130,17 +159,22 @@ where
             self.values.drain(0..excess);
         }
 
-        // 충분한 데이터가 없는 경우
-        if self.values.len() < self.period {
-            return EMA {
-                period: self.period,
-                ema: data.close_price(),
-            };
-        }
-
-        // ta-lib으로 EMA 계산
-        let (result, _) = exponential_moving_average(&self.values, Some(self.period)).unwrap();
-        let ema = *result.last().unwrap_or(&0.0);
+        // EMA 계산
+        let alpha = moving_average::calculate_ema_alpha(self.period);
+        let ema = match self.previous_ema {
+            Some(prev_ema) => {
+                moving_average::calculate_ema_step(data.close_price(), prev_ema, alpha)
+            }
+            None => {
+                // 첫 번째 EMA는 SMA로 계산하거나 현재 가격 사용
+                moving_average::calculate_sma_or_default(
+                    &self.values,
+                    self.period,
+                    data.close_price(),
+                )
+            }
+        };
+        self.previous_ema = Some(ema);
 
         EMA {
             period: self.period,

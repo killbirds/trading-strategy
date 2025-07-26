@@ -82,9 +82,7 @@ fn test_hybrid_strategy_signals_uptrend() {
         }
     }
 
-    println!(
-        "총 매수 신호: {enter_signals}, 총 매도 신호: {exit_signals}"
-    );
+    println!("총 매수 신호: {enter_signals}, 총 매도 신호: {exit_signals}");
 
     // 상승장에서는 적어도 매수 신호가 발생해야 함
     assert!(
@@ -93,9 +91,7 @@ fn test_hybrid_strategy_signals_uptrend() {
     );
 
     // 백테스팅에서는 거래가 완료되지 않을 수 있으므로 매수 신호 발생 여부로만 판단
-    println!(
-        "매수 신호 {enter_signals} 개 발생으로 전략이 정상 동작함을 확인"
-    );
+    println!("매수 신호 {enter_signals} 개 발생으로 전략이 정상 동작함을 확인");
 }
 
 #[test]

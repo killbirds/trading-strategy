@@ -1,8 +1,8 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::TABuilder;
+use crate::indicator::utils::moving_average;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
-use ta_lib::simple_moving_average;
 use trading_chart::Candle;
 
 /// 볼린저 밴드 출력값 구조체
@@ -75,9 +75,8 @@ impl BollingerBandsIndicator {
             };
         }
 
-        // ta-lib으로 SMA 계산
-        let (sma_result, _) = simple_moving_average(&self.values, Some(self.period)).unwrap();
-        let mean = *sma_result.last().unwrap_or(&price);
+        // SMA 계산
+        let mean = moving_average::calculate_sma_or_default(&self.values, self.period, price);
 
         // 표준편차 계산
         let std_dev = calculate_standard_deviation(&self.values, self.period);

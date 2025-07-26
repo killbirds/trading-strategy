@@ -84,9 +84,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             "three_rsi" => StrategyType::ThreeRSI,
             "three_rsi_short" => StrategyType::ThreeRSIShort,
             _ => {
-                return Err(format!(
-                    "지원되지 않는 기본 전략 타입: {base_strategy_str}"
-                ));
+                return Err(format!("지원되지 않는 기본 전략 타입: {base_strategy_str}"));
             }
         };
 

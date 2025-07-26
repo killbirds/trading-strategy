@@ -186,9 +186,7 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         let total_change = adx_values[n] - adx_values[0];
 
         // 디버그 로깅
-        println!(
-            "Decreasing count: {decreasing_count}, Total change: {total_change}"
-        );
+        println!("Decreasing count: {decreasing_count}, Total change: {total_change}");
 
         // n개 중 최소 50% 이상이 감소하고, 전체적으로도 감소했다면 추세 약화로 판단
         decreasing_count >= (n as f64 * 0.5).ceil() as usize && total_change > 0.0
@@ -240,15 +238,9 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         let previous_min_adx = previous_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));
 
         // 디버그 로깅
-        println!(
-            "Recent average: {recent_avg:.2}, Previous average: {previous_avg:.2}"
-        );
-        println!(
-            "Recent change: {recent_change:.2}%, Previous change: {previous_change:.2}%"
-        );
-        println!(
-            "Recent min ADX: {recent_min_adx:.2}, Previous min ADX: {previous_min_adx:.2}"
-        );
+        println!("Recent average: {recent_avg:.2}, Previous average: {previous_avg:.2}");
+        println!("Recent change: {recent_change:.2}%, Previous change: {previous_change:.2}%");
+        println!("Recent min ADX: {recent_min_adx:.2}, Previous min ADX: {previous_min_adx:.2}");
 
         // 조건:
         // 1. 최근 ADX 평균이 이전 ADX 평균보다 높음
