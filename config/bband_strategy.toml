@@ -1,7 +1,0 @@
-# 볼린저 밴드 전략 설정
-count = 2                # 확인 캔들 수
-period = 20              # 볼린저 밴드 계산 기간
-multiplier = 2.0         # 볼린저 밴드 승수 (표준편차 배수)
-narrowing_period = 5     # 밴드 폭 감소 확인 기간
-squeeze_period = 5       # 좁은 상태 유지 기간
-squeeze_threshold = 0.02 # 스퀴즈 임계값 (밴드 폭 / 중간값 비율) 
