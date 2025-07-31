@@ -179,7 +179,7 @@ pub struct ATRsBuilderFactory;
 
 impl ATRsBuilderFactory {
     /// 새 ATR 빌더 생성
-    pub fn new<C: Candle>(periods: &[usize]) -> ATRsBuilder<C> {
+    pub fn build<C: Candle>(periods: &[usize]) -> ATRsBuilder<C> {
         ATRsBuilder::new(periods)
     }
 }

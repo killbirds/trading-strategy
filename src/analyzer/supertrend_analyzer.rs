@@ -80,7 +80,7 @@ impl<C: Candle> Display for SuperTrendAnalyzer<C> {
 impl<C: Candle> SuperTrendAnalyzer<C> {
     /// 새 슈퍼트렌드 분석기 생성
     pub fn new(periods: &[(usize, f64)], storage: &CandleStore<C>) -> SuperTrendAnalyzer<C> {
-        let supertrendsbuilder = SuperTrendsBuilderFactory::new(periods);
+        let supertrendsbuilder = SuperTrendsBuilderFactory::build(periods);
         let mut analyzer = SuperTrendAnalyzer {
             supertrendsbuilder,
             items: Vec::new(),

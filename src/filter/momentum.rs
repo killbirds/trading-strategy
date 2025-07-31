@@ -70,7 +70,7 @@ impl MomentumFilter {
         cci_period: usize,
         momentum_period: usize,
         history_length: usize,
-        threshold: f64,
+        _threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
     ) -> Result<bool> {

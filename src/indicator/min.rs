@@ -39,7 +39,7 @@ where
         }
     }
 
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> MIN {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MIN {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -106,8 +106,8 @@ impl<C> TABuilder<MIN, C> for MINBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> MIN {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MIN {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> MIN {

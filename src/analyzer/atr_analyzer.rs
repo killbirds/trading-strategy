@@ -51,7 +51,7 @@ impl<C: Candle> Display for ATRAnalyzer<C> {
 impl<C: Candle> ATRAnalyzer<C> {
     /// 새 ATR 분석기 생성
     pub fn new(periods: &[usize], storage: &CandleStore<C>) -> ATRAnalyzer<C> {
-        let atrsbuilder = ATRsBuilderFactory::new(periods);
+        let atrsbuilder = ATRsBuilderFactory::build(periods);
         let mut analyzer = ATRAnalyzer {
             atrsbuilder,
             items: Vec::new(),

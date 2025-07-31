@@ -164,6 +164,7 @@ pub fn create_sideways_candles(count: usize, base_price: f64, range: f64) -> Vec
 
 /// 전략 백테스팅 결과
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct BacktestResult {
     pub total_trades: usize,
     pub winning_trades: usize,
@@ -194,7 +195,6 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
     let mut position: Option<(f64, f64)> = None; // (진입 가격, 수량)
 
     let mut trades = Vec::new();
-    let mut current_drawdown = 0.0;
     let mut max_drawdown = 0.0;
     let mut equity_peak = initial_capital;
 
@@ -224,9 +224,8 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
                 // 자산 최고점 업데이트
                 if capital > equity_peak {
                     equity_peak = capital;
-                    current_drawdown = 0.0;
                 } else {
-                    current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
+                    let current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
                     if current_drawdown > max_drawdown {
                         max_drawdown = current_drawdown;
                     }

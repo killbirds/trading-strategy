@@ -43,16 +43,6 @@ impl SuperTrend {
         }
     }
 
-    /// 기본 슈퍼트렌드 값 생성
-    pub fn default() -> SuperTrend {
-        SuperTrend {
-            value: 0.0,
-            direction: 0,
-            upper_band: 0.0,
-            lower_band: 0.0,
-        }
-    }
-
     /// 상승 추세인지 확인
     pub fn is_uptrend(&self) -> bool {
         self.direction > 0
@@ -61,6 +51,17 @@ impl SuperTrend {
     /// 하락 추세인지 확인
     pub fn is_downtrend(&self) -> bool {
         self.direction < 0
+    }
+}
+
+impl Default for SuperTrend {
+    fn default() -> Self {
+        SuperTrend {
+            value: 0.0,
+            direction: 0,
+            upper_band: 0.0,
+            lower_band: 0.0,
+        }
     }
 }
 
@@ -270,7 +271,7 @@ pub struct SuperTrendsBuilderFactory;
 
 impl SuperTrendsBuilderFactory {
     /// 새 슈퍼트렌드 빌더 생성
-    pub fn new<C: Candle>(periods: &[(usize, f64)]) -> SuperTrendsBuilder<C> {
+    pub fn build<C: Candle>(periods: &[(usize, f64)]) -> SuperTrendsBuilder<C> {
         SuperTrendsBuilder::new(periods)
     }
 }

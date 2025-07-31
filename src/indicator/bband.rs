@@ -224,7 +224,7 @@ where
     ///
     /// # Returns
     /// * `BollingerBands` - 계산된 볼린저 밴드 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> BollingerBands {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> BollingerBands {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -288,8 +288,8 @@ impl<C> TABuilder<BollingerBands, C> for BollingerBandsBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> BollingerBands {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> BollingerBands {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> BollingerBands {

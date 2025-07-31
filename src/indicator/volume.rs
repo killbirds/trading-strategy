@@ -72,7 +72,7 @@ where
     ///
     /// # Returns
     /// * `Volume` - 계산된 볼륨 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -180,8 +180,8 @@ impl<C> TABuilder<Volume, C> for VolumeBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> Volume {

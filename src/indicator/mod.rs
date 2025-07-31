@@ -219,7 +219,7 @@ pub trait TABuilder<T, C: Candle>: Send + std::fmt::Debug {
     ///
     /// # Returns
     /// * `T` - 생성된 기술적 지표
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> T;
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> T;
 
     /// 데이터에서 기술적 지표 생성
     ///
@@ -290,7 +290,7 @@ where
     ///
     /// # Returns
     /// * `TAs<K, T>` - 생성된 기술적 지표 컬렉션
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> TAs<K, T> {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> TAs<K, T> {
         self.build(&storage.get_time_ordered_items())
     }
 

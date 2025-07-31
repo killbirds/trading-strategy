@@ -238,18 +238,18 @@ impl<C: Candle + 'static> TechnicalAnalysisBuilder<C> {
     ///
     /// # Returns
     /// * `TechnicalAnalysisResult` - 계산된 모든 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> TechnicalAnalysisResult {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> TechnicalAnalysisResult {
         TechnicalAnalysisResult {
-            smas: self.sma_builder.from_storage(storage),
-            emas: self.ema_builder.from_storage(storage),
-            rsis: self.rsi_builder.from_storage(storage),
-            adxs: self.adx_builder.from_storage(storage),
-            bbands: self.bband_builder.from_storage(storage),
-            macds: self.macd_builder.from_storage(storage),
-            maxs: self.max_builder.from_storage(storage),
-            mins: self.min_builder.from_storage(storage),
-            ichimokus: self.ichimoku_builder.from_storage(storage),
-            volumes: self.volume_builder.from_storage(storage),
+            smas: self.sma_builder.build_from_storage(storage),
+            emas: self.ema_builder.build_from_storage(storage),
+            rsis: self.rsi_builder.build_from_storage(storage),
+            adxs: self.adx_builder.build_from_storage(storage),
+            bbands: self.bband_builder.build_from_storage(storage),
+            macds: self.macd_builder.build_from_storage(storage),
+            maxs: self.max_builder.build_from_storage(storage),
+            mins: self.min_builder.build_from_storage(storage),
+            ichimokus: self.ichimoku_builder.build_from_storage(storage),
+            volumes: self.volume_builder.build_from_storage(storage),
         }
     }
 

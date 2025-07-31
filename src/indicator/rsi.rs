@@ -156,7 +156,7 @@ where
     ///
     /// # Returns
     /// * `RSI` - 계산된 RSI 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> RSI {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> RSI {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -237,8 +237,8 @@ impl<C> TABuilder<RSI, C> for RSIBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> RSI {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> RSI {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> RSI {

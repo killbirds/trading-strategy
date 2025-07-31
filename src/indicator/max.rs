@@ -39,7 +39,7 @@ where
         }
     }
 
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> MAX {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MAX {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -106,8 +106,8 @@ impl<C> TABuilder<MAX, C> for MAXBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> MAX {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MAX {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> MAX {

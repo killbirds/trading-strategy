@@ -162,7 +162,7 @@ where
     ///
     /// # Returns
     /// * `MACD` - 계산된 MACD 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> MACD {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MACD {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -233,8 +233,8 @@ impl<C> TABuilder<MACD, C> for MACDBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> MACD {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MACD {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> MACD {

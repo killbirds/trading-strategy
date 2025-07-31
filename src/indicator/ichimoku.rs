@@ -166,6 +166,7 @@ pub struct IchimokuBuilder<C: Candle> {
 ///
 /// # Returns
 /// * `f64` - 중간값
+#[allow(dead_code)]
 fn donchian_midpoint<C: Candle>(candles: &[C], period: usize) -> f64 {
     if candles.is_empty() || period == 0 {
         return 0.0;
@@ -234,7 +235,7 @@ where
     ///
     /// # Returns
     /// * `Ichimoku` - 계산된 일목균형표 지표
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> Ichimoku {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Ichimoku {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -371,8 +372,8 @@ impl<C> TABuilder<Ichimoku, C> for IchimokuBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> Ichimoku {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Ichimoku {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> Ichimoku {

@@ -137,7 +137,7 @@ where
     ///
     /// # Returns
     /// * `VWAP` - 계산된 VWAP
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> VWAP {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> VWAP {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -244,8 +244,8 @@ impl<C> TABuilder<VWAP, C> for VWAPBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> VWAP {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> VWAP {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> VWAP {

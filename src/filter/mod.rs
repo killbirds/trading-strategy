@@ -762,6 +762,7 @@ mod tests {
     }
 
     /// 이치모쿠 필터 생성 유틸리티 함수
+    #[allow(dead_code)]
     pub fn create_ichimoku_filter(
         tenkan_period: usize,
         kijun_period: usize,
@@ -779,6 +780,7 @@ mod tests {
     }
 
     /// VWAP 필터 생성 유틸리티 함수
+    #[allow(dead_code)]
     pub fn create_vwap_filter(
         period: usize,
         filter_type: i32,

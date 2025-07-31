@@ -39,7 +39,8 @@ where
     /// * `CandleStore<T>` - 생성된 저장소 인스턴스
     pub fn new(mut items: Vec<T>, max_size: usize, use_duplicated_filter: bool) -> CandleStore<T> {
         // datetime 기준으로 내림차순 정렬 (최신 데이터가 먼저 오도록)
-        items.sort_by(|a, b| b.datetime().cmp(&a.datetime()));
+        items.sort_by_key(|a| a.datetime());
+        items.reverse();
 
         // 최대 크기를 초과하는 아이템들 제거
         if items.len() > max_size {

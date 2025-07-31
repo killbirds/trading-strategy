@@ -158,7 +158,7 @@ where
         }
     }
 
-    pub fn from_storage(&mut self, storage: &CandleStore<C>) -> ADX {
+    pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> ADX {
         self.build(&storage.get_time_ordered_items())
     }
 
@@ -197,8 +197,8 @@ impl<C> TABuilder<ADX, C> for ADXBuilder<C>
 where
     C: Candle,
 {
-    fn from_storage(&mut self, storage: &CandleStore<C>) -> ADX {
-        self.from_storage(storage)
+    fn build_from_storage(&mut self, storage: &CandleStore<C>) -> ADX {
+        self.build_from_storage(storage)
     }
 
     fn build(&mut self, data: &[C]) -> ADX {
