@@ -446,7 +446,7 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
     }
 
     /// 지지선 붕괴 신호 확인 (n개 연속 지지선 붕괴, 이전 m개는 아님)
-    pub fn is_support_breakdown_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_support_breakdown_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(support) = &data.nearest_support {
@@ -457,11 +457,12 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 저항선 돌파 신호 확인 (n개 연속 저항선 돌파, 이전 m개는 아님)
-    pub fn is_resistance_breakout_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_resistance_breakout_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(resistance) = &data.nearest_resistance {
@@ -472,11 +473,12 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 지지선 바운스 신호 확인 (n개 연속 지지선 바운스, 이전 m개는 아님)
-    pub fn is_support_bounce_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_support_bounce_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(support) = &data.nearest_support {
@@ -488,11 +490,12 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 저항선 거부 신호 확인 (n개 연속 저항선 거부, 이전 m개는 아님)
-    pub fn is_resistance_rejection_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_resistance_rejection_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(resistance) = &data.nearest_resistance {
@@ -504,11 +507,18 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 강한 지지선 근처 신호 확인 (n개 연속 강한 지지선 근처, 이전 m개는 아님)
-    pub fn is_near_strong_support_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_near_strong_support_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(support) = &data.nearest_support {
@@ -520,11 +530,18 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 강한 저항선 근처 신호 확인 (n개 연속 강한 저항선 근처, 이전 m개는 아님)
-    pub fn is_near_strong_resistance_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_near_strong_resistance_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 if let Some(resistance) = &data.nearest_resistance {
@@ -536,47 +553,48 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 지지선 위 신호 확인 (n개 연속 지지선 위, 이전 m개는 아님)
-    pub fn is_above_support_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_above_support(), n, m)
+    pub fn is_above_support_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_above_support(), n, m, p)
     }
 
     /// 저항선 아래 신호 확인 (n개 연속 저항선 아래, 이전 m개는 아님)
-    pub fn is_below_resistance_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_below_resistance(), n, m)
+    pub fn is_below_resistance_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_below_resistance(), n, m, p)
     }
 
     /// 지지선 근처 신호 확인 (n개 연속 지지선 근처, 이전 m개는 아님)
-    pub fn is_near_support_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_near_support(threshold), n, m)
+    pub fn is_near_support_signal(&self, n: usize, m: usize, threshold: f64, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_near_support(threshold), n, m, p)
     }
 
     /// 저항선 근처 신호 확인 (n개 연속 저항선 근처, 이전 m개는 아님)
-    pub fn is_near_resistance_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_near_resistance(threshold), n, m)
+    pub fn is_near_resistance_signal(&self, n: usize, m: usize, threshold: f64, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_near_resistance(threshold), n, m, p)
     }
 
     /// n개의 연속 데이터에서 지지선 위인지 확인
-    pub fn is_above_support(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_above_support(), n)
+    pub fn is_above_support(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_above_support(), n, p)
     }
 
     /// n개의 연속 데이터에서 저항선 아래인지 확인
-    pub fn is_below_resistance(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_below_resistance(), n)
+    pub fn is_below_resistance(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_below_resistance(), n, p)
     }
 
     /// n개의 연속 데이터에서 지지선 근처인지 확인
-    pub fn is_near_support(&self, n: usize, threshold: f64) -> bool {
-        self.is_all(|data| data.is_near_support(threshold), n)
+    pub fn is_near_support(&self, n: usize, threshold: f64, p: usize) -> bool {
+        self.is_all(|data| data.is_near_support(threshold), n, p)
     }
 
     /// n개의 연속 데이터에서 저항선 근처인지 확인
-    pub fn is_near_resistance(&self, n: usize, threshold: f64) -> bool {
-        self.is_all(|data| data.is_near_resistance(threshold), n)
+    pub fn is_near_resistance(&self, n: usize, threshold: f64, p: usize) -> bool {
+        self.is_all(|data| data.is_near_resistance(threshold), n, p)
     }
 }
 

@@ -152,21 +152,23 @@ pub fn filter_copys<C: Candle + 'static>(
         2 => filter.context().is_all(
             |data| data.rsi.value() < filter.config_rsi_lower(),
             params.consecutive_n,
+            params.p,
         ),
         // 3: RSI 과매수 조건만 확인
         3 => filter.context().is_all(
             |data| data.rsi.value() > filter.config_rsi_upper(),
             params.consecutive_n,
+            params.p,
         ),
         // 4: 볼린저밴드 하단 터치 조건만 확인
         4 => {
-            filter.bband_analyzer().is_below_lower_band(1)
+            filter.bband_analyzer().is_below_lower_band(1, params.p)
                 || filter
                     .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1)
+                    .is_break_through_lower_band_from_below(1, params.p)
         }
         // 5: 볼린저밴드 상단 터치 조건만 확인
-        5 => filter.bband_analyzer().is_above_upper_band(1),
+        5 => filter.bband_analyzer().is_above_upper_band(1, params.p),
         // 6: 이평선 지지선 조건만 확인
         6 => filter.check_ma_support(),
         // 7: 이평선 저항선 조건만 확인
@@ -176,11 +178,12 @@ pub fn filter_copys<C: Candle + 'static>(
             let rsi_oversold = filter.context().is_all(
                 |data| data.rsi.value() < filter.config_rsi_lower(),
                 params.consecutive_n,
+                params.p,
             );
-            let bband_support = filter.bband_analyzer().is_below_lower_band(1)
+            let bband_support = filter.bband_analyzer().is_below_lower_band(1, params.p)
                 || filter
                     .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1);
+                    .is_break_through_lower_band_from_below(1, params.p);
             let ma_support = filter.check_ma_support();
 
             rsi_oversold && bband_support && ma_support
@@ -190,8 +193,9 @@ pub fn filter_copys<C: Candle + 'static>(
             let rsi_overbought = filter.context().is_all(
                 |data| data.rsi.value() > filter.config_rsi_upper(),
                 params.consecutive_n,
+                params.p,
             );
-            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1);
+            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1, params.p);
             let ma_resistance = filter.check_ma_resistance();
 
             rsi_overbought && bband_resistance && ma_resistance
@@ -201,11 +205,12 @@ pub fn filter_copys<C: Candle + 'static>(
             let rsi_oversold = filter.context().is_all(
                 |data| data.rsi.value() < filter.config_rsi_lower(),
                 params.consecutive_n,
+                params.p,
             );
-            let bband_support = filter.bband_analyzer().is_below_lower_band(1)
+            let bband_support = filter.bband_analyzer().is_below_lower_band(1, params.p)
                 || filter
                     .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1);
+                    .is_break_through_lower_band_from_below(1, params.p);
             let ma_support = filter.check_ma_support();
 
             let signal_count = [rsi_oversold, bband_support, ma_support]
@@ -219,8 +224,9 @@ pub fn filter_copys<C: Candle + 'static>(
             let rsi_overbought = filter.context().is_all(
                 |data| data.rsi.value() > filter.config_rsi_upper(),
                 params.consecutive_n,
+                params.p,
             );
-            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1);
+            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1, params.p);
             let ma_resistance = filter.check_ma_resistance();
 
             let signal_count = [rsi_overbought, bband_resistance, ma_resistance]
@@ -236,11 +242,12 @@ pub fn filter_copys<C: Candle + 'static>(
                 rsi >= filter.config_rsi_lower() && rsi <= filter.config_rsi_upper()
             },
             params.consecutive_n,
+            params.p,
         ),
         // 13: 볼린저밴드 내부 (상단과 하단 사이)
         13 => {
-            !filter.bband_analyzer().is_above_upper_band(1)
-                && !filter.bband_analyzer().is_below_lower_band(1)
+            !filter.bband_analyzer().is_above_upper_band(1, params.p)
+                && !filter.bband_analyzer().is_below_lower_band(1, params.p)
         }
         // 14: 이평선 정배열 상태 (단기 > 장기)
         14 => {

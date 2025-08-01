@@ -87,7 +87,7 @@ fn test_adx_strong_trend() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_strong_trend(1));
+    assert!(analyzer.is_strong_trend(1, 0));
 }
 
 #[test]
@@ -111,7 +111,7 @@ fn test_adx_weak_trend() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_weak_trend(1));
+    assert!(analyzer.is_weak_trend(1, 0));
 }
 
 #[test]

@@ -150,6 +150,7 @@ pub trait MAStrategyCommon<C: Candle + 'static>: Strategy<C> {
             condition_fn,
             1,
             self.config_cross_previous_periods(),
+            0,
         )
     }
 }

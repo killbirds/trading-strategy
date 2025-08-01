@@ -815,103 +815,114 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
     }
 
     /// 강한 양의 모멘텀 신호 확인 (n개 연속 강한 양의 모멘텀, 이전 m개는 아님)
-    pub fn is_strong_positive_momentum_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_positive_momentum(), n, m)
+    pub fn is_strong_positive_momentum_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_positive_momentum(), n, m, p)
     }
 
     /// 강한 음의 모멘텀 신호 확인 (n개 연속 강한 음의 모멘텀, 이전 m개는 아님)
-    pub fn is_strong_negative_momentum_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_negative_momentum(), n, m)
+    pub fn is_strong_negative_momentum_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_negative_momentum(), n, m, p)
     }
 
     /// 모멘텀 가속 신호 확인 (n개 연속 모멘텀 가속, 이전 m개는 아님)
-    pub fn is_accelerating_momentum_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_accelerating_momentum(), n, m)
+    pub fn is_accelerating_momentum_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_accelerating_momentum(), n, m, p)
     }
 
     /// 모멘텀 감속 신호 확인 (n개 연속 모멘텀 감속, 이전 m개는 아님)
-    pub fn is_decelerating_momentum_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_decelerating_momentum(), n, m)
+    pub fn is_decelerating_momentum_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_decelerating_momentum(), n, m, p)
     }
 
     /// 과매수 신호 확인 (n개 연속 과매수, 이전 m개는 아님)
-    pub fn is_overbought_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_overbought(), n, m)
+    pub fn is_overbought_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_overbought(), n, m, p)
     }
 
     /// 과매도 신호 확인 (n개 연속 과매도, 이전 m개는 아님)
-    pub fn is_oversold_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_oversold(), n, m)
+    pub fn is_oversold_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_oversold(), n, m, p)
     }
 
     /// 모멘텀 다이버전스 돌파 신호 확인 (n개 연속 모멘텀 다이버전스, 이전 m개는 아님)
-    pub fn is_momentum_divergence_breakthrough(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.has_momentum_divergence(), n, m)
+    pub fn is_momentum_divergence_breakthrough(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.has_momentum_divergence(), n, m, p)
     }
 
     /// 불리시 다이버전스 신호 확인 (n개 연속 불리시 다이버전스, 이전 m개는 아님)
-    pub fn is_bullish_divergence_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_bullish_divergence(), n, m)
+    pub fn is_bullish_divergence_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_bullish_divergence(), n, m, p)
     }
 
     /// 베어리시 다이버전스 신호 확인 (n개 연속 베어리시 다이버전스, 이전 m개는 아님)
-    pub fn is_bearish_divergence_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_bearish_divergence(), n, m)
+    pub fn is_bearish_divergence_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_bearish_divergence(), n, m, p)
     }
 
     /// 지속적인 모멘텀 돌파 신호 확인 (n개 연속 지속적인 모멘텀, 이전 m개는 아님)
-    pub fn is_persistent_momentum_breakthrough(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_persistent_momentum(), n, m)
+    pub fn is_persistent_momentum_breakthrough(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_persistent_momentum(), n, m, p)
     }
 
     /// 안정적인 모멘텀 신호 확인 (n개 연속 안정적인 모멘텀, 이전 m개는 아님)
-    pub fn is_stable_momentum_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_stable_momentum(), n, m)
+    pub fn is_stable_momentum_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_stable_momentum(), n, m, p)
     }
 
     /// 모멘텀 반전 돌파 신호 확인 (n개 연속 모멘텀 반전 신호, 이전 m개는 아님)
-    pub fn is_momentum_reversal_breakthrough(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_momentum_reversal_signal(), n, m)
+    pub fn is_momentum_reversal_breakthrough(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_momentum_reversal_signal(), n, m, p)
     }
 
     /// 모멘텀 극값 근처 신호 확인 (n개 연속 모멘텀 극값 근처, 이전 m개는 아님)
-    pub fn is_near_momentum_extreme_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_near_momentum_extreme(threshold), n, m)
+    pub fn is_near_momentum_extreme_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_near_momentum_extreme(threshold),
+            n,
+            m,
+            p,
+        )
     }
 
     /// n개의 연속 데이터에서 강한 양의 모멘텀인지 확인
-    pub fn is_strong_positive_momentum(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_positive_momentum(), n)
+    pub fn is_strong_positive_momentum(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_positive_momentum(), n, p)
     }
 
     /// n개의 연속 데이터에서 강한 음의 모멘텀인지 확인
-    pub fn is_strong_negative_momentum(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_negative_momentum(), n)
+    pub fn is_strong_negative_momentum(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_negative_momentum(), n, p)
     }
 
     /// n개의 연속 데이터에서 모멘텀 가속인지 확인
-    pub fn is_accelerating_momentum(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_accelerating_momentum(), n)
+    pub fn is_accelerating_momentum(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_accelerating_momentum(), n, p)
     }
 
     /// n개의 연속 데이터에서 모멘텀 감속인지 확인
-    pub fn is_decelerating_momentum(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_decelerating_momentum(), n)
+    pub fn is_decelerating_momentum(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_decelerating_momentum(), n, p)
     }
 
     /// n개의 연속 데이터에서 과매수인지 확인
-    pub fn is_overbought(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_overbought(), n)
+    pub fn is_overbought(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_overbought(), n, p)
     }
 
     /// n개의 연속 데이터에서 과매도인지 확인
-    pub fn is_oversold(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_oversold(), n)
+    pub fn is_oversold(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_oversold(), n, p)
     }
 
     /// n개의 연속 데이터에서 모멘텀 다이버전스인지 확인
-    pub fn is_momentum_divergence(&self, n: usize) -> bool {
-        self.is_all(|data| data.has_momentum_divergence(), n)
+    pub fn is_momentum_divergence(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.has_momentum_divergence(), n, p)
     }
 }
 

@@ -172,7 +172,7 @@ impl<C: Candle + 'static> Strategy<C> for MAShortStrategy<C> {
     fn should_enter(&self, _candle: &C) -> bool {
         // 데드 크로스 발생시 숏 진입 신호
         self.ctx
-            .is_ma_reverse_arrangement_dead_cross(1, self.config.cross_previous_periods)
+            .is_ma_reverse_arrangement_dead_cross(1, self.config.cross_previous_periods, 0)
     }
 
     fn should_exit(&self, _candle: &C) -> bool {

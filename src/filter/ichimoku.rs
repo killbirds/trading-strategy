@@ -60,11 +60,11 @@ pub fn filter_ichimoku<C: Candle + 'static>(
 
     let result = match params.filter_type {
         // 0: 가격이 구름대 위에 있는 경우 (상승 추세)
-        0 => analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n),
+        0 => analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n, params.p),
         // 1: 가격이 구름대 아래에 있는 경우 (하락 추세)
-        1 => analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n),
+        1 => analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n, params.p),
         // 2: 전환선이 기준선 위에 있는 경우 (골든 크로스)
-        2 => analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n),
+        2 => analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n, params.p),
         // 3: 골든 크로스 발생 - 전환선이 기준선을 상향 돌파
         3 => analyzer.is_golden_cross(&ichimoku_params),
         // 4: 데드 크로스 발생 - 전환선이 기준선을 하향 돌파
@@ -74,23 +74,23 @@ pub fn filter_ichimoku<C: Candle + 'static>(
         // 6: 구름 붕괴 - 가격이 구름을 하향 돌파
         6 => analyzer.is_cloud_breakdown(&ichimoku_params),
         // 7: 매수 신호 - 강한 상승 트렌드
-        7 => analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n),
+        7 => analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n, params.p),
         // 8: 매도 신호 - 강한 하락 트렌드
-        8 => analyzer.is_sell_signal(&ichimoku_params, params.consecutive_n),
+        8 => analyzer.is_sell_signal(&ichimoku_params, params.consecutive_n, params.p),
         // 9: 구름이 두꺼워지는 추세
-        9 => analyzer.is_cloud_thickening(&ichimoku_params, params.consecutive_n),
+        9 => analyzer.is_cloud_thickening(&ichimoku_params, params.consecutive_n, params.p),
         // 10: 이치모쿠 완벽 정렬 (가격이 모든 선 위에 있음)
         10 => {
-            analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n)
-                && analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n)
+            analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n, params.p)
+                && analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n, params.p)
         }
         // 11: 이치모쿠 완벽 역배열 (가격이 모든 선 아래에 있음)
         11 => {
-            analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n)
-                && !analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n)
+            analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n, params.p)
+                && !analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n, params.p)
         }
         // 12: 강한 매수 신호 (여러 조건 만족)
-        12 => analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n),
+        12 => analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n, params.p),
         _ => false,
     };
 

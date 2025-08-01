@@ -105,13 +105,14 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
         let rsi_oversold = self.context().is_all(
             |data| data.rsi.value() < self.config_rsi_lower(),
             consecutive_n,
+            0,
         );
 
         // 2. 볼린저밴드 하단 터치 반등 신호
-        let bband_support = self.bband_analyzer().is_below_lower_band(1)
+        let bband_support = self.bband_analyzer().is_below_lower_band(1, 0)
             || self
                 .bband_analyzer()
-                .is_break_through_lower_band_from_below(1);
+                .is_break_through_lower_band_from_below(1, 0);
 
         // 3. 이동평균선 지지선 역할 확인 (가격이 주요 이평선 근처에서 반등)
         let ma_support = self.check_ma_support();
@@ -130,10 +131,11 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
         let rsi_overbought = self.context().is_all(
             |data| data.rsi.value() > self.config_rsi_upper(),
             consecutive_n,
+            0,
         );
 
         // 2. 볼린저밴드 상단 터치 반락 신호
-        let bband_resistance = self.bband_analyzer().is_above_upper_band(1);
+        let bband_resistance = self.bband_analyzer().is_above_upper_band(1, 0);
 
         // 3. 이동평균선 저항선 역할 확인 (가격이 주요 이평선 근처에서 반락)
         let ma_resistance = self.check_ma_resistance();

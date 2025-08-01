@@ -17,6 +17,7 @@ pub fn filter_atr<C: Candle + 'static>(
         params.threshold,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -51,6 +52,7 @@ impl ATRFilter {
         threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < period || candles.len() < consecutive_n {
             return Ok(false);
@@ -89,10 +91,10 @@ impl ATRFilter {
                     analyzer.is_volatility_contracting(period, consecutive_n)
                 }
                 ATRFilterType::HighVolatility => {
-                    analyzer.is_high_volatility(consecutive_n, period, threshold)
+                    analyzer.is_high_volatility(consecutive_n, period, threshold, p)
                 }
                 ATRFilterType::LowVolatility => {
-                    analyzer.is_low_volatility(consecutive_n, period, threshold)
+                    analyzer.is_low_volatility(consecutive_n, period, threshold, p)
                 }
                 ATRFilterType::VolatilityIncreasing => {
                     analyzer.is_volatility_increasing(consecutive_n, period)
@@ -150,7 +152,7 @@ mod tests {
             },
         ];
 
-        let result = ATRFilter::check_filter("TEST", &candles, 2, 5.0, 0, 1);
+        let result = ATRFilter::check_filter("TEST", &candles, 2, 5.0, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -183,7 +185,7 @@ mod tests {
             },
         ];
 
-        let result = ATRFilter::check_filter("TEST", &candles, 2, 5.0, 99, 1);
+        let result = ATRFilter::check_filter("TEST", &candles, 2, 5.0, 99, 1, 0);
         assert!(result.is_err());
     }
 }

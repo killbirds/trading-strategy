@@ -221,7 +221,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
     }
 
     fn should_exit(&self, _candle: &C) -> bool {
-        self.ctx.is_above_middle_band(1)
+        self.ctx.is_above_middle_band(1, 0)
     }
 
     fn position(&self) -> PositionType {

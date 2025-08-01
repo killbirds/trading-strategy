@@ -23,6 +23,7 @@ pub fn filter_momentum<C: Candle + 'static>(
         params.threshold,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -73,6 +74,7 @@ impl MomentumFilter {
         _threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < history_length || candles.len() < consecutive_n {
             return Ok(false);
@@ -123,36 +125,38 @@ impl MomentumFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 MomentumFilterType::StrongPositiveMomentum => {
-                    analyzer.is_strong_positive_momentum_signal(consecutive_n, 1)
+                    analyzer.is_strong_positive_momentum_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::StrongNegativeMomentum => {
-                    analyzer.is_strong_negative_momentum_signal(consecutive_n, 1)
+                    analyzer.is_strong_negative_momentum_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::AcceleratingMomentum => {
-                    analyzer.is_accelerating_momentum_signal(consecutive_n, 1)
+                    analyzer.is_accelerating_momentum_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::DeceleratingMomentum => {
-                    analyzer.is_decelerating_momentum_signal(consecutive_n, 1)
+                    analyzer.is_decelerating_momentum_signal(consecutive_n, 1, p)
                 }
-                MomentumFilterType::Overbought => analyzer.is_overbought_signal(consecutive_n, 1),
-                MomentumFilterType::Oversold => analyzer.is_oversold_signal(consecutive_n, 1),
+                MomentumFilterType::Overbought => {
+                    analyzer.is_overbought_signal(consecutive_n, 1, p)
+                }
+                MomentumFilterType::Oversold => analyzer.is_oversold_signal(consecutive_n, 1, p),
                 MomentumFilterType::MomentumDivergence => {
-                    analyzer.is_momentum_divergence_breakthrough(consecutive_n, 1)
+                    analyzer.is_momentum_divergence_breakthrough(consecutive_n, 1, p)
                 }
                 MomentumFilterType::BullishDivergence => {
-                    analyzer.is_bullish_divergence_signal(consecutive_n, 1)
+                    analyzer.is_bullish_divergence_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::BearishDivergence => {
-                    analyzer.is_bearish_divergence_signal(consecutive_n, 1)
+                    analyzer.is_bearish_divergence_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::PersistentMomentum => {
-                    analyzer.is_persistent_momentum_breakthrough(consecutive_n, 1)
+                    analyzer.is_persistent_momentum_breakthrough(consecutive_n, 1, p)
                 }
                 MomentumFilterType::StableMomentum => {
-                    analyzer.is_stable_momentum_signal(consecutive_n, 1)
+                    analyzer.is_stable_momentum_signal(consecutive_n, 1, p)
                 }
                 MomentumFilterType::MomentumReversalSignal => {
-                    analyzer.is_momentum_reversal_breakthrough(consecutive_n, 1)
+                    analyzer.is_momentum_reversal_breakthrough(consecutive_n, 1, p)
                 }
             };
 
@@ -222,7 +226,7 @@ mod tests {
         ];
 
         let result =
-            MomentumFilter::check_filter("TEST", &candles, 14, 14, 14, 10, 20, 10, 5, 0.5, 0, 1);
+            MomentumFilter::check_filter("TEST", &candles, 14, 14, 14, 10, 20, 10, 5, 0.5, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -271,8 +275,9 @@ mod tests {
             },
         ];
 
-        let result =
-            MomentumFilter::check_filter("TEST", &candles, 14, 14, 14, 10, 20, 10, 5, 0.5, 99, 1);
+        let result = MomentumFilter::check_filter(
+            "TEST", &candles, 14, 14, 14, 10, 20, 10, 5, 0.5, 99, 1, 0,
+        );
         assert!(result.is_err());
     }
 }

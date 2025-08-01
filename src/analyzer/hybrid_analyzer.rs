@@ -683,11 +683,13 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         m: usize,
         rsi_lower: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| self.calculate_buy_signal_strength(rsi_lower) > threshold,
             n,
             m,
+            p,
         )
     }
 
@@ -699,11 +701,13 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         rsi_upper: f64,
         profit_percentage: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| self.calculate_sell_signal_strength(rsi_upper, profit_percentage) > threshold,
             n,
             m,
+            p,
         )
     }
 
@@ -716,6 +720,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         volatility: f64,
         volume_factor: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -724,6 +729,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -737,6 +743,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         volatility: f64,
         volume_factor: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -749,29 +756,55 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 시장 상황 개선 신호 확인 (n개 연속 시장 상황 개선, 이전 m개는 아님)
-    pub fn is_market_condition_improving_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_market_condition_improving_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |_| self.calculate_market_condition_factor() > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 모멘텀 강화 신호 확인 (n개 연속 모멘텀 강화, 이전 m개는 아님)
-    pub fn is_momentum_strengthening_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|_| self.calculate_momentum_factor() > threshold, n, m)
+    pub fn is_momentum_strengthening_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(
+            |_| self.calculate_momentum_factor() > threshold,
+            n,
+            m,
+            p,
+        )
     }
 
     /// 지표 합의 신호 확인 (n개 연속 지표 합의, 이전 m개는 아님)
-    pub fn is_indicators_consensus_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_indicators_consensus_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |_| self.calculate_indicators_consensus_factor() > threshold,
             n,
             m,
+            p,
         )
     }
 
@@ -783,6 +816,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         base_strength: f64,
         risk_factor: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -791,6 +825,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -802,6 +837,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         base_strength: f64,
         risk_factor: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -810,6 +846,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -820,6 +857,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         m: usize,
         signal_type: &str,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
@@ -850,14 +888,16 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 강한 매수 신호인지 확인
-    pub fn is_strong_buy_signal(&self, n: usize, rsi_lower: f64, threshold: f64) -> bool {
+    pub fn is_strong_buy_signal(&self, n: usize, rsi_lower: f64, threshold: f64, p: usize) -> bool {
         self.is_all(
             |_| self.calculate_buy_signal_strength(rsi_lower) > threshold,
             n,
+            p,
         )
     }
 
@@ -868,21 +908,27 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         rsi_upper: f64,
         profit_percentage: f64,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_all(
             |_| self.calculate_sell_signal_strength(rsi_upper, profit_percentage) > threshold,
             n,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 시장 상황이 좋은지 확인
-    pub fn is_good_market_condition(&self, n: usize, threshold: f64) -> bool {
-        self.is_all(|_| self.calculate_market_condition_factor() > threshold, n)
+    pub fn is_good_market_condition(&self, n: usize, threshold: f64, p: usize) -> bool {
+        self.is_all(
+            |_| self.calculate_market_condition_factor() > threshold,
+            n,
+            p,
+        )
     }
 
     /// n개의 연속 데이터에서 모멘텀이 강한지 확인
-    pub fn is_strong_momentum(&self, n: usize, threshold: f64) -> bool {
-        self.is_all(|_| self.calculate_momentum_factor() > threshold, n)
+    pub fn is_strong_momentum(&self, n: usize, threshold: f64, p: usize) -> bool {
+        self.is_all(|_| self.calculate_momentum_factor() > threshold, n, p)
     }
 }
 

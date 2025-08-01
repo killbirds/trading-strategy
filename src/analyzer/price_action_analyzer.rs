@@ -658,7 +658,7 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
     }
 
     /// 불리시 반전 신호 확인 (n개 연속 불리시 반전 신호, 이전 m개는 아님)
-    pub fn is_bullish_reversal_signal_confirmed(&self, n: usize, m: usize) -> bool {
+    pub fn is_bullish_reversal_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 let is_reversal_pattern = matches!(
@@ -672,11 +672,12 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 베어리시 반전 신호 확인 (n개 연속 베어리시 반전 신호, 이전 m개는 아님)
-    pub fn is_bearish_reversal_signal_confirmed(&self, n: usize, m: usize) -> bool {
+    pub fn is_bearish_reversal_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 let is_reversal_pattern = matches!(
@@ -690,27 +691,35 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 강한 추세 지속 신호 확인 (n개 연속 강한 추세 지속, 이전 m개는 아님)
-    pub fn is_strong_trend_continuation_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_strong_trend_continuation_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 data.is_strong_trend() && data.is_continuation_pattern() && data.is_large_candle()
             },
             n,
             m,
+            p,
         )
     }
 
     /// 추세 약화 신호 확인 (n개 연속 추세 약화, 이전 m개는 아님)
-    pub fn is_trend_weakening_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_indecision_pattern(), n, m)
+    pub fn is_trend_weakening_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_indecision_pattern(), n, m, p)
     }
 
     /// 볼륨 확인 신호 (n개 연속 볼륨 확인, 이전 m개는 아님)
-    pub fn is_volume_confirmation_signal(&self, n: usize, m: usize, volume_threshold: f64) -> bool {
+    pub fn is_volume_confirmation_signal(
+        &self,
+        n: usize,
+        m: usize,
+        volume_threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 data.is_high_volume(volume_threshold)
@@ -719,57 +728,58 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 상승 추세 신호 확인 (n개 연속 상승 추세, 이전 m개는 아님)
-    pub fn is_uptrend_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_uptrend(), n, m)
+    pub fn is_uptrend_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_uptrend(), n, m, p)
     }
 
     /// 하락 추세 신호 확인 (n개 연속 하락 추세, 이전 m개는 아님)
-    pub fn is_downtrend_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_downtrend(), n, m)
+    pub fn is_downtrend_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_downtrend(), n, m, p)
     }
 
     /// 강한 모멘텀 신호 확인 (n개 연속 강한 모멘텀, 이전 m개는 아님)
-    pub fn is_strong_momentum_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_momentum(threshold), n, m)
+    pub fn is_strong_momentum_signal(&self, n: usize, m: usize, threshold: f64, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_momentum(threshold), n, m, p)
     }
 
     /// VWAP 위 신호 확인 (n개 연속 VWAP 위, 이전 m개는 아님)
-    pub fn is_above_vwap_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_above_vwap(), n, m)
+    pub fn is_above_vwap_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_above_vwap(), n, m, p)
     }
 
     /// VWAP 아래 신호 확인 (n개 연속 VWAP 아래, 이전 m개는 아님)
-    pub fn is_below_vwap_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_below_vwap(), n, m)
+    pub fn is_below_vwap_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_below_vwap(), n, m, p)
     }
 
     /// n개의 연속 데이터에서 상승 추세인지 확인
-    pub fn is_uptrend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_uptrend(), n)
+    pub fn is_uptrend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_uptrend(), n, p)
     }
 
     /// n개의 연속 데이터에서 하락 추세인지 확인
-    pub fn is_downtrend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_downtrend(), n)
+    pub fn is_downtrend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_downtrend(), n, p)
     }
 
     /// n개의 연속 데이터에서 강한 추세인지 확인
-    pub fn is_strong_trend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_trend(), n)
+    pub fn is_strong_trend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_trend(), n, p)
     }
 
     /// n개의 연속 데이터에서 반전 패턴인지 확인
-    pub fn is_reversal_pattern(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_reversal_pattern(), n)
+    pub fn is_reversal_pattern(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_reversal_pattern(), n, p)
     }
 
     /// n개의 연속 데이터에서 계속 패턴인지 확인
-    pub fn is_continuation_pattern(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_continuation_pattern(), n)
+    pub fn is_continuation_pattern(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_continuation_pattern(), n, p)
     }
 }
 

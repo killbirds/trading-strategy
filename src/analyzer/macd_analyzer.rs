@@ -85,13 +85,13 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
     }
 
     /// 히스토그램이 임계값보다 큰지 확인
-    pub fn is_histogram_above_threshold(&self, threshold: f64, n: usize) -> bool {
-        self.is_all(|data| data.is_histogram_above_threshold(threshold), n)
+    pub fn is_histogram_above_threshold(&self, threshold: f64, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_histogram_above_threshold(threshold), n, p)
     }
 
     /// 히스토그램이 임계값보다 작은지 확인
-    pub fn is_histogram_below_threshold(&self, threshold: f64, n: usize) -> bool {
-        self.is_all(|data| data.is_histogram_below_threshold(threshold), n)
+    pub fn is_histogram_below_threshold(&self, threshold: f64, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_histogram_below_threshold(threshold), n, p)
     }
 
     /// MACD가 시그널 라인을 상향 돌파했는지 확인
@@ -159,91 +159,117 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
     }
 
     /// MACD 라인이 시그널 라인 상향 돌파 신호 확인 (n개 연속 MACD > 시그널, 이전 m개는 아님)
-    pub fn is_macd_above_signal_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_above_signal(), n, m)
+    pub fn is_macd_above_signal_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_macd_above_signal(), n, m, p)
     }
 
     /// MACD 라인이 시그널 라인 하향 돌파 신호 확인 (n개 연속 MACD < 시그널, 이전 m개는 아님)
-    pub fn is_macd_below_signal_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_macd_below_signal(), n, m)
+    pub fn is_macd_below_signal_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_macd_below_signal(), n, m, p)
     }
 
     /// 히스토그램 양수 돌파 신호 확인 (n개 연속 히스토그램 > 0, 이전 m개는 아님)
-    pub fn is_histogram_positive_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.histogram > 0.0, n, m)
+    pub fn is_histogram_positive_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.histogram > 0.0, n, m, p)
     }
 
     /// 히스토그램 음수 돌파 신호 확인 (n개 연속 히스토그램 < 0, 이전 m개는 아님)
-    pub fn is_histogram_negative_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.histogram < 0.0, n, m)
+    pub fn is_histogram_negative_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.histogram < 0.0, n, m, p)
     }
 
     /// 히스토그램 임계값 상향 돌파 신호 확인 (n개 연속 히스토그램 > 임계값, 이전 m개는 아님)
-    pub fn is_histogram_above_threshold_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_histogram_above_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_histogram_above_threshold(threshold),
             n,
             m,
+            p,
         )
     }
 
     /// 히스토그램 임계값 하향 돌파 신호 확인 (n개 연속 히스토그램 < 임계값, 이전 m개는 아님)
-    pub fn is_histogram_below_threshold_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_histogram_below_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_histogram_below_threshold(threshold),
             n,
             m,
+            p,
         )
     }
 
     /// MACD 라인 양수 돌파 신호 확인 (n개 연속 MACD > 0, 이전 m개는 아님)
-    pub fn is_macd_line_positive_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.macd_line > 0.0, n, m)
+    pub fn is_macd_line_positive_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.macd_line > 0.0, n, m, p)
     }
 
     /// MACD 라인 음수 돌파 신호 확인 (n개 연속 MACD < 0, 이전 m개는 아님)
-    pub fn is_macd_line_negative_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.macd_line < 0.0, n, m)
+    pub fn is_macd_line_negative_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.macd_line < 0.0, n, m, p)
     }
 
     /// MACD 라인 임계값 돌파 신호 확인 (n개 연속 MACD 라인 > 임계값, 이전 m개는 아님)
-    pub fn is_macd_line_above_threshold_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.macd_line > threshold, n, m)
+    pub fn is_macd_line_above_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.macd_line > threshold, n, m, p)
     }
 
     /// MACD 라인 임계값 하향 돌파 신호 확인 (n개 연속 MACD 라인 < 임계값, 이전 m개는 아님)
-    pub fn is_macd_line_below_threshold_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.macd_line < threshold, n, m)
+    pub fn is_macd_line_below_threshold_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.macd_line < threshold, n, m, p)
     }
 
     /// 시그널 라인 양수 돌파 신호 확인 (n개 연속 시그널 > 0, 이전 m개는 아님)
-    pub fn is_signal_line_positive_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.signal_line > 0.0, n, m)
+    pub fn is_signal_line_positive_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.signal_line > 0.0, n, m, p)
     }
 
     /// 시그널 라인 음수 돌파 신호 확인 (n개 연속 시그널 < 0, 이전 m개는 아님)
-    pub fn is_signal_line_negative_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.macd.signal_line < 0.0, n, m)
+    pub fn is_signal_line_negative_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.macd.signal_line < 0.0, n, m, p)
     }
 
     /// n개의 연속 데이터에서 MACD가 시그널 위인지 확인
-    pub fn is_macd_above_signal(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_macd_above_signal(), n)
+    pub fn is_macd_above_signal(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_macd_above_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 MACD가 시그널 아래인지 확인
-    pub fn is_macd_below_signal(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_macd_below_signal(), n)
+    pub fn is_macd_below_signal(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_macd_below_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 히스토그램이 양수인지 확인
-    pub fn is_histogram_positive(&self, n: usize) -> bool {
-        self.is_all(|data| data.macd.histogram > 0.0, n)
+    pub fn is_histogram_positive(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.macd.histogram > 0.0, n, p)
     }
 
     /// n개의 연속 데이터에서 히스토그램이 음수인지 확인
-    pub fn is_histogram_negative(&self, n: usize) -> bool {
-        self.is_all(|data| data.macd.histogram < 0.0, n)
+    pub fn is_histogram_negative(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.macd.histogram < 0.0, n, p)
     }
 }
 

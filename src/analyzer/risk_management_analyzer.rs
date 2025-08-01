@@ -639,97 +639,116 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 고위험 신호 확인 (n개 연속 고위험, 이전 m개는 아님)
-    pub fn is_high_risk_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_risk(), n, m)
+    pub fn is_high_risk_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_risk(), n, m, p)
     }
 
     /// 저위험 신호 확인 (n개 연속 저위험, 이전 m개는 아님)
-    pub fn is_low_risk_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_low_risk(), n, m)
+    pub fn is_low_risk_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_low_risk(), n, m, p)
     }
 
     /// 고변동성 신호 확인 (n개 연속 고변동성, 이전 m개는 아님)
-    pub fn is_high_volatility_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_volatility(), n, m)
+    pub fn is_high_volatility_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_volatility(), n, m, p)
     }
 
     /// 저변동성 신호 확인 (n개 연속 저변동성, 이전 m개는 아님)
-    pub fn is_low_volatility_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_low_volatility(), n, m)
+    pub fn is_low_volatility_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_low_volatility(), n, m, p)
     }
 
     /// 좋은 샤프 비율 신호 확인 (n개 연속 좋은 샤프 비율, 이전 m개는 아님)
-    pub fn is_good_sharpe_ratio_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_good_sharpe_ratio(), n, m)
+    pub fn is_good_sharpe_ratio_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_good_sharpe_ratio(), n, m, p)
     }
 
     /// 큰 포지션 권장 신호 확인 (n개 연속 큰 포지션 권장, 이전 m개는 아님)
-    pub fn is_large_position_recommended_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_large_position_recommended(), n, m)
+    pub fn is_large_position_recommended_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_large_position_recommended(), n, m, p)
     }
 
     /// 작은 포지션 권장 신호 확인 (n개 연속 작은 포지션 권장, 이전 m개는 아님)
-    pub fn is_small_position_recommended_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_small_position_recommended(), n, m)
+    pub fn is_small_position_recommended_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_small_position_recommended(), n, m, p)
     }
 
     /// 양의 리스크 조정 수익률 신호 확인 (n개 연속 양의 리스크 조정 수익률, 이전 m개는 아님)
-    pub fn is_positive_risk_adjusted_return_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_positive_risk_adjusted_return(), n, m)
+    pub fn is_positive_risk_adjusted_return_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_positive_risk_adjusted_return(), n, m, p)
     }
 
     /// 거래 권장 신호 확인 (n개 연속 거래 권장, 이전 m개는 아님)
-    pub fn is_trading_recommended_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_trading_recommended(), n, m)
+    pub fn is_trading_recommended_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_trading_recommended(), n, m, p)
     }
 
     /// 허용 가능한 손실 신호 확인 (n개 연속 허용 가능한 손실, 이전 m개는 아님)
-    pub fn is_acceptable_drawdown_signal(&self, n: usize, m: usize, max_acceptable: f64) -> bool {
+    pub fn is_acceptable_drawdown_signal(
+        &self,
+        n: usize,
+        m: usize,
+        max_acceptable: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_acceptable_drawdown(max_acceptable),
             n,
             m,
+            p,
         )
     }
 
     /// 포지션 크기 임계값 돌파 신호 확인 (n개 연속 포지션 크기 임계값 초과, 이전 m개는 아님)
-    pub fn is_position_size_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.optimal_position_size > threshold, n, m)
+    pub fn is_position_size_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.optimal_position_size > threshold, n, m, p)
     }
 
     /// 변동성 임계값 돌파 신호 확인 (n개 연속 변동성 임계값 초과, 이전 m개는 아님)
-    pub fn is_volatility_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.volatility_percentage > threshold, n, m)
+    pub fn is_volatility_breakthrough(&self, n: usize, m: usize, threshold: f64, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.volatility_percentage > threshold, n, m, p)
     }
 
     /// 샤프 비율 임계값 돌파 신호 확인 (n개 연속 샤프 비율 임계값 초과, 이전 m개는 아님)
-    pub fn is_sharpe_ratio_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.sharpe_ratio > threshold, n, m)
+    pub fn is_sharpe_ratio_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.sharpe_ratio > threshold, n, m, p)
     }
 
     /// n개의 연속 데이터에서 고위험인지 확인
-    pub fn is_high_risk(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_high_risk(), n)
+    pub fn is_high_risk(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_high_risk(), n, p)
     }
 
     /// n개의 연속 데이터에서 저위험인지 확인
-    pub fn is_low_risk(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_low_risk(), n)
+    pub fn is_low_risk(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_low_risk(), n, p)
     }
 
     /// n개의 연속 데이터에서 고변동성인지 확인
-    pub fn is_high_volatility(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_high_volatility(), n)
+    pub fn is_high_volatility(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_high_volatility(), n, p)
     }
 
     /// n개의 연속 데이터에서 저변동성인지 확인
-    pub fn is_low_volatility(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_low_volatility(), n)
+    pub fn is_low_volatility(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_low_volatility(), n, p)
     }
 
     /// n개의 연속 데이터에서 거래 권장인지 확인
-    pub fn is_trading_recommended(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_trading_recommended(), n)
+    pub fn is_trading_recommended(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_trading_recommended(), n, p)
     }
 }
 

@@ -62,6 +62,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 price > first_ma
             },
             params.consecutive_n,
+            params.p,
         ),
         // 1: 가격이 마지막 MA 위에 있는 경우
         1 => analyzer.is_all(
@@ -71,9 +72,10 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 price > last_ma
             },
             params.consecutive_n,
+            params.p,
         ),
         // 2: 정규 배열인 경우
-        2 => analyzer.is_ma_regular_arrangement(params.consecutive_n),
+        2 => analyzer.is_ma_regular_arrangement(params.consecutive_n, params.p),
         // 3: 첫번째 MA가 마지막 MA 위에 있는 경우
         3 => analyzer.is_all(
             |data| {
@@ -82,6 +84,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 first_ma > last_ma
             },
             params.consecutive_n,
+            params.p,
         ),
         // 4: 첫번째 MA가 마지막 MA 아래에 있는 경우
         4 => analyzer.is_all(
@@ -91,9 +94,10 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 first_ma < last_ma
             },
             params.consecutive_n,
+            params.p,
         ),
         // 5: 골든 크로스 발생 확인
-        5 => analyzer.is_ma_regular_arrangement_golden_cross(1, params.consecutive_n),
+        5 => analyzer.is_ma_regular_arrangement_golden_cross(1, params.consecutive_n, params.p),
         // 6: 가격이 첫번째와 마지막 MA 사이에 있는 경우
         6 => analyzer.is_all(
             |data| {
@@ -103,6 +107,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 (first_ma <= price && price <= last_ma) || (last_ma <= price && price <= first_ma)
             },
             params.consecutive_n,
+            params.p,
         ),
         // 7: 이동평균선들이 수렴하는 중 (간격 좁아짐)
         7 => {
@@ -145,6 +150,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 true
             },
             params.consecutive_n,
+            params.p,
         ),
         // 10: 가격이 모든 이동평균선 아래에 있음 (강한 하락 추세)
         10 => analyzer.is_all(
@@ -159,6 +165,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
                 true
             },
             params.consecutive_n,
+            params.p,
         ),
         _ => false,
     };
@@ -287,6 +294,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -301,6 +309,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 1,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -315,6 +324,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 2,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -329,6 +339,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 3,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -343,6 +354,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 4,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -357,6 +369,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 5,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -371,6 +384,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 6,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -385,6 +399,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 99, // 유효하지 않은 필터 타입
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -401,6 +416,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 4,   // 첫번째 MA가 마지막 MA 아래에 있는 경우
             consecutive_n: 1, // 1개 조건만 확인
+            p: 0,
         };
 
         let result = filter_moving_average("TEST/USDT", &params, &candles);
@@ -416,6 +432,7 @@ mod tests {
             periods: vec![5, 20],
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -429,6 +446,7 @@ mod tests {
             periods: vec![5, 10, 20],
             filter_type: 2,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -443,6 +461,7 @@ mod tests {
             periods: vec![],
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -456,6 +475,7 @@ mod tests {
             periods: vec![10],
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());

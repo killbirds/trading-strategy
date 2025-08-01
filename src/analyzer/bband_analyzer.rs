@@ -74,60 +74,63 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     }
 
     /// 가격이 볼린저 밴드 하한선 아래로 내려갔는지 확인
-    pub fn is_below_lower_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() < data.bband.lower(), n)
+    pub fn is_below_lower_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.lower(), n, p)
     }
 
     /// n개의 연속된 캔들이 하단 밴드 위에 있는지 확인
-    pub fn is_above_lower_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() > data.bband.lower(), n)
+    pub fn is_above_lower_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.lower(), n, p)
     }
 
     /// 가격이 볼린저 밴드 상한선 위로 올라갔는지 확인
-    pub fn is_below_upper_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() < data.bband.upper(), n)
+    pub fn is_below_upper_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.upper(), n, p)
     }
 
-    pub fn is_above_upper_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n)
+    pub fn is_above_upper_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n, p)
     }
 
     /// 가격이 볼린저 밴드 중앙선 위로 올라갔는지 확인
-    pub fn is_above_middle_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() > data.bband.middle(), n)
+    pub fn is_above_middle_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.middle(), n, p)
     }
 
     /// 가격이 볼린저 밴드 중앙선 아래로 내려갔는지 확인
-    pub fn is_below_middle_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() < data.bband.middle(), n)
+    pub fn is_below_middle_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() < data.bband.middle(), n, p)
     }
 
     /// 하단 밴드 아래에서 위로 돌파한 경우 (상승 반전 신호) 확인
-    pub fn is_break_through_lower_band_from_below(&self, n: usize) -> bool {
+    pub fn is_break_through_lower_band_from_below(&self, n: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.low_price() > data.bband.lower(),
             1,
             n,
+            p,
         )
     }
 
     /// 상단 밴드 아래에서 위로 돌파한 경우 확인
-    pub fn is_break_through_upper_band_from_below(&self, n: usize) -> bool {
+    pub fn is_break_through_upper_band_from_below(&self, n: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.high_price() > data.bband.upper(),
             1,
             n,
+            p,
         )
     }
 
     /// 밴드 폭이 충분히 넓은지 확인
-    pub fn is_band_width_sufficient(&self) -> bool {
+    pub fn is_band_width_sufficient(&self, p: usize) -> bool {
         self.is_all(
             |data| {
                 let band_width = (data.bband.upper() - data.bband.lower()) / data.bband.middle();
                 band_width > 0.02
             },
             1,
+            p,
         )
     }
 
@@ -159,22 +162,24 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     ///
     /// # Arguments
     /// * `n` - 확인할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 고가가 상단을 돌파하면 true
-    pub fn is_high_break_through_upper_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.high_price() > data.bband.upper(), n)
+    pub fn is_high_break_through_upper_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.high_price() > data.bband.upper(), n, p)
     }
 
     /// 종가가 볼린저 밴드 상단 위에 있는지 확인
     ///
     /// # Arguments
     /// * `n` - 확인할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 종가가 상단 위에 있으면 true
-    pub fn is_close_above_upper_band(&self, n: usize) -> bool {
-        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n)
+    pub fn is_close_above_upper_band(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.candle.close_price() > data.bband.upper(), n, p)
     }
 
     /// 볼린저 밴드 스퀴즈 돌파 패턴 확인
@@ -274,10 +279,11 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     /// # Arguments
     /// * `n` - 확인할 캔들 수
     /// * `threshold` - 좁은 상태 판정 임계값 (밴드 폭 / 중간값 비율)
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 밴드 폭이 임계값 이하로 좁으면 true
-    pub fn is_band_width_squeeze(&self, n: usize, threshold: f64) -> bool {
+    pub fn is_band_width_squeeze(&self, n: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
                 let band_width = data.bband.upper() - data.bband.lower();
@@ -289,6 +295,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
                 width_ratio <= threshold
             },
             n,
+            p,
         )
     }
 
@@ -329,7 +336,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         }
 
         // 최근 squeeze_period 동안 좁은 상태 유지
-        let recent_squeeze = self.is_band_width_squeeze(squeeze_period, threshold);
+        let recent_squeeze = self.is_band_width_squeeze(squeeze_period, threshold, 0);
 
         // 그 이전에 narrowing_period 동안 밴드 폭 감소
         let previous_narrowing =
@@ -388,7 +395,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         }
 
         // 현재는 스퀴즈 상태가 아니고
-        let current_not_squeeze = !self.is_band_width_squeeze(1, threshold);
+        let current_not_squeeze = !self.is_band_width_squeeze(1, threshold, 0);
 
         // 이전에는 스퀴즈 상태였는지 확인
         let previous_was_squeeze = if self.items.len() >= 2 {
@@ -408,43 +415,47 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
     }
 
     /// 하단 밴드 하향 돌파 신호 확인 (n개 연속 하단 밴드 아래, 이전 m개는 아님)
-    pub fn is_below_lower_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_below_lower_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.close_price() < data.bband.lower(),
             n,
             m,
+            p,
         )
     }
 
     /// 상단 밴드 상향 돌파 신호 확인 (n개 연속 상단 밴드 위, 이전 m개는 아님)
-    pub fn is_above_upper_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_above_upper_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.close_price() > data.bband.upper(),
             n,
             m,
+            p,
         )
     }
 
     /// 중간선 상향 돌파 신호 확인 (n개 연속 중간선 위, 이전 m개는 아님)
-    pub fn is_above_middle_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_above_middle_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.close_price() > data.bband.middle(),
             n,
             m,
+            p,
         )
     }
 
     /// 중간선 하향 돌파 신호 확인 (n개 연속 중간선 아래, 이전 m개는 아님)
-    pub fn is_below_middle_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_below_middle_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.close_price() < data.bband.middle(),
             n,
             m,
+            p,
         )
     }
 
     /// 스퀴즈 상태 돌파 신호 확인 (n개 연속 스퀴즈 상태, 이전 m개는 아님)
-    pub fn is_squeeze_state_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_squeeze_state_signal(&self, n: usize, m: usize, threshold: f64, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 let band_width = data.bband.upper() - data.bband.lower();
@@ -457,11 +468,12 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 밴드폭 확장 신호 확인 (n개 연속 밴드폭 확장, 이전 m개는 아님)
-    pub fn is_band_expansion_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_band_expansion_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |_data| {
                 if self.items.len() < 2 {
@@ -474,24 +486,27 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 상단 밴드 고가 돌파 신호 확인 (n개 연속 고가가 상단 밴드 돌파, 이전 m개는 아님)
-    pub fn is_high_breaks_upper_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_high_breaks_upper_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.high_price() > data.bband.upper(),
             n,
             m,
+            p,
         )
     }
 
     /// 종가가 상단 밴드 위 신호 확인 (n개 연속 종가가 상단 밴드 위, 이전 m개는 아님)
-    pub fn is_close_above_upper_band_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_close_above_upper_band_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.candle.close_price() > data.bband.upper(),
             n,
             m,
+            p,
         )
     }
 
@@ -501,6 +516,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         n: usize,
         m: usize,
         narrowing_period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -518,11 +534,18 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 밴드폭 임계값 돌파 신호 확인 (n개 연속 밴드폭 임계값 초과, 이전 m개는 아님)
-    pub fn is_band_width_threshold_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_band_width_threshold_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
                 let band_width = data.bband.upper() - data.bband.lower();
@@ -535,6 +558,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 }

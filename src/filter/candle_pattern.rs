@@ -19,6 +19,7 @@ pub fn filter_candle_pattern<C: Candle + 'static>(
         params.threshold,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -63,6 +64,7 @@ impl CandlePatternFilter {
         threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < pattern_history_length || candles.len() < consecutive_n {
             return Ok(false);
@@ -108,25 +110,25 @@ impl CandlePatternFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 CandlePatternFilterType::StrongBullishPattern => {
-                    analyzer.is_strong_bullish_pattern_signal(consecutive_n, 1)
+                    analyzer.is_strong_bullish_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::StrongBearishPattern => {
-                    analyzer.is_strong_bearish_pattern_signal(consecutive_n, 1)
+                    analyzer.is_strong_bearish_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::ReversalPattern => {
-                    analyzer.is_reversal_pattern_signal(consecutive_n, 1)
+                    analyzer.is_reversal_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::ContinuationPattern => {
-                    analyzer.is_continuation_pattern_signal(consecutive_n, 1)
+                    analyzer.is_continuation_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::VolumeConfirmedPattern => {
-                    analyzer.is_volume_confirmed_pattern_signal(consecutive_n, 1)
+                    analyzer.is_volume_confirmed_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::HighReliabilityPattern => {
-                    analyzer.is_high_reliability_pattern_signal(consecutive_n, 1)
+                    analyzer.is_high_reliability_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::ContextAlignedPattern => {
-                    analyzer.is_context_aligned_pattern_signal(consecutive_n, 1)
+                    analyzer.is_context_aligned_pattern_signal(consecutive_n, 1, p)
                 }
                 CandlePatternFilterType::StrongReversalSignal => {
                     analyzer.is_strong_reversal_signal()
@@ -207,7 +209,7 @@ mod tests {
             },
         ];
 
-        let result = CandlePatternFilter::check_filter("TEST", &candles, 0.3, 0.3, 5, 0.5, 0, 1);
+        let result = CandlePatternFilter::check_filter("TEST", &candles, 0.3, 0.3, 5, 0.5, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -256,7 +258,8 @@ mod tests {
             },
         ];
 
-        let result = CandlePatternFilter::check_filter("TEST", &candles, 0.3, 0.3, 5, 0.5, 99, 1);
+        let result =
+            CandlePatternFilter::check_filter("TEST", &candles, 0.3, 0.3, 5, 0.5, 99, 1, 0);
         assert!(result.is_err());
     }
 }

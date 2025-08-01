@@ -74,6 +74,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
         index: usize,
         rate_of_return: f64,
         n: usize,
+        p: usize,
     ) -> bool {
         self.is_all(
             |data| {
@@ -83,6 +84,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
                 }) < rate_of_return
             },
             n,
+            p,
         )
     }
 
@@ -92,6 +94,7 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
         index: usize,
         rate_of_return: f64,
         n: usize,
+        p: usize,
     ) -> bool {
         self.is_all(
             |data| {
@@ -101,27 +104,28 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
                 }) > rate_of_return
             },
             n,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 이동평균이 정규 배열인지 확인
-    pub fn is_ma_regular_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_regular_arrangement(), n)
+    pub fn is_ma_regular_arrangement(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_ma_regular_arrangement(), n, p)
     }
 
     /// 골든 크로스 패턴 확인 (정규 배열이 n개 연속, 이전 m개는 아님)
-    pub fn is_ma_regular_arrangement_golden_cross(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_ma_regular_arrangement(), n, m)
+    pub fn is_ma_regular_arrangement_golden_cross(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_ma_regular_arrangement(), n, m, p)
     }
 
     /// n개의 연속 데이터에서 이동평균이 역배열인지 확인
-    pub fn is_ma_reverse_arrangement(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_ma_reverse_arrangement(), n)
+    pub fn is_ma_reverse_arrangement(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_ma_reverse_arrangement(), n, p)
     }
 
     /// 데드 크로스 패턴 확인 (역배열이 n개 연속, 이전 m개는 아님)
-    pub fn is_ma_reverse_arrangement_dead_cross(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_ma_reverse_arrangement(), n, m)
+    pub fn is_ma_reverse_arrangement_dead_cross(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_ma_reverse_arrangement(), n, m, p)
     }
 
     /// 특정 인덱스의 이동평균 값 반환

@@ -727,118 +727,165 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
     }
 
     /// 강한 매수 신호 확인 (n개 연속 강한 매수 신호, 이전 m개는 아님)
-    pub fn is_strong_buy_signal_confirmed(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_buy_signal(), n, m)
+    pub fn is_strong_buy_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_buy_signal(), n, m, p)
     }
 
     /// 강한 매도 신호 확인 (n개 연속 강한 매도 신호, 이전 m개는 아님)
-    pub fn is_strong_sell_signal_confirmed(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_sell_signal(), n, m)
+    pub fn is_strong_sell_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_sell_signal(), n, m, p)
     }
 
     /// 높은 강도 신호 확인 (n개 연속 높은 강도 신호, 이전 m개는 아님)
-    pub fn is_high_strength_signal_confirmed(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_strength_signal(), n, m)
+    pub fn is_high_strength_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_strength_signal(), n, m, p)
     }
 
     /// 높은 품질 신호 확인 (n개 연속 높은 품질 신호, 이전 m개는 아님)
-    pub fn is_high_quality_signal_confirmed(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_quality_signal(), n, m)
+    pub fn is_high_quality_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_quality_signal(), n, m, p)
     }
 
     /// 안정적인 신호 확인 (n개 연속 안정적인 신호, 이전 m개는 아님)
-    pub fn is_stable_signal_confirmed(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_stable_signal(), n, m)
+    pub fn is_stable_signal_confirmed(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_stable_signal(), n, m, p)
     }
 
     /// 좋은 시장 상황 신호 확인 (n개 연속 좋은 시장 상황, 이전 m개는 아님)
-    pub fn is_good_market_condition_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_good_market_condition(), n, m)
+    pub fn is_good_market_condition_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_good_market_condition(), n, m, p)
     }
 
     /// 일관된 신호 확인 (n개 연속 일관된 신호, 이전 m개는 아님)
-    pub fn is_consistent_signal_confirmed(&self, n: usize, m: usize, lookback: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_consistent_signal(lookback), n, m)
+    pub fn is_consistent_signal_confirmed(
+        &self,
+        n: usize,
+        m: usize,
+        lookback: usize,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_consistent_signal(lookback), n, m, p)
     }
 
     /// 종합 신호 점수 임계값 돌파 확인 (n개 연속 임계값 초과, 이전 m개는 아님)
-    pub fn is_overall_signal_score_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_overall_signal_score_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.calculate_overall_signal_score() > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 신호 강도 임계값 돌파 확인 (n개 연속 매수 신호 강도 임계값 초과, 이전 m개는 아님)
-    pub fn is_buy_signal_strength_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_buy_signal_strength_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.signal_analysis.buy_signal_strength > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 신호 강도 임계값 돌파 확인 (n개 연속 매도 신호 강도 임계값 초과, 이전 m개는 아님)
-    pub fn is_sell_signal_strength_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_sell_signal_strength_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.signal_analysis.sell_signal_strength > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 신호 품질 임계값 돌파 확인 (n개 연속 품질 점수 임계값 초과, 이전 m개는 아님)
-    pub fn is_signal_quality_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_signal_quality_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.signal_analysis.signal_quality.overall_score > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 신호 일치도 임계값 돌파 확인 (n개 연속 일치도 임계값 초과, 이전 m개는 아님)
-    pub fn is_consensus_score_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_consensus_score_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.signal_analysis.signal_quality.consensus_score > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 신호 안정성 임계값 돌파 확인 (n개 연속 안정성 점수 임계값 초과, 이전 m개는 아님)
-    pub fn is_signal_stability_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.signal_stability_score > threshold, n, m)
+    pub fn is_signal_stability_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.signal_stability_score > threshold, n, m, p)
     }
 
     /// n개의 연속 데이터에서 강한 매수 신호인지 확인
-    pub fn is_strong_buy_signal_continuous(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_buy_signal(), n)
+    pub fn is_strong_buy_signal_continuous(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_buy_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 강한 매도 신호인지 확인
-    pub fn is_strong_sell_signal_continuous(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_sell_signal(), n)
+    pub fn is_strong_sell_signal_continuous(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_sell_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 높은 강도 신호인지 확인
-    pub fn is_high_strength_signal(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_high_strength_signal(), n)
+    pub fn is_high_strength_signal(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_high_strength_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 높은 품질 신호인지 확인
-    pub fn is_high_quality_signal_continuous(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_high_quality_signal(), n)
+    pub fn is_high_quality_signal_continuous(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_high_quality_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 안정적인 신호인지 확인
-    pub fn is_stable_signal(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_stable_signal(), n)
+    pub fn is_stable_signal(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_stable_signal(), n, p)
     }
 
     /// n개의 연속 데이터에서 좋은 시장 상황인지 확인
-    pub fn is_good_market_condition(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_good_market_condition(), n)
+    pub fn is_good_market_condition(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_good_market_condition(), n, p)
     }
 }
 

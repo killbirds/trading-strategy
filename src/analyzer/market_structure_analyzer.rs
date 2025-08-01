@@ -695,83 +695,89 @@ impl<C: Candle + Clone + 'static> MarketStructureAnalyzer<C> {
     }
 
     /// 상승 추세 구조 신호 확인 (n개 연속 상승 추세, 이전 m개는 아님)
-    pub fn is_uptrend_structure_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_uptrend(), n, m)
+    pub fn is_uptrend_structure_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_uptrend(), n, m, p)
     }
 
     /// 하락 추세 구조 신호 확인 (n개 연속 하락 추세, 이전 m개는 아님)
-    pub fn is_downtrend_structure_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_downtrend(), n, m)
+    pub fn is_downtrend_structure_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_downtrend(), n, m, p)
     }
 
     /// 구조 변화 돌파 신호 확인 (n개 연속 구조 변화, 이전 m개는 아님)
-    pub fn is_structure_change_breakthrough(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.has_structure_change(), n, m)
+    pub fn is_structure_change_breakthrough(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.has_structure_change(), n, m, p)
     }
 
     /// 강한 시장 구조 신호 확인 (n개 연속 강한 시장 구조, 이전 m개는 아님)
-    pub fn is_strong_market_structure_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_market_flow(), n, m)
+    pub fn is_strong_market_structure_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_market_flow(), n, m, p)
     }
 
     /// 불리시 구조 변화 신호 확인 (n개 연속 불리시 구조 변화, 이전 m개는 아님)
-    pub fn is_bullish_structure_change_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_bullish_structure_change(), n, m)
+    pub fn is_bullish_structure_change_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_bullish_structure_change(), n, m, p)
     }
 
     /// 베어리시 구조 변화 신호 확인 (n개 연속 베어리시 구조 변화, 이전 m개는 아님)
-    pub fn is_bearish_structure_change_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_bearish_structure_change(), n, m)
+    pub fn is_bearish_structure_change_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_bearish_structure_change(), n, m, p)
     }
 
     /// 높은 임밸런스 신호 확인 (n개 연속 높은 임밸런스, 이전 m개는 아님)
-    pub fn is_high_imbalance_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_imbalance(), n, m)
+    pub fn is_high_imbalance_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_imbalance(), n, m, p)
     }
 
     /// 유동성 사냥 돌파 신호 확인 (n개 연속 유동성 풀 근접, 이전 m개는 아님)
-    pub fn is_liquidity_hunt_breakthrough(&self, n: usize, m: usize, threshold: f64) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_near_liquidity_pool(threshold), n, m)
+    pub fn is_liquidity_hunt_breakthrough(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_near_liquidity_pool(threshold), n, m, p)
     }
 
     /// 오더 블록 신호 확인 (n개 연속 오더 블록 내부, 이전 m개는 아님)
-    pub fn is_order_block_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_in_order_block(), n, m)
+    pub fn is_order_block_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_in_order_block(), n, m, p)
     }
 
     /// Fair Value Gap 신호 확인 (n개 연속 FVG 내부, 이전 m개는 아님)
-    pub fn is_fair_value_gap_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_in_fair_value_gap(), n, m)
+    pub fn is_fair_value_gap_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_in_fair_value_gap(), n, m, p)
     }
 
     /// 스윙 하이 돌파 신호 확인 (n개 연속 스윙 하이 돌파, 이전 m개는 아님)
-    pub fn is_swing_high_break_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_swing_high_broken(), n, m)
+    pub fn is_swing_high_break_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_swing_high_broken(), n, m, p)
     }
 
     /// 스윙 로우 돌파 신호 확인 (n개 연속 스윙 로우 돌파, 이전 m개는 아님)
-    pub fn is_swing_low_break_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_swing_low_broken(), n, m)
+    pub fn is_swing_low_break_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_swing_low_broken(), n, m, p)
     }
 
     /// n개의 연속 데이터에서 상승 추세인지 확인
-    pub fn is_uptrend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_uptrend(), n)
+    pub fn is_uptrend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_uptrend(), n, p)
     }
 
     /// n개의 연속 데이터에서 하락 추세인지 확인
-    pub fn is_downtrend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_downtrend(), n)
+    pub fn is_downtrend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_downtrend(), n, p)
     }
 
     /// n개의 연속 데이터에서 횡보인지 확인
-    pub fn is_sideways(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_sideways(), n)
+    pub fn is_sideways(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_sideways(), n, p)
     }
 
     /// n개의 연속 데이터에서 강한 시장 구조인지 확인
-    pub fn is_strong_market_flow(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_strong_market_flow(), n)
+    pub fn is_strong_market_flow(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_strong_market_flow(), n, p)
     }
 }
 

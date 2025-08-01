@@ -115,10 +115,10 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
 
     /// 진입 조건: RSI가 정규 배열이고 50 이상이며 캔들이 MA 위에 있고 ADX > 20
     fn should_enter_by_rsi_regular_arrangement(&self) -> bool {
-        self.ctx.is_rsi_regular_arrangement(2)
-            && self.ctx.is_rsi_all_greater_than_50(2)
-            && self.ctx.is_candle_high_above_ma(2)
-            && self.ctx.is_adx_greater_than_20(2)
+        self.ctx.is_rsi_regular_arrangement(2, 0)
+            && self.ctx.is_rsi_all_greater_than_50(2, 0)
+            && self.ctx.is_candle_high_above_ma(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 
     /// 진입 조건: RSI가 최근에 모두 50 이상으로 돌파했고 다른 조건도 충족
@@ -127,9 +127,10 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
             |data| data.rsis.is_all(|rsi| rsi.value > 50.0),
             2,
             3,
-        ) && self.ctx.is_rsi_regular_arrangement(2)
-            && self.ctx.is_candle_high_above_ma(2)
-            && self.ctx.is_adx_greater_than_20(2)
+            0,
+        ) && self.ctx.is_rsi_regular_arrangement(2, 0)
+            && self.ctx.is_candle_high_above_ma(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 
     /// 진입 조건: 캔들이 최근에 MA 위로 돌파했고 다른 조건도 충족
@@ -138,17 +139,18 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
             |data| data.is_candle_greater_than(|candle| candle.close_price(), |ctx| ctx.ma.get()),
             2,
             3,
-        ) && self.ctx.is_rsi_regular_arrangement(2)
-            && self.ctx.is_rsi_all_greater_than_50(2)
-            && self.ctx.is_adx_greater_than_20(2)
+            0,
+        ) && self.ctx.is_rsi_regular_arrangement(2, 0)
+            && self.ctx.is_rsi_all_greater_than_50(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 
     /// 청산 조건: RSI가 역배열이고 50 미만이며 캔들이 MA 아래에 있고 ADX > 20
     fn should_exit_by_rsi_reverse_arrangement(&self) -> bool {
-        self.ctx.is_rsi_reverse_arrangement(2)
-            && self.ctx.is_rsi_all_less_than_50(2)
-            && self.ctx.is_candle_low_below_ma(2)
-            && self.ctx.is_adx_greater_than_20(2)
+        self.ctx.is_rsi_reverse_arrangement(2, 0)
+            && self.ctx.is_rsi_all_less_than_50(2, 0)
+            && self.ctx.is_candle_low_below_ma(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 
     /// 청산 조건: RSI가 최근에 모두 50 미만으로 돌파했고 다른 조건도 충족
@@ -157,9 +159,10 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
             |data| data.rsis.is_all(|rsi| rsi.value < 50.0),
             2,
             3,
-        ) && self.ctx.is_rsi_reverse_arrangement(2)
-            && self.ctx.is_candle_low_below_ma(2)
-            && self.ctx.is_adx_greater_than_20(2)
+            0,
+        ) && self.ctx.is_rsi_reverse_arrangement(2, 0)
+            && self.ctx.is_candle_low_below_ma(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 
     /// 청산 조건: 캔들이 최근에 MA 아래로 돌파했고 다른 조건도 충족
@@ -168,9 +171,10 @@ impl<C: Candle + 'static> ThreeRSIStrategy<C> {
             |data| data.is_candle_less_than(|candle| candle.close_price(), |ctx| ctx.ma.get()),
             2,
             3,
-        ) && self.ctx.is_rsi_reverse_arrangement(2)
-            && self.ctx.is_rsi_all_less_than_50(2)
-            && self.ctx.is_adx_greater_than_20(2)
+            0,
+        ) && self.ctx.is_rsi_reverse_arrangement(2, 0)
+            && self.ctx.is_rsi_all_less_than_50(2, 0)
+            && self.ctx.is_adx_greater_than_20(2, 0)
     }
 }
 

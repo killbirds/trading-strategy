@@ -191,15 +191,16 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `is_fn` - 확인할 조건 함수
     /// * `n` - 확인할 데이터 개수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
-    fn is_all(&self, is_fn: impl Fn(&Data) -> bool, n: usize) -> bool {
+    fn is_all(&self, is_fn: impl Fn(&Data) -> bool, n: usize, p: usize) -> bool {
         let data = self.datum();
-        if data.len() < n {
+        if data.len() < n + p {
             false
         } else {
-            data.iter().take(n).all(is_fn)
+            data.iter().skip(p).take(n).all(is_fn)
         }
     }
 
@@ -209,6 +210,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `is_fn` - 확인할 조건 함수
     /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
     /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 돌파 패턴이 확인되면 true
@@ -217,11 +219,14 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         is_fn: impl Fn(&Data) -> bool + Copy,
         n: usize,
         m: usize,
+        p: usize,
     ) -> bool {
-        if self.datum().len() < n + m {
+        if self.datum().len() < n + m + p {
             false
         } else {
-            let (heads, tails) = self.datum().split_at(n);
+            let data = self.datum();
+            let (heads, tails) = data.split_at(n + p);
+            let heads = &heads[p..]; // p만큼 drop
             let result = heads.iter().all(is_fn);
             result && tails.iter().take(m).all(|data| !is_fn(data))
         }
@@ -233,6 +238,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get` - 기술적 지표 컬렉션 가져오는 함수
     /// * `get_value` - 개별 지표에서 값 추출 함수
     /// * `n` - 확인할 데이터 개수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
@@ -241,6 +247,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         get: impl Fn(&Data) -> &TAs<K, T>,
         get_value: impl Fn(&T) -> f64,
         n: usize,
+        p: usize,
     ) -> bool
     where
         K: PartialEq + Eq + Hash + std::fmt::Debug,
@@ -251,6 +258,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
                 tas.is_regular_arrangement(&get_value)
             },
             n,
+            p,
         )
     }
 
@@ -260,6 +268,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get` - 기술적 지표 컬렉션 가져오는 함수
     /// * `get_value` - 개별 지표에서 값 추출 함수
     /// * `n` - 확인할 데이터 개수
+    /// * `p` - 최신 데이터에서 drop할 개수
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
@@ -268,6 +277,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         get: impl Fn(&Data) -> &TAs<K, T>,
         get_value: impl Fn(&T) -> f64,
         n: usize,
+        p: usize,
     ) -> bool
     where
         K: PartialEq + Eq + Hash + std::fmt::Debug,
@@ -275,6 +285,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         self.is_all(
             |data| data.is_reverse_arrangement::<K, T>(&get, &get_value),
             n,
+            p,
         )
     }
 
@@ -283,6 +294,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `signal_fn` - 각 데이터에서 매수 시그널이 있는지 확인하는 함수
     /// * `n` - 검사할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수
     /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
     ///
     /// # Returns
@@ -291,14 +303,15 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         &self,
         signal_fn: impl Fn(&Data) -> f64,
         n: usize,
+        p: usize,
         threshold: f64,
     ) -> Option<usize> {
         let data = self.datum();
-        if data.len() < n {
+        if data.len() < n + p {
             return None;
         }
 
-        (0..n.min(data.len())).find(|&i| signal_fn(&data[i]) >= threshold)
+        (p..p + n.min(data.len() - p)).find(|&i| signal_fn(&data[i]) >= threshold)
     }
 
     /// 최근 n개 캔들 중에서 매도 시그널이 있는지 확인
@@ -306,6 +319,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `signal_fn` - 각 데이터에서 매도 시그널이 있는지 확인하는 함수
     /// * `n` - 검사할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
     /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
     ///
     /// # Returns
@@ -314,14 +328,15 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         &self,
         signal_fn: impl Fn(&Data) -> f64,
         n: usize,
+        p: usize,
         threshold: f64,
     ) -> Option<usize> {
         let data = self.datum();
-        if data.len() < n {
+        if data.len() < n + p {
             return None;
         }
 
-        (0..n.min(data.len())).find(|&i| signal_fn(&data[i]) >= threshold)
+        (p..p + n.min(data.len() - p)).find(|&i| signal_fn(&data[i]) >= threshold)
     }
 
     /// 특정 패턴의 시그널을 감지 (범용 패턴 감지)
@@ -329,44 +344,47 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `conditions` - 조건 함수들의 벡터 (각 함수는 특정 조건이 만족하는지 확인)
     /// * `n` - 검사할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 모든 조건이 충족되면 true
-    fn detect_pattern(&self, conditions: Vec<impl Fn(&Data) -> bool>, n: usize) -> bool {
+    fn detect_pattern(&self, conditions: Vec<impl Fn(&Data) -> bool>, n: usize, p: usize) -> bool {
         let data = self.datum();
-        if data.len() < n {
+        if data.len() < n + p {
             return false;
         }
 
         conditions
             .iter()
-            .all(|cond| (0..n.min(data.len())).any(|i| cond(&data[i])))
+            .all(|cond| (p..p + n.min(data.len() - p)).any(|i| cond(&data[i])))
     }
 
     /// 지정된 기간 동안 거래량이 급증했는지 확인
     ///
     /// # Arguments
     /// * `n` - 검사할 캔들 수
+    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
     /// * `threshold` - 평균 대비 거래량 증가 비율 (예: 2.0은 평균의 2배)
     ///
     /// # Returns
     /// * `bool` - 거래량 급증이 감지되면 true
-    fn is_volume_spike(&self, n: usize, threshold: f64) -> bool {
+    fn is_volume_spike(&self, n: usize, p: usize, threshold: f64) -> bool {
         let data = self.datum();
-        if data.len() <= n {
+        if data.len() <= n + p {
             return false;
         }
 
-        // 최근 n개를 제외한 캔들들의 평균 거래량 계산
+        // 최근 n개를 제외한 캔들들의 평균 거래량 계산 (p만큼 drop 후)
         let avg_volume: f64 = data
             .iter()
-            .skip(n)
+            .skip(n + p)
             .map(|d| d.candle().volume())
             .sum::<f64>()
-            / (data.len() - n) as f64;
+            / (data.len() - n - p) as f64;
 
-        // 최근 n개 캔들 중 하나라도 평균의 threshold배 이상인지 확인
+        // 최근 n개 캔들 중 하나라도 평균의 threshold배 이상인지 확인 (p만큼 drop 후)
         data.iter()
+            .skip(p)
             .take(n)
             .any(|d| d.candle().volume() > avg_volume * threshold)
     }

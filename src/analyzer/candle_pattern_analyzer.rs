@@ -855,37 +855,38 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
     }
 
     /// 강한 반전 패턴 신호 확인 (n개 연속 강한 반전 패턴, 이전 m개는 아님)
-    pub fn is_strong_reversal_pattern_signal(&self, n: usize, m: usize) -> bool {
+    pub fn is_strong_reversal_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_strong_bullish_pattern() || data.is_strong_bearish_pattern(),
             n,
             m,
+            p,
         )
     }
 
     /// 볼륨 확인된 패턴 신호 확인 (n개 연속 볼륨 확인된 패턴, 이전 m개는 아님)
-    pub fn is_volume_confirmed_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_volume_confirmed_pattern(), n, m)
+    pub fn is_volume_confirmed_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_volume_confirmed_pattern(), n, m, p)
     }
 
     /// 높은 신뢰도 패턴 신호 확인 (n개 연속 높은 신뢰도 패턴, 이전 m개는 아님)
-    pub fn is_high_reliability_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_high_reliability_pattern(), n, m)
+    pub fn is_high_reliability_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_high_reliability_pattern(), n, m, p)
     }
 
     /// 컨텍스트 정렬된 패턴 신호 확인 (n개 연속 컨텍스트 정렬된 패턴, 이전 m개는 아님)
-    pub fn is_context_aligned_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_context_aligned_pattern(), n, m)
+    pub fn is_context_aligned_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_context_aligned_pattern(), n, m, p)
     }
 
     /// 반전 패턴 신호 확인 (n개 연속 반전 패턴, 이전 m개는 아님)
-    pub fn is_reversal_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_reversal_pattern(), n, m)
+    pub fn is_reversal_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_reversal_pattern(), n, m, p)
     }
 
     /// 계속 패턴 신호 확인 (n개 연속 계속 패턴, 이전 m개는 아님)
-    pub fn is_continuation_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_continuation_pattern(), n, m)
+    pub fn is_continuation_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_continuation_pattern(), n, m, p)
     }
 
     /// 패턴 클러스터링 신호 확인 (n개 연속 패턴 클러스터링 임계값 초과, 이전 m개는 아님)
@@ -894,40 +895,43 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
         n: usize,
         m: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.calculate_pattern_clustering_score() > threshold,
             n,
             m,
+            p,
         )
     }
 
     /// 강한 불리시 패턴 신호 확인 (n개 연속 강한 불리시 패턴, 이전 m개는 아님)
-    pub fn is_strong_bullish_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_bullish_pattern(), n, m)
+    pub fn is_strong_bullish_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_bullish_pattern(), n, m, p)
     }
 
     /// 강한 베어리시 패턴 신호 확인 (n개 연속 강한 베어리시 패턴, 이전 m개는 아님)
-    pub fn is_strong_bearish_pattern_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_strong_bearish_pattern(), n, m)
+    pub fn is_strong_bearish_pattern_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(|data| data.is_strong_bearish_pattern(), n, m, p)
     }
 
     /// n개의 연속 데이터에서 강한 반전 패턴인지 확인
-    pub fn is_strong_reversal_pattern(&self, n: usize) -> bool {
+    pub fn is_strong_reversal_pattern(&self, n: usize, p: usize) -> bool {
         self.is_all(
             |data| data.is_strong_bullish_pattern() || data.is_strong_bearish_pattern(),
             n,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 볼륨 확인된 패턴인지 확인
-    pub fn is_volume_confirmed_pattern(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_volume_confirmed_pattern(), n)
+    pub fn is_volume_confirmed_pattern(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_volume_confirmed_pattern(), n, p)
     }
 
     /// n개의 연속 데이터에서 높은 신뢰도 패턴인지 확인
-    pub fn is_high_reliability_pattern(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_high_reliability_pattern(), n)
+    pub fn is_high_reliability_pattern(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_high_reliability_pattern(), n, p)
     }
 }
 

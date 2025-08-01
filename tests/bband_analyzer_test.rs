@@ -94,7 +94,7 @@ fn test_bband_below_lower_band() {
         analyzer.items.first().unwrap().bband.lower(),
         analyzer.items.first().unwrap().candle.close_price()
     );
-    assert!(analyzer.is_below_lower_band(1));
+    assert!(analyzer.is_below_lower_band(1, 0));
 }
 
 #[test]
@@ -126,7 +126,7 @@ fn test_bband_above_upper_band() {
         analyzer.items.first().unwrap().bband.upper(),
         analyzer.items.first().unwrap().candle.close_price()
     );
-    assert!(analyzer.is_above_upper_band(1));
+    assert!(analyzer.is_above_upper_band(1, 0));
 }
 
 #[test]
@@ -153,5 +153,5 @@ fn test_bband_width_sufficient() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_band_width_sufficient());
+    assert!(analyzer.is_band_width_sufficient(0));
 }

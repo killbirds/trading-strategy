@@ -105,34 +105,34 @@ impl SupportResistanceFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 SupportResistanceFilterType::SupportBreakdown => {
-                    analyzer.is_support_breakdown_signal(consecutive_n, 1)
+                    analyzer.is_support_breakdown_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::ResistanceBreakout => {
-                    analyzer.is_resistance_breakout_signal(consecutive_n, 1)
+                    analyzer.is_resistance_breakout_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::SupportBounce => {
-                    analyzer.is_support_bounce_signal(consecutive_n, 1)
+                    analyzer.is_support_bounce_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::ResistanceRejection => {
-                    analyzer.is_resistance_rejection_signal(consecutive_n, 1)
+                    analyzer.is_resistance_rejection_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::NearStrongSupport => {
-                    analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold)
+                    analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, 0)
                 }
                 SupportResistanceFilterType::NearStrongResistance => {
-                    analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold)
+                    analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, 0)
                 }
                 SupportResistanceFilterType::AboveSupport => {
-                    analyzer.is_above_support_signal(consecutive_n, 1)
+                    analyzer.is_above_support_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::BelowResistance => {
-                    analyzer.is_below_resistance_signal(consecutive_n, 1)
+                    analyzer.is_below_resistance_signal(consecutive_n, 1, 0)
                 }
                 SupportResistanceFilterType::NearSupport => {
-                    analyzer.is_near_support_signal(consecutive_n, 1, threshold)
+                    analyzer.is_near_support_signal(consecutive_n, 1, threshold, 0)
                 }
                 SupportResistanceFilterType::NearResistance => {
-                    analyzer.is_near_resistance_signal(consecutive_n, 1, threshold)
+                    analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, 0)
                 }
             };
 

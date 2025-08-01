@@ -182,7 +182,7 @@ impl<C: Candle + 'static> Strategy<C> for MACDShortStrategy<C> {
             .is_macd_crossed_below_signal(1, self.config.confirm_period)
             && self
                 .ctx
-                .is_histogram_below_threshold(self.config.histogram_threshold, 1)
+                .is_histogram_below_threshold(self.config.histogram_threshold, 1, 0)
     }
 
     fn should_exit(&self, _candle: &C) -> bool {

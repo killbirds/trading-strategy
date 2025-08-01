@@ -110,10 +110,10 @@ impl SuperTrendFilter {
                     analyzer.is_trend_changed(&period, &multiplier, consecutive_n)
                 }
                 SuperTrendFilterType::Uptrend => {
-                    analyzer.is_uptrend(consecutive_n, period, multiplier)
+                    analyzer.is_uptrend(consecutive_n, period, multiplier, 0)
                 }
                 SuperTrendFilterType::Downtrend => {
-                    analyzer.is_downtrend(consecutive_n, period, multiplier)
+                    analyzer.is_downtrend(consecutive_n, period, multiplier, 0)
                 }
             };
 

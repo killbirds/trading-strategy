@@ -52,7 +52,11 @@ pub fn filter_macd<C: Candle + 'static>(
             if analyzer.items.len() < params.consecutive_n {
                 false
             } else {
-                analyzer.is_all(|data| data.is_macd_above_signal(), params.consecutive_n)
+                analyzer.is_all(
+                    |data| data.is_macd_above_signal(),
+                    params.consecutive_n,
+                    params.p,
+                )
             }
         }
         // 1: MACD 라인이 시그널 라인 아래에 있는 경우 (하락 추세)
@@ -60,7 +64,11 @@ pub fn filter_macd<C: Candle + 'static>(
             if analyzer.items.len() < params.consecutive_n {
                 false
             } else {
-                analyzer.is_all(|data| data.is_macd_below_signal(), params.consecutive_n)
+                analyzer.is_all(
+                    |data| data.is_macd_below_signal(),
+                    params.consecutive_n,
+                    params.p,
+                )
             }
         }
         // 2: MACD 라인이 시그널 라인을 상향 돌파한 경우 (매수 신호)
@@ -68,9 +76,13 @@ pub fn filter_macd<C: Candle + 'static>(
         // 3: MACD 라인이 시그널 라인을 하향 돌파한 경우 (매도 신호)
         3 => analyzer.is_macd_crossed_below_signal(params.consecutive_n, 1),
         // 4: 히스토그램이 임계값보다 큰 경우 (강한 상승)
-        4 => analyzer.is_histogram_above_threshold(params.threshold, params.consecutive_n),
+        4 => {
+            analyzer.is_histogram_above_threshold(params.threshold, params.consecutive_n, params.p)
+        }
         // 5: 히스토그램이 임계값보다 작은 경우 (강한 하락)
-        5 => analyzer.is_histogram_below_threshold(params.threshold, params.consecutive_n),
+        5 => {
+            analyzer.is_histogram_below_threshold(params.threshold, params.consecutive_n, params.p)
+        }
         // 6: MACD 라인이 제로라인을 상향 돌파 (강한 상승 신호)
         6 => {
             if analyzer.items.len() < 2 {

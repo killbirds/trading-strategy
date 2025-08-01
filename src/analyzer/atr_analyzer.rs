@@ -138,6 +138,7 @@ impl<C: Candle> ATRAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
@@ -146,6 +147,7 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -156,6 +158,7 @@ impl<C: Candle> ATRAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
@@ -164,6 +167,7 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -174,6 +178,7 @@ impl<C: Candle> ATRAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
@@ -182,6 +187,7 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -192,6 +198,7 @@ impl<C: Candle> ATRAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| {
@@ -200,11 +207,18 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 변동성 증가 신호 확인 (n개 연속 변동성 증가, 이전 m개는 아님)
-    pub fn is_volatility_increasing_signal(&self, n: usize, m: usize, period: usize) -> bool {
+    pub fn is_volatility_increasing_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
                 if self.items.len() < 2 {
@@ -216,11 +230,18 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// 변동성 감소 신호 확인 (n개 연속 변동성 감소, 이전 m개는 아님)
-    pub fn is_volatility_decreasing_signal(&self, n: usize, m: usize, period: usize) -> bool {
+    pub fn is_volatility_decreasing_signal(
+        &self,
+        n: usize,
+        m: usize,
+        period: usize,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
                 if self.items.len() < 2 {
@@ -232,28 +253,31 @@ impl<C: Candle> ATRAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 고변동성인지 확인
-    pub fn is_high_volatility(&self, n: usize, period: usize, threshold: f64) -> bool {
+    pub fn is_high_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
                 let atr = data.get_atr(period);
                 atr > threshold
             },
             n,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 저변동성인지 확인
-    pub fn is_low_volatility(&self, n: usize, period: usize, threshold: f64) -> bool {
+    pub fn is_low_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
                 let atr = data.get_atr(period);
                 atr < threshold
             },
             n,
+            p,
         )
     }
 

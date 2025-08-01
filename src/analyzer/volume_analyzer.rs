@@ -106,13 +106,23 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
     }
 
     /// 평균 이상 볼륨 신호 확인 (n개 연속 평균 이상 볼륨, 이전 m개는 아님)
-    pub fn is_volume_above_average_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_all_volume_ratio_above_average(), n, m)
+    pub fn is_volume_above_average_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_all_volume_ratio_above_average(),
+            n,
+            m,
+            p,
+        )
     }
 
     /// 평균 이하 볼륨 신호 확인 (n개 연속 평균 이하 볼륨, 이전 m개는 아님)
-    pub fn is_volume_below_average_signal(&self, n: usize, m: usize) -> bool {
-        self.is_break_through_by_satisfying(|data| data.is_all_volume_ratio_below_average(), n, m)
+    pub fn is_volume_below_average_signal(&self, n: usize, m: usize, p: usize) -> bool {
+        self.is_break_through_by_satisfying(
+            |data| data.is_all_volume_ratio_below_average(),
+            n,
+            m,
+            p,
+        )
     }
 
     /// 볼륨 급증 신호 확인 (n개 연속 볼륨 급증, 이전 m개는 아님)
@@ -122,6 +132,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -134,6 +145,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -144,6 +156,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -156,6 +169,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -166,16 +180,29 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         m: usize,
         period: usize,
         threshold: f64,
+        p: usize,
     ) -> bool {
-        self.is_break_through_by_satisfying(|data| data.get_volume_ratio(period) > threshold, n, m)
+        self.is_break_through_by_satisfying(
+            |data| data.get_volume_ratio(period) > threshold,
+            n,
+            m,
+            p,
+        )
     }
 
     /// 강한 볼륨 신호 확인 (n개 연속 강한 볼륨, 이전 m개는 아님)
-    pub fn is_significantly_above_volume_signal(&self, n: usize, m: usize, threshold: f64) -> bool {
+    pub fn is_significantly_above_volume_signal(
+        &self,
+        n: usize,
+        m: usize,
+        threshold: f64,
+        p: usize,
+    ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_all_volume_ratio_significantly_above(threshold),
             n,
             m,
+            p,
         )
     }
 
@@ -185,11 +212,13 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         n: usize,
         m: usize,
         period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_bullish_with_increased_volume(period),
             n,
             m,
+            p,
         )
     }
 
@@ -199,11 +228,13 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         n: usize,
         m: usize,
         period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_bearish_with_increased_volume(period),
             n,
             m,
+            p,
         )
     }
 
@@ -214,6 +245,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         m: usize,
         period: usize,
         trend_period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -242,6 +274,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -252,6 +285,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         m: usize,
         period: usize,
         trend_period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |_| {
@@ -280,6 +314,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
             },
             n,
             m,
+            p,
         )
     }
 
@@ -363,40 +398,43 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         n: usize,
         m: usize,
         period: usize,
+        p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
             |data| data.is_current_volume_above_average(period),
             n,
             m,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 볼륨이 평균 이상인지 확인
-    pub fn is_volume_above_average(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_volume_ratio_above_average(), n)
+    pub fn is_volume_above_average(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_all_volume_ratio_above_average(), n, p)
     }
 
     /// n개의 연속 데이터에서 볼륨이 평균 이하인지 확인
-    pub fn is_volume_below_average(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_volume_ratio_below_average(), n)
+    pub fn is_volume_below_average(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_all_volume_ratio_below_average(), n, p)
     }
 
     /// n개의 연속 데이터에서 볼륨이 임계값 이상인지 확인
-    pub fn is_volume_significantly_above(&self, n: usize, threshold: f64) -> bool {
+    pub fn is_volume_significantly_above(&self, n: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| data.is_all_volume_ratio_significantly_above(threshold),
             n,
+            p,
         )
     }
 
     /// n개의 연속 데이터에서 불리시 볼륨 증가인지 확인
-    pub fn is_bullish_with_increased_volume(&self, n: usize, period: usize) -> bool {
-        self.is_all(|data| data.is_bullish_with_increased_volume(period), n)
+    pub fn is_bullish_with_increased_volume(&self, n: usize, period: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_bullish_with_increased_volume(period), n, p)
     }
 
     /// n개의 연속 데이터에서 베어리시 볼륨 증가인지 확인
-    pub fn is_bearish_with_increased_volume(&self, n: usize, period: usize) -> bool {
-        self.is_all(|data| data.is_bearish_with_increased_volume(period), n)
+    pub fn is_bearish_with_increased_volume(&self, n: usize, period: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_bearish_with_increased_volume(period), n, p)
     }
 }
 

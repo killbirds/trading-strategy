@@ -109,44 +109,46 @@ impl<C: Candle + 'static> ThreeRSIAnalyzer<C> {
     }
 
     /// RSI 값이 모두 50 미만인지 확인 (약세)
-    pub fn is_rsi_all_less_than_50(&self, n: usize) -> bool {
-        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value < 50.0), n)
+    pub fn is_rsi_all_less_than_50(&self, n: usize, p: usize) -> bool {
+        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value < 50.0), n, p)
     }
 
     /// RSI 값이 모두 50 이상인지 확인 (강세)
-    pub fn is_rsi_all_greater_than_50(&self, n: usize) -> bool {
-        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value > 50.0), n)
+    pub fn is_rsi_all_greater_than_50(&self, n: usize, p: usize) -> bool {
+        self.is_all(|ctx| ctx.rsis.is_all(|rsi| rsi.value > 50.0), n, p)
     }
 
     /// RSI가 역순 배열인지 확인 (단기가 더 작고 장기가 더 큼)
-    pub fn is_rsi_reverse_arrangement(&self, n: usize) -> bool {
-        self.is_reverse_arrangement(|ctx| &ctx.rsis, |rsi| rsi.value, n)
+    pub fn is_rsi_reverse_arrangement(&self, n: usize, p: usize) -> bool {
+        self.is_reverse_arrangement(|ctx| &ctx.rsis, |rsi| rsi.value, n, p)
     }
 
     /// RSI가 정순 배열인지 확인 (단기가 더 크고 장기가 더 작음)
-    pub fn is_rsi_regular_arrangement(&self, n: usize) -> bool {
-        self.is_regular_arrangement(|ctx| &ctx.rsis, |rsi| rsi.value, n)
+    pub fn is_rsi_regular_arrangement(&self, n: usize, p: usize) -> bool {
+        self.is_regular_arrangement(|ctx| &ctx.rsis, |rsi| rsi.value, n, p)
     }
 
     /// 캔들이 이동평균선보다 낮은지 확인 (약세)
-    pub fn is_candle_low_below_ma(&self, n: usize) -> bool {
+    pub fn is_candle_low_below_ma(&self, n: usize, p: usize) -> bool {
         self.is_all(
             |data| data.is_candle_less_than(|candle| candle.low_price(), |ctx| ctx.ma.get()),
             n,
+            p,
         )
     }
 
     /// 캔들이 이동평균선보다 높은지 확인 (강세)
-    pub fn is_candle_high_above_ma(&self, n: usize) -> bool {
+    pub fn is_candle_high_above_ma(&self, n: usize, p: usize) -> bool {
         self.is_all(
             |data| data.is_candle_greater_than(|candle| candle.high_price(), |ctx| ctx.ma.get()),
             n,
+            p,
         )
     }
 
     /// ADX가 20 이상인지 확인 (추세 강도)
-    pub fn is_adx_greater_than_20(&self, n: usize) -> bool {
-        self.is_all(|ctx| ctx.adx.adx > 20.0, n)
+    pub fn is_adx_greater_than_20(&self, n: usize, p: usize) -> bool {
+        self.is_all(|ctx| ctx.adx.adx > 20.0, n, p)
     }
 }
 

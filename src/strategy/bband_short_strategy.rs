@@ -152,16 +152,16 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         // 가격이 상단 밴드를 상향 돌파했을 때 숏 진입 신호
         let is_buy = self
             .ctx
-            .is_break_through_upper_band_from_below(self.config.count);
+            .is_break_through_upper_band_from_below(self.config.count, 0);
 
         // 밴드 폭이 충분히 넓은지 확인
-        is_buy && self.ctx.is_band_width_sufficient()
+        is_buy && self.ctx.is_band_width_sufficient(0)
     }
 
     fn should_exit(&self, _candle: &C) -> bool {
         // 가격이 하단 밴드를 하향 돌파했을 때 숏 청산 신호
         self.ctx
-            .is_break_through_lower_band_from_below(self.config.count)
+            .is_break_through_lower_band_from_below(self.config.count, 0)
     }
 
     fn position(&self) -> PositionType {

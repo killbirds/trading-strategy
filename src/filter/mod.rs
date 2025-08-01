@@ -116,6 +116,8 @@ pub struct RSIParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for RSIParams {
@@ -126,6 +128,7 @@ impl Default for RSIParams {
             overbought: 70.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -145,6 +148,8 @@ pub struct MACDParams {
     pub consecutive_n: usize,
     /// 히스토그램 임계값 (기본값: 0)
     pub threshold: f64,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for MACDParams {
@@ -156,6 +161,7 @@ impl Default for MACDParams {
             filter_type: 0,
             consecutive_n: 1,
             threshold: 0.0,
+            p: 0,
         }
     }
 }
@@ -171,6 +177,8 @@ pub struct BollingerBandParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for BollingerBandParams {
@@ -180,6 +188,7 @@ impl Default for BollingerBandParams {
             dev_mult: 2.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -195,6 +204,8 @@ pub struct ADXParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for ADXParams {
@@ -204,6 +215,7 @@ impl Default for ADXParams {
             threshold: 25.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -217,6 +229,8 @@ pub struct MovingAverageParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for MovingAverageParams {
@@ -225,6 +239,7 @@ impl Default for MovingAverageParams {
             periods: vec![5, 20],
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -242,6 +257,8 @@ pub struct IchimokuParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for IchimokuParams {
@@ -252,6 +269,7 @@ impl Default for IchimokuParams {
             senkou_span_b_period: 52,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -267,6 +285,8 @@ pub struct VWAPParams {
     pub consecutive_n: usize,
     /// 임계값 (기본값: 0.05 - 5%)
     pub threshold: f64,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for VWAPParams {
@@ -276,6 +296,7 @@ impl Default for VWAPParams {
             filter_type: 0,
             consecutive_n: 1,
             threshold: 0.05,
+            p: 0,
         }
     }
 }
@@ -293,6 +314,8 @@ pub struct CopysParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 /// ATR 필터 파라미터
@@ -306,6 +329,8 @@ pub struct ATRParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 /// SuperTrend 필터 파라미터
@@ -332,6 +357,8 @@ pub struct VolumeParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 /// ThreeRSI 필터 파라미터
@@ -349,6 +376,8 @@ pub struct ThreeRSIParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 /// CandlePattern 필터 파라미터
@@ -366,6 +395,8 @@ pub struct CandlePatternParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 /// SupportResistance 필터 파라미터
@@ -408,6 +439,8 @@ pub struct MomentumParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    pub p: usize,
 }
 
 impl Default for CopysParams {
@@ -418,6 +451,7 @@ impl Default for CopysParams {
             rsi_lower: 30.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -429,6 +463,7 @@ impl Default for ATRParams {
             threshold: 0.01,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -451,6 +486,7 @@ impl Default for VolumeParams {
             threshold: 1.5,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -464,6 +500,7 @@ impl Default for ThreeRSIParams {
             adx_period: 14,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -477,6 +514,7 @@ impl Default for CandlePatternParams {
             threshold: 0.5,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -507,6 +545,7 @@ impl Default for MomentumParams {
             threshold: 0.5,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -696,6 +735,7 @@ mod tests {
             overbought,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 
@@ -715,6 +755,7 @@ mod tests {
             filter_type,
             consecutive_n,
             threshold,
+            p: 0,
         })
     }
 
@@ -730,6 +771,7 @@ mod tests {
             dev_mult,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 
@@ -745,6 +787,7 @@ mod tests {
             threshold,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 
@@ -758,6 +801,7 @@ mod tests {
             periods,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 
@@ -776,6 +820,7 @@ mod tests {
             senkou_span_b_period,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 
@@ -792,6 +837,7 @@ mod tests {
             filter_type,
             consecutive_n,
             threshold,
+            p: 0,
         })
     }
 
@@ -809,6 +855,7 @@ mod tests {
             rsi_lower,
             filter_type,
             consecutive_n,
+            p: 0,
         })
     }
 

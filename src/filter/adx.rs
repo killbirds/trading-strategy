@@ -76,7 +76,7 @@ pub fn filter_adx<C: Candle + 'static>(
         0 => {
             if params.threshold == 25.0 {
                 // 기본 임계값 25인 경우 is_weak_trend 함수 사용
-                analyzer.is_weak_trend(params.consecutive_n)
+                analyzer.is_weak_trend(params.consecutive_n, params.p)
             } else {
                 adx <= params.threshold
             }
@@ -85,10 +85,10 @@ pub fn filter_adx<C: Candle + 'static>(
         1 => {
             if params.threshold == 25.0 {
                 // 기본 임계값 25인 경우 is_strong_trend 함수 사용
-                analyzer.is_strong_trend(params.consecutive_n)
+                analyzer.is_strong_trend(params.consecutive_n, params.p)
             } else if params.threshold == 50.0 {
                 // 임계값 50인 경우 is_very_strong_trend 함수 사용
-                analyzer.is_very_strong_trend(params.consecutive_n)
+                analyzer.is_very_strong_trend(params.consecutive_n, params.p)
             } else {
                 adx > params.threshold
             }

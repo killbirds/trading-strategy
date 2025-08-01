@@ -177,7 +177,7 @@ impl<C: Candle + 'static> Strategy<C> for MAStrategy<C> {
     fn should_enter(&self, _candle: &C) -> bool {
         // 골든 크로스 발생시 롱 진입 신호
         self.ctx
-            .is_ma_regular_arrangement_golden_cross(1, self.config.cross_previous_periods)
+            .is_ma_regular_arrangement_golden_cross(1, self.config.cross_previous_periods, 0)
     }
 
     fn should_exit(&self, _candle: &C) -> bool {

@@ -56,6 +56,7 @@ pub fn filter_rsi<C: Candle + 'static>(
                 rsi > params.overbought
             },
             params.consecutive_n,
+            params.p,
         ),
         // 1: 과매도 (RSI < 30)
         1 => {
@@ -66,6 +67,7 @@ pub fn filter_rsi<C: Candle + 'static>(
                     rsi < params.oversold
                 },
                 params.consecutive_n,
+                params.p,
             )
         }
         // 2: 과매수 또는 과매도 아닌 정상 범위
@@ -80,6 +82,7 @@ pub fn filter_rsi<C: Candle + 'static>(
                         rsi >= params.oversold && rsi <= params.overbought
                     },
                     params.consecutive_n,
+                    params.p,
                 )
             }
         }
@@ -316,6 +319,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -343,6 +347,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 1,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -360,6 +365,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 2,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -376,6 +382,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 3,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -412,6 +419,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 4,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -429,6 +437,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 5, // 유효하지 않은 필터 타입
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -455,6 +464,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 1,   // RSI가 과매도 임계값 아래
             consecutive_n: 3, // 3연속 조건
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -472,6 +482,7 @@ mod tests {
             overbought: 70.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());

@@ -26,6 +26,7 @@ pub fn filter_three_rsi<C: Candle + 'static>(
         params.adx_period,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -62,6 +63,7 @@ impl ThreeRSIFilter {
         adx_period: usize,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < ma_period || candles.len() < consecutive_n {
             return Ok(false);
@@ -99,25 +101,25 @@ impl ThreeRSIFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 ThreeRSIFilterType::AllRSILessThan50 => {
-                    analyzer.is_rsi_all_less_than_50(consecutive_n)
+                    analyzer.is_rsi_all_less_than_50(consecutive_n, p)
                 }
                 ThreeRSIFilterType::AllRSIGreaterThan50 => {
-                    analyzer.is_rsi_all_greater_than_50(consecutive_n)
+                    analyzer.is_rsi_all_greater_than_50(consecutive_n, p)
                 }
                 ThreeRSIFilterType::RSIReverseArrangement => {
-                    analyzer.is_rsi_reverse_arrangement(consecutive_n)
+                    analyzer.is_rsi_reverse_arrangement(consecutive_n, p)
                 }
                 ThreeRSIFilterType::RSIRegularArrangement => {
-                    analyzer.is_rsi_regular_arrangement(consecutive_n)
+                    analyzer.is_rsi_regular_arrangement(consecutive_n, p)
                 }
                 ThreeRSIFilterType::CandleLowBelowMA => {
-                    analyzer.is_candle_low_below_ma(consecutive_n)
+                    analyzer.is_candle_low_below_ma(consecutive_n, p)
                 }
                 ThreeRSIFilterType::CandleHighAboveMA => {
-                    analyzer.is_candle_high_above_ma(consecutive_n)
+                    analyzer.is_candle_high_above_ma(consecutive_n, p)
                 }
                 ThreeRSIFilterType::ADXGreaterThan20 => {
-                    analyzer.is_adx_greater_than_20(consecutive_n)
+                    analyzer.is_adx_greater_than_20(consecutive_n, p)
                 }
             };
 
@@ -186,8 +188,17 @@ mod tests {
             },
         ];
 
-        let result =
-            ThreeRSIFilter::check_filter("TEST", &candles, &[7, 14, 21], MAType::SMA, 20, 14, 0, 1);
+        let result = ThreeRSIFilter::check_filter(
+            "TEST",
+            &candles,
+            &[7, 14, 21],
+            MAType::SMA,
+            20,
+            14,
+            0,
+            1,
+            0,
+        );
         assert!(result.is_ok());
     }
 
@@ -236,8 +247,17 @@ mod tests {
             },
         ];
 
-        let result =
-            ThreeRSIFilter::check_filter("TEST", &candles, &[7, 14, 21], MAType::SMA, 5, 14, 99, 1);
+        let result = ThreeRSIFilter::check_filter(
+            "TEST",
+            &candles,
+            &[7, 14, 21],
+            MAType::SMA,
+            5,
+            14,
+            99,
+            1,
+            0,
+        );
         assert!(result.is_err());
     }
 }

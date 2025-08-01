@@ -85,7 +85,7 @@ fn test_macd_histogram_above_threshold() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_histogram_above_threshold(0.0, 1));
+    assert!(analyzer.is_histogram_above_threshold(0.0, 1, 0));
 }
 
 #[test]

@@ -17,6 +17,7 @@ pub fn filter_volume<C: Candle + 'static>(
         params.threshold,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -55,6 +56,7 @@ impl VolumeFilter {
         threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < period || candles.len() < consecutive_n {
             return Ok(false);
@@ -93,21 +95,21 @@ impl VolumeFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 VolumeFilterType::VolumeAboveAverage => {
-                    analyzer.is_volume_above_average(consecutive_n)
+                    analyzer.is_volume_above_average(consecutive_n, p)
                 }
                 VolumeFilterType::VolumeBelowAverage => {
-                    analyzer.is_volume_below_average(consecutive_n)
+                    analyzer.is_volume_below_average(consecutive_n, p)
                 }
                 VolumeFilterType::VolumeSurge => analyzer.is_volume_surge(period, threshold),
                 VolumeFilterType::VolumeDecline => analyzer.is_volume_decline(period, threshold),
                 VolumeFilterType::VolumeSignificantlyAbove => {
-                    analyzer.is_volume_significantly_above(consecutive_n, threshold)
+                    analyzer.is_volume_significantly_above(consecutive_n, threshold, p)
                 }
                 VolumeFilterType::BullishWithIncreasedVolume => {
-                    analyzer.is_bullish_with_increased_volume(consecutive_n, period)
+                    analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
                 }
                 VolumeFilterType::BearishWithIncreasedVolume => {
-                    analyzer.is_bearish_with_increased_volume(consecutive_n, period)
+                    analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
                 }
                 VolumeFilterType::IncreasingVolumeInUptrend => {
                     analyzer.is_increasing_volume_in_uptrend(period, consecutive_n)
@@ -182,7 +184,7 @@ mod tests {
             },
         ];
 
-        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 0, 1);
+        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -231,7 +233,7 @@ mod tests {
             },
         ];
 
-        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 99, 1);
+        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 99, 1, 0);
         assert!(result.is_err());
     }
 }

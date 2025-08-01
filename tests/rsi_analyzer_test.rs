@@ -88,7 +88,7 @@ fn test_rsi_less_than() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_rsi_less_than(30.0, 1));
+    assert!(analyzer.is_rsi_less_than(30.0, 1, 0));
 }
 
 #[test]
@@ -112,7 +112,7 @@ fn test_rsi_greater_than() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_rsi_greater_than(70.0, 1));
+    assert!(analyzer.is_rsi_greater_than(70.0, 1, 0));
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_ma_regular_arrangement() {
     }
 
     analyzer.init_from_storage(&storage);
-    assert!(analyzer.is_ma_regular_arrangement(1));
+    assert!(analyzer.is_ma_regular_arrangement(1, 0));
 }
 
 #[test]

@@ -87,18 +87,18 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
     }
 
     /// 모든 ADX 값이 n개의 연속 데이터에서 강한 추세(25 이상)인지 확인
-    pub fn is_strong_trend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_adx_strong_trend(), n)
+    pub fn is_strong_trend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_all_adx_strong_trend(), n, p)
     }
 
     /// 모든 ADX 값이 n개의 연속 데이터에서 매우 강한 추세(50 이상)인지 확인
-    pub fn is_very_strong_trend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_adx_very_strong_trend(), n)
+    pub fn is_very_strong_trend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_all_adx_very_strong_trend(), n, p)
     }
 
     /// 모든 ADX 값이 n개의 연속 데이터에서 약한 추세(25 미만)인지 확인
-    pub fn is_weak_trend(&self, n: usize) -> bool {
-        self.is_all(|data| data.is_all_adx_weak_trend(), n)
+    pub fn is_weak_trend(&self, n: usize, p: usize) -> bool {
+        self.is_all(|data| data.is_all_adx_weak_trend(), n, p)
     }
 
     /// 추세 강도가 증가하는지 확인 (현재 ADX가 이전 ADX보다 큰지)
