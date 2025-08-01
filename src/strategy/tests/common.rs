@@ -73,12 +73,19 @@ pub fn create_uptrend_candles(
     for i in 0..count {
         let price = base_price + (i as f64 * price_increment);
         let timestamp = now.timestamp() + (i as i64 * 60); // 1분 간격
+        // 노이즈 추가: 0 ~ price_increment의 100% 범위 내에서 의사 난수 값
+        let noise = if i > 0 {
+            ((i as f64 * 13.0) % 10.0 - 5.0) * price_increment * 0.5
+        } else {
+            0.0
+        };
+        let noisy_price = price + noise;
         let candle = TestCandle {
             timestamp,
-            open: price - price_increment / 2.0,
-            high: price + price_increment / 4.0,
-            low: price - price_increment / 4.0,
-            close: price,
+            open: noisy_price - price_increment / 2.0,
+            high: noisy_price + price_increment / 4.0,
+            low: noisy_price - price_increment / 4.0,
+            close: noisy_price,
             volume: 100.0,
         };
         candles.push(candle);

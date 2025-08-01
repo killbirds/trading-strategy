@@ -116,7 +116,7 @@ pub struct RSIParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -148,7 +148,7 @@ pub struct MACDParams {
     pub consecutive_n: usize,
     /// 히스토그램 임계값 (기본값: 0)
     pub threshold: f64,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -177,7 +177,7 @@ pub struct BollingerBandParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -204,7 +204,7 @@ pub struct ADXParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -229,7 +229,7 @@ pub struct MovingAverageParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -257,7 +257,7 @@ pub struct IchimokuParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -285,7 +285,7 @@ pub struct VWAPParams {
     pub consecutive_n: usize,
     /// 임계값 (기본값: 0.05 - 5%)
     pub threshold: f64,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -314,7 +314,7 @@ pub struct CopysParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -329,7 +329,7 @@ pub struct ATRParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -357,7 +357,7 @@ pub struct VolumeParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -376,7 +376,7 @@ pub struct ThreeRSIParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -395,7 +395,7 @@ pub struct CandlePatternParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 
@@ -439,7 +439,7 @@ pub struct MomentumParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
-    /// 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
     pub p: usize,
 }
 

@@ -1,4 +1,5 @@
 use crate::strategy::Strategy;
+use crate::strategy::hybrid_common::HybridStrategyCommon;
 use crate::strategy::hybrid_strategy::HybridStrategy;
 use crate::strategy::ma_strategy::MAStrategy;
 use crate::strategy::rsi_strategy::RSIStrategy;
@@ -7,6 +8,7 @@ use crate::strategy::tests::common::{
     create_uptrend_candles,
 };
 use std::collections::HashMap;
+use trading_chart::Candle;
 
 // 테스트용 설정 생성 함수
 fn create_hybrid_config() -> HashMap<String, String> {
@@ -78,6 +80,21 @@ fn test_hybrid_strategy_signals_uptrend() {
                 println!("캔들 35에서 신호 상세:");
                 println!("  매수 신호: {enter_signal}");
                 println!("  매도 신호: {exit_signal}");
+
+                // 신호 강도 계산
+                let buy_strength = strategy.calculate_buy_signal_strength();
+                let sell_strength = strategy.calculate_sell_signal_strength(0.0);
+                println!("  매수 신호 강도: {buy_strength:.4}");
+                println!("  매도 신호 강도: {sell_strength:.4}");
+
+                // 컨텍스트 정보 출력
+                println!("  컨텍스트 데이터 개수: {}", strategy.context().items.len());
+                if let Some(last_data) = strategy.context().items.first() {
+                    println!("  최신 캔들 종가: {:.2}", last_data.candle.close_price());
+                    println!("  최신 MA 값: {:.2}", last_data.ma.get());
+                    println!("  최신 RSI 값: {:.2}", last_data.rsi.value());
+                    println!("  최신 MACD 히스토그램: {:.4}", last_data.macd.histogram);
+                }
             }
         }
     }

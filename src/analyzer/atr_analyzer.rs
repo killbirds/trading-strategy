@@ -258,6 +258,17 @@ impl<C: Candle> ATRAnalyzer<C> {
     }
 
     /// n개의 연속 데이터에서 고변동성인지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 데이터 개수
+    /// * `period` - ATR 계산 기간
+    /// * `threshold` - 변동성 임계값
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    ///
+    /// # Returns
+    /// * `bool` - n개 연속으로 고변동성이면 true
+    ///
+
     pub fn is_high_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
@@ -270,6 +281,17 @@ impl<C: Candle> ATRAnalyzer<C> {
     }
 
     /// n개의 연속 데이터에서 저변동성인지 확인
+    ///
+    /// # Arguments
+    /// * `n` - 확인할 데이터 개수
+    /// * `period` - ATR 계산 기간
+    /// * `threshold` - 변동성 임계값
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    ///
+    /// # Returns
+    /// * `bool` - n개 연속으로 저변동성이면 true
+    ///
+
     pub fn is_low_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {

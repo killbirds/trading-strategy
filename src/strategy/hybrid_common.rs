@@ -342,10 +342,18 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
             // RSI가 과매도 상태를 벗어나 상승 중 (약한 매수 신호)
             strength += 0.8; // 0.5에서 0.8로 증가
             count += 1.0;
-        } else if rsi > 50.0 && rsi < 60.0 && rsi > previous.rsi.value() {
-            // RSI가 50-60 구간에서 상승 중 (상승 추세 형성)
+        } else if rsi > 50.0 && rsi < 70.0 && rsi > previous.rsi.value() {
+            // RSI가 50-70 구간에서 상승 중 (상승 추세 형성) - 범위 확장
             strength += 0.7;
             count += 0.8;
+        } else if rsi > 70.0 && rsi < 90.0 && rsi > previous.rsi.value() {
+            // RSI가 70-90 구간에서 상승 중 (강한 상승 추세) - 가중치 상향
+            strength += 1.0;
+            count += 1.0;
+        } else if rsi > 90.0 && rsi <= 100.0 && rsi > previous.rsi.value() {
+            // RSI가 90-100 구간에서 상승 중 (극강한 상승 추세) - 추가 조건
+            strength += 0.3;
+            count += 0.4;
         }
 
         // 4. 가격 변동 패턴 (추가)
@@ -357,7 +365,7 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
 
         // 최종 강도 계산 (정규화)
         if count > 0.0 {
-            strength / (count * 2.0) // 최대 강도를 기준으로 정규화
+            strength / count // 정규화 방식을 단순화하여 더 높은 신호 강도 생성
         } else {
             0.0
         }

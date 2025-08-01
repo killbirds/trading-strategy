@@ -117,7 +117,7 @@ impl MomentumFilter {
 
         // 캔들 데이터 처리
         for candle in candles {
-            analyzer.next_data(candle.clone());
+            analyzer.next(candle.clone());
         }
 
         // 연속적인 조건 확인

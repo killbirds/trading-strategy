@@ -450,7 +450,7 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridShortStrategy<C> {
         self.reset_cache();
 
         // 컨텍스트에 데이터 추가
-        self.ctx.next_data(candle);
+        self.ctx.next(candle);
     }
 
     fn should_enter(&self, _candle: &C) -> bool {

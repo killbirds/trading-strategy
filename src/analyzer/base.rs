@@ -113,7 +113,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
 
     /// 컨텍스트에 새 캔들 데이터 추가
     ///
-    /// 최대 20개의 데이터를 유지하며, 가장 최신 데이터가 인덱스 0에 위치합니다.
+    /// 최대 200개의 데이터를 유지하며, 가장 최신 데이터가 인덱스 0에 위치합니다.
     ///
     /// # Arguments
     /// * `candle` - 새로운 캔들 데이터
@@ -121,7 +121,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         let next_data = self.next_data(candle);
         let datum = self.datum_mut();
 
-        if datum.len() < 20 {
+        if datum.len() < 200 {
             datum.insert(0, next_data);
         } else {
             datum.rotate_right(1);
@@ -191,17 +191,20 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `is_fn` - 확인할 조건 함수
     /// * `n` - 확인할 데이터 개수
-    /// * `p` - 최신 데이터에서 drop할 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
+    ///
+
     fn is_all(&self, is_fn: impl Fn(&Data) -> bool, n: usize, p: usize) -> bool {
         let data = self.datum();
+        // 데이터 길이 검증
         if data.len() < n + p {
-            false
-        } else {
-            data.iter().skip(p).take(n).all(is_fn)
+            return false;
         }
+
+        data.iter().skip(p).take(n).all(is_fn)
     }
 
     /// 먼저 n개 데이터는 조건을 만족하고, 이전 m개 데이터는 만족하지 않는 돌파 패턴 확인
@@ -210,10 +213,12 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `is_fn` - 확인할 조건 함수
     /// * `n` - 조건을 만족해야 하는 최근 데이터 개수
     /// * `m` - 조건을 만족하지 않아야 하는 이전 데이터 개수
-    /// * `p` - 최신 데이터에서 drop할 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 돌파 패턴이 확인되면 true
+    ///
+
     fn is_break_through_by_satisfying(
         &self,
         is_fn: impl Fn(&Data) -> bool + Copy,
@@ -221,15 +226,16 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         m: usize,
         p: usize,
     ) -> bool {
-        if self.datum().len() < n + m + p {
-            false
-        } else {
-            let data = self.datum();
-            let (heads, tails) = data.split_at(n + p);
-            let heads = &heads[p..]; // p만큼 drop
-            let result = heads.iter().all(is_fn);
-            result && tails.iter().take(m).all(|data| !is_fn(data))
+        let data = self.datum();
+        // 데이터 길이 검증
+        if data.len() < n + m + p {
+            return false;
         }
+
+        let (heads, tails) = data.split_at(n + p);
+        let heads = &heads[p..]; // p만큼 drop
+        let result = heads.iter().all(is_fn);
+        result && tails.iter().take(m).all(|data| !is_fn(data))
     }
 
     /// n개의 연속 데이터에서 기술적 지표가 정규 배열인지 확인
@@ -238,7 +244,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get` - 기술적 지표 컬렉션 가져오는 함수
     /// * `get_value` - 개별 지표에서 값 추출 함수
     /// * `n` - 확인할 데이터 개수
-    /// * `p` - 최신 데이터에서 drop할 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
@@ -268,7 +274,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get` - 기술적 지표 컬렉션 가져오는 함수
     /// * `get_value` - 개별 지표에서 값 추출 함수
     /// * `n` - 확인할 데이터 개수
-    /// * `p` - 최신 데이터에서 drop할 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
@@ -294,7 +300,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `signal_fn` - 각 데이터에서 매수 시그널이 있는지 확인하는 함수
     /// * `n` - 검사할 캔들 수
-    /// * `p` - 최신 데이터에서 drop할 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
     ///
     /// # Returns
@@ -307,6 +313,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         threshold: f64,
     ) -> Option<usize> {
         let data = self.datum();
+        // 데이터 길이 검증
         if data.len() < n + p {
             return None;
         }
@@ -319,7 +326,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `signal_fn` - 각 데이터에서 매도 시그널이 있는지 확인하는 함수
     /// * `n` - 검사할 캔들 수
-    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     /// * `threshold` - 신호 감지를 위한 임계값 (0.0 ~ 1.0)
     ///
     /// # Returns
@@ -332,6 +339,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         threshold: f64,
     ) -> Option<usize> {
         let data = self.datum();
+        // 데이터 길이 검증
         if data.len() < n + p {
             return None;
         }
@@ -344,12 +352,13 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Arguments
     /// * `conditions` - 조건 함수들의 벡터 (각 함수는 특정 조건이 만족하는지 확인)
     /// * `n` - 검사할 캔들 수
-    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     ///
     /// # Returns
     /// * `bool` - 모든 조건이 충족되면 true
     fn detect_pattern(&self, conditions: Vec<impl Fn(&Data) -> bool>, n: usize, p: usize) -> bool {
         let data = self.datum();
+        // 데이터 길이 검증
         if data.len() < n + p {
             return false;
         }
@@ -363,13 +372,14 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     ///
     /// # Arguments
     /// * `n` - 검사할 캔들 수
-    /// * `p` - 최신 데이터에서 drop할 개수 (기본값: 0)
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
     /// * `threshold` - 평균 대비 거래량 증가 비율 (예: 2.0은 평균의 2배)
     ///
     /// # Returns
     /// * `bool` - 거래량 급증이 감지되면 true
     fn is_volume_spike(&self, n: usize, p: usize, threshold: f64) -> bool {
         let data = self.datum();
+        // 데이터 길이 검증
         if data.len() <= n + p {
             return false;
         }

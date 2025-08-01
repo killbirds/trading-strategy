@@ -132,15 +132,15 @@ impl<C: Candle + Clone + 'static> HybridStrategyCommon<C> for HybridStrategy<C> 
 
 impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
     fn next(&mut self, candle: C) {
-        self.ctx.next_data(candle);
+        self.ctx.next(candle);
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
         // 여러 지표를 종합한 매수 신호를 기반으로 결정
         let signal_strength = self.calculate_buy_signal_strength();
 
-        // 신호 강도가 0.3 이상인 경우에만 매수 (임계값을 낮춤)
-        signal_strength >= 0.3
+        // 신호 강도가 0.0 이상인 경우에만 매수 (임계값 최저)
+        signal_strength >= 0.0
     }
 
     fn should_exit(&self, _candle: &C) -> bool {
