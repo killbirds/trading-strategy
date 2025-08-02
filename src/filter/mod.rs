@@ -117,6 +117,7 @@ pub struct RSIParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -149,6 +150,7 @@ pub struct MACDParams {
     /// 히스토그램 임계값 (기본값: 0)
     pub threshold: f64,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -178,6 +180,7 @@ pub struct BollingerBandParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -205,6 +208,7 @@ pub struct ADXParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -230,6 +234,7 @@ pub struct MovingAverageParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -258,6 +263,7 @@ pub struct IchimokuParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -286,6 +292,7 @@ pub struct VWAPParams {
     /// 임계값 (기본값: 0.05 - 5%)
     pub threshold: f64,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -315,6 +322,7 @@ pub struct CopysParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -330,6 +338,7 @@ pub struct ATRParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -344,6 +353,9 @@ pub struct SuperTrendParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
+    pub p: usize,
 }
 
 /// Volume 필터 파라미터
@@ -358,6 +370,7 @@ pub struct VolumeParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -377,6 +390,7 @@ pub struct ThreeRSIParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -396,6 +410,7 @@ pub struct CandlePatternParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -414,6 +429,9 @@ pub struct SupportResistanceParams {
     pub filter_type: i32,
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
+    pub p: usize,
 }
 
 /// Momentum 필터 파라미터
@@ -440,6 +458,7 @@ pub struct MomentumParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
     pub p: usize,
 }
 
@@ -475,6 +494,7 @@ impl Default for SuperTrendParams {
             multiplier: 3.0,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }
@@ -528,6 +548,7 @@ impl Default for SupportResistanceParams {
             threshold: 0.05,
             filter_type: 0,
             consecutive_n: 1,
+            p: 0,
         }
     }
 }

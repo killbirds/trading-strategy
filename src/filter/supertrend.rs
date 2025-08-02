@@ -17,6 +17,7 @@ pub fn filter_supertrend<C: Candle + 'static>(
         params.multiplier,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -55,6 +56,7 @@ impl SuperTrendFilter {
         multiplier: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < period || candles.len() < consecutive_n {
             return Ok(false);
@@ -110,10 +112,10 @@ impl SuperTrendFilter {
                     analyzer.is_trend_changed(&period, &multiplier, consecutive_n)
                 }
                 SuperTrendFilterType::Uptrend => {
-                    analyzer.is_uptrend(consecutive_n, period, multiplier, 0)
+                    analyzer.is_uptrend(consecutive_n, period, multiplier, p)
                 }
                 SuperTrendFilterType::Downtrend => {
-                    analyzer.is_downtrend(consecutive_n, period, multiplier, 0)
+                    analyzer.is_downtrend(consecutive_n, period, multiplier, p)
                 }
             };
 
@@ -182,7 +184,7 @@ mod tests {
             },
         ];
 
-        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 0, 1);
+        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -231,7 +233,7 @@ mod tests {
             },
         ];
 
-        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 99, 1);
+        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 99, 1, 0);
         assert!(result.is_err());
     }
 }

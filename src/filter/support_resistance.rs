@@ -19,6 +19,7 @@ pub fn filter_support_resistance<C: Candle + 'static>(
         params.threshold,
         params.filter_type,
         params.consecutive_n,
+        params.p,
     )
 }
 
@@ -61,6 +62,7 @@ impl SupportResistanceFilter {
         threshold: f64,
         filter_type: i32,
         consecutive_n: usize,
+        p: usize,
     ) -> Result<bool> {
         if candles.len() < lookback_period || candles.len() < consecutive_n {
             return Ok(false);
@@ -105,34 +107,34 @@ impl SupportResistanceFilter {
         for _ in 0..analyzer.items.len() {
             let result = match filter_type {
                 SupportResistanceFilterType::SupportBreakdown => {
-                    analyzer.is_support_breakdown_signal(consecutive_n, 1, 0)
+                    analyzer.is_support_breakdown_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::ResistanceBreakout => {
-                    analyzer.is_resistance_breakout_signal(consecutive_n, 1, 0)
+                    analyzer.is_resistance_breakout_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::SupportBounce => {
-                    analyzer.is_support_bounce_signal(consecutive_n, 1, 0)
+                    analyzer.is_support_bounce_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::ResistanceRejection => {
-                    analyzer.is_resistance_rejection_signal(consecutive_n, 1, 0)
+                    analyzer.is_resistance_rejection_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::NearStrongSupport => {
-                    analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, 0)
+                    analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, p)
                 }
                 SupportResistanceFilterType::NearStrongResistance => {
-                    analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, 0)
+                    analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, p)
                 }
                 SupportResistanceFilterType::AboveSupport => {
-                    analyzer.is_above_support_signal(consecutive_n, 1, 0)
+                    analyzer.is_above_support_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::BelowResistance => {
-                    analyzer.is_below_resistance_signal(consecutive_n, 1, 0)
+                    analyzer.is_below_resistance_signal(consecutive_n, 1, p)
                 }
                 SupportResistanceFilterType::NearSupport => {
-                    analyzer.is_near_support_signal(consecutive_n, 1, threshold, 0)
+                    analyzer.is_near_support_signal(consecutive_n, 1, threshold, p)
                 }
                 SupportResistanceFilterType::NearResistance => {
-                    analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, 0)
+                    analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, p)
                 }
             };
 
@@ -202,7 +204,7 @@ mod tests {
         ];
 
         let result =
-            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 0, 1);
+            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 0, 1, 0);
         assert!(result.is_ok());
     }
 
@@ -252,7 +254,7 @@ mod tests {
         ];
 
         let result =
-            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 99, 1);
+            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 99, 1, 0);
         assert!(result.is_err());
     }
 }
