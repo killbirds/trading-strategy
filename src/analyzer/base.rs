@@ -398,4 +398,55 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
             .take(n)
             .any(|d| d.candle().volume() > avg_volume * threshold)
     }
+
+    /// n개의 연속 데이터에서 특정 값이 횡보 상태인지 확인
+    ///
+    /// # Arguments
+    /// * `get_value` - 각 데이터에서 확인할 값 추출 함수
+    /// * `n` - 확인할 데이터 개수
+    /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    /// * `threshold` - 변동폭 비율 임계값 (예: 0.05 = 5%)
+    ///
+    /// # Returns
+    /// * `bool` - 변동폭 비율이 임계값 이하이면 true
+    fn is_sideways(
+        &self,
+        get_value: impl Fn(&Data) -> f64,
+        n: usize,
+        p: usize,
+        threshold: f64,
+    ) -> bool {
+        let data = self.datum();
+        // 데이터 길이 검증
+        if data.len() < n + p {
+            return false;
+        }
+
+        // 최근 n개의 값들을 수집
+        let values: Vec<f64> = data
+            .iter()
+            .skip(p)
+            .take(n)
+            .map(get_value)
+            .collect();
+
+        if values.len() < n {
+            return false;
+        }
+
+        // 최대값과 최소값의 차이를 계산
+        let max_value = values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        let min_value = values.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        let range = max_value - min_value;
+
+        // 평균값 계산
+        let avg_value = values.iter().sum::<f64>() / values.len() as f64;
+
+        // 변동폭 비율이 임계값 이하인지 확인 (threshold는 비율, 예: 0.05 = 5%)
+        if avg_value > 0.0 {
+            (range / avg_value) <= threshold
+        } else {
+            false
+        }
+    }
 }

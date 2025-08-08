@@ -271,6 +271,36 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
     pub fn is_histogram_negative(&self, n: usize, p: usize) -> bool {
         self.is_all(|data| data.macd.histogram < 0.0, n, p)
     }
+
+    /// n개의 연속 데이터에서 MACD 라인이 횡보 상태인지 확인
+    pub fn is_macd_line_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &MACDAnalyzerData<C>| data.macd.macd_line,
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 시그널 라인이 횡보 상태인지 확인
+    pub fn is_signal_line_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &MACDAnalyzerData<C>| data.macd.signal_line,
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 히스토그램이 횡보 상태인지 확인
+    pub fn is_histogram_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &MACDAnalyzerData<C>| data.macd.histogram,
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<MACDAnalyzerData<C>, C> for MACDAnalyzer<C> {

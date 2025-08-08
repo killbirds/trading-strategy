@@ -149,6 +149,16 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
 
         (current_short > current_long) != (previous_short > previous_long)
     }
+
+    /// 특정 인덱스의 이동평균 값이 횡보
+    pub fn is_ma_sideways(&self, index: usize, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &MAAnalyzerData<C>| data.mas.get_by_key_index(index).get(),
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<MAAnalyzerData<C>, C> for MAAnalyzer<C> {

@@ -155,6 +155,16 @@ impl<C: Candle + 'static> RSIAnalyzer<C> {
     pub fn is_rsi_greater_than(&self, value: f64, n: usize, p: usize) -> bool {
         self.is_all(|data| data.rsi.value() > value, n, p)
     }
+
+    /// n개의 연속 데이터에서 RSI가 횡보 상태인지 확인
+    pub fn is_rsi_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &RSIAnalyzerData<C>| data.rsi.value(),
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<RSIAnalyzerData<C>, C> for RSIAnalyzer<C> {

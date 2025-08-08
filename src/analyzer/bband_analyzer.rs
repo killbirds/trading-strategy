@@ -561,6 +561,46 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             p,
         )
     }
+
+    /// n개의 연속 데이터에서 중간 밴드가 횡보 상태인지 확인
+    pub fn is_middle_band_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &BBandAnalyzerData<C>| data.bband.middle(),
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 상단 밴드가 횡보 상태인지 확인
+    pub fn is_upper_band_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &BBandAnalyzerData<C>| data.bband.upper(),
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 하단 밴드가 횡보 상태인지 확인
+    pub fn is_lower_band_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &BBandAnalyzerData<C>| data.bband.lower(),
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 밴드폭이 횡보 상태인지 확인
+    pub fn is_band_width_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &BBandAnalyzerData<C>| data.bband.upper() - data.bband.lower(),
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<BBandAnalyzerData<C>, C> for BBandAnalyzer<C> {

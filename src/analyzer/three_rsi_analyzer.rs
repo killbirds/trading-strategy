@@ -150,6 +150,36 @@ impl<C: Candle + 'static> ThreeRSIAnalyzer<C> {
     pub fn is_adx_greater_than_20(&self, n: usize, p: usize) -> bool {
         self.is_all(|ctx| ctx.adx.adx > 20.0, n, p)
     }
+
+    /// n개의 연속 데이터에서 특정 RSI가 횡보 상태인지 확인
+    pub fn is_rsi_sideways(&self, rsi_index: usize, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &ThreeRSIAnalyzerData<C>| data.rsis.get_by_key_index(rsi_index).value,
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 이동평균이 횡보 상태인지 확인
+    pub fn is_ma_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &ThreeRSIAnalyzerData<C>| data.ma.get(),
+            n,
+            p,
+            threshold,
+        )
+    }
+
+    /// n개의 연속 데이터에서 ADX가 횡보 상태인지 확인
+    pub fn is_adx_sideways(&self, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &ThreeRSIAnalyzerData<C>| data.adx.adx,
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<ThreeRSIAnalyzerData<C>, C> for ThreeRSIAnalyzer<C> {

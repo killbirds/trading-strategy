@@ -255,6 +255,16 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         println!("Is trend reversal: {is_reversal}");
         is_reversal
     }
+
+    /// n개의 연속 데이터에서 ADX가 횡보 상태인지 확인
+    pub fn is_adx_sideways(&self, period: usize, n: usize, p: usize, threshold: f64) -> bool {
+        self.is_sideways(
+            |data: &ADXAnalyzerData<C>| data.get_adx(period),
+            n,
+            p,
+            threshold,
+        )
+    }
 }
 
 impl<C: Candle> AnalyzerOps<ADXAnalyzerData<C>, C> for ADXAnalyzer<C> {
