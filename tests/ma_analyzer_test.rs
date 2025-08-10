@@ -108,7 +108,7 @@ fn test_ma_analyzer_is_sideways() {
     // 횡보 데이터 생성
     let sideways_candles = create_sideways_ma_candles(50, 100.0, 5.0);
     let mut storage = CandleStore::<TestCandle>::new(Vec::new(), 1000, false);
-    
+
     // 캔들 데이터를 스토리지에 추가
     for candle in &sideways_candles {
         storage.add(candle.clone());
@@ -120,8 +120,8 @@ fn test_ma_analyzer_is_sideways() {
 
     // 횡보 상태 테스트 (작은 임계값 - 5% 비율)
     let is_sideways_result = analyzer.is_ma_sideways(0, 10, 0, 0.05);
-    println!("횡보 데이터에서 is_sideways 결과: {}", is_sideways_result);
-    
+    println!("횡보 데이터에서 is_sideways 결과: {is_sideways_result}");
+
     // 횡보 데이터에서는 true가 나와야 함
     assert!(is_sideways_result);
 }
@@ -131,7 +131,7 @@ fn test_ma_analyzer_is_not_sideways() {
     // 추세 데이터 생성
     let trending_candles = create_trending_ma_candles(50, 100.0, 1.0);
     let mut storage = CandleStore::<TestCandle>::new(Vec::new(), 1000, false);
-    
+
     // 캔들 데이터를 스토리지에 추가
     for candle in &trending_candles {
         storage.add(candle.clone());
@@ -143,8 +143,8 @@ fn test_ma_analyzer_is_not_sideways() {
 
     // 추세 상태 테스트 (작은 임계값 - 5% 비율)
     let is_sideways_result = analyzer.is_ma_sideways(0, 10, 0, 0.05);
-    println!("추세 데이터에서 is_sideways 결과: {}", is_sideways_result);
-    
+    println!("추세 데이터에서 is_sideways 결과: {is_sideways_result}");
+
     // 추세 데이터에서는 false가 나와야 함
     assert!(!is_sideways_result);
 }
@@ -154,7 +154,7 @@ fn test_ma_analyzer_is_sideways_with_different_thresholds() {
     // 횡보 데이터 생성
     let sideways_candles = create_sideways_ma_candles(50, 100.0, 5.0);
     let mut storage = CandleStore::<TestCandle>::new(Vec::new(), 1000, false);
-    
+
     // 캔들 데이터를 스토리지에 추가
     for candle in &sideways_candles {
         storage.add(candle.clone());
@@ -166,11 +166,16 @@ fn test_ma_analyzer_is_sideways_with_different_thresholds() {
 
     // 다양한 임계값으로 테스트 (비율 기반)
     let thresholds = vec![0.01, 0.05, 0.1, 0.2]; // 1%, 5%, 10%, 20%
-    
+
     for threshold in thresholds {
         let result = analyzer.is_ma_sideways(0, 10, 0, threshold);
-        println!("임계값 {} ({}%)에서 is_sideways 결과: {}", threshold, threshold * 100.0, result);
-        
+        println!(
+            "임계값 {} ({}%)에서 is_sideways 결과: {}",
+            threshold,
+            threshold * 100.0,
+            result
+        );
+
         // 임계값이 클수록 true가 나올 가능성이 높음
         if threshold >= 0.1 {
             assert!(result);

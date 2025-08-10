@@ -167,6 +167,139 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
+        // 11: 역배열 (내림차순) - 단기 MA가 장기 MA 아래에 있음
+        11 => analyzer.is_ma_reverse_arrangement(params.consecutive_n, params.p),
+        // 12: 데드 크로스 발생 확인 (역배열이 n개 연속, 이전 m개는 아님)
+        12 => analyzer.is_ma_reverse_arrangement_dead_cross(1, params.consecutive_n, params.p),
+        // 13: 이동평균선들이 횡보 중 (변화율이 임계값 이하)
+        13 => {
+            if params.periods.is_empty() {
+                false
+            } else {
+                analyzer.is_ma_sideways(0, params.consecutive_n, params.p, 0.02) // 2% 임계값
+            }
+        }
+        // 14: 이동평균선들이 강한 상승 추세 (수익률이 양수)
+        14 => {
+            if params.periods.is_empty() {
+                false
+            } else {
+                analyzer.is_ma_greater_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
+            }
+        }
+        // 15: 이동평균선들이 강한 하락 추세 (수익률이 음수)
+        15 => {
+            if params.periods.is_empty() {
+                false
+            } else {
+                analyzer.is_ma_less_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
+            }
+        }
+        // 16: 가격이 이동평균선들과 교차 중 (가격이 MA들 사이를 오가며 횡보)
+        16 => analyzer.is_all(
+            |data| {
+                let price = data.candle.close_price();
+                let mut above_count = 0;
+                let mut below_count = 0;
+
+                for i in 0..params.periods.len() {
+                    let ma = data.mas.get_by_key_index(i).get();
+                    if price > ma {
+                        above_count += 1;
+                    } else if price < ma {
+                        below_count += 1;
+                    }
+                }
+
+                // 가격이 일부 MA 위에 있고 일부 MA 아래에 있으면 교차 중
+                above_count > 0 && below_count > 0
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 17: 이동평균선들이 수렴 후 발산 시작 (골든 크로스 전조)
+        17 => {
+            if analyzer.items.len() < 3 || params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                .abs();
+                let prev_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                .abs();
+                let prev_prev_gap = (analyzer.items[2].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[2].mas.get_by_key_index(last_index).get())
+                .abs();
+
+                // 이전에 수렴했다가 현재 발산하기 시작
+                prev_gap < prev_prev_gap && current_gap > prev_gap
+            }
+        }
+        // 18: 이동평균선들이 발산 후 수렴 시작 (데드 크로스 전조)
+        18 => {
+            if analyzer.items.len() < 3 || params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                .abs();
+                let prev_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                .abs();
+                let prev_prev_gap = (analyzer.items[2].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[2].mas.get_by_key_index(last_index).get())
+                .abs();
+
+                // 이전에 발산했다가 현재 수렴하기 시작
+                prev_gap > prev_prev_gap && current_gap < prev_gap
+            }
+        }
+        // 19: 이동평균선들이 평행 이동 중 (모든 MA가 같은 방향으로 움직임)
+        19 => analyzer.is_all(
+            |data| {
+                if analyzer.items.len() < 2 {
+                    return false;
+                }
+
+                let current = data;
+                let previous = &analyzer.items[1];
+
+                let mut all_rising = true;
+                let mut all_falling = true;
+
+                for i in 0..params.periods.len() {
+                    let current_ma = current.mas.get_by_key_index(i).get();
+                    let previous_ma = previous.mas.get_by_key_index(i).get();
+
+                    if current_ma <= previous_ma {
+                        all_rising = false;
+                    }
+                    if current_ma >= previous_ma {
+                        all_falling = false;
+                    }
+                }
+
+                all_rising || all_falling
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 20: 이동평균선들이 교차점 근처 (MA들 간의 간격이 매우 좁음)
+        20 => {
+            if params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
+                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                .abs();
+                let avg_price = analyzer.items[0].candle.close_price();
+                let gap_ratio = current_gap / avg_price;
+
+                // 간격이 평균 가격의 0.5% 이하일 때 교차점 근처로 판단
+                gap_ratio <= 0.005
+            }
+        }
         _ => false,
     };
 
@@ -481,5 +614,155 @@ mod tests {
         assert!(result.is_ok());
         // 단일 MA만 있는 경우 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
+    }
+
+    #[test]
+    fn test_filter_type_11_reverse_arrangement() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 11,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 역배열 (단기 MA가 장기 MA 아래에 있음) 확인
+        assert!(result.unwrap()); // 하락 추세이므로 true
+    }
+
+    #[test]
+    fn test_filter_type_12_dead_cross() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 12,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 데드 크로스 발생 확인
+        assert!(!result.unwrap()); // 단일 데이터로는 크로스 확인 불가
+    }
+
+    #[test]
+    fn test_filter_type_13_ma_sideways() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![10],
+            filter_type: 13,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 이동평균선이 횡보 중인지 확인
+        assert!(result.unwrap()); // 실제로는 횡보로 판단됨
+    }
+
+    #[test]
+    fn test_filter_type_14_strong_uptrend() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![10],
+            filter_type: 14,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 강한 상승 추세 확인
+        assert!(!result.unwrap()); // 하락 추세이므로 false
+    }
+
+    #[test]
+    fn test_filter_type_15_strong_downtrend() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![10],
+            filter_type: 15,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 강한 하락 추세 확인
+        assert!(result.unwrap()); // 하락 추세이므로 true
+    }
+
+    #[test]
+    fn test_filter_type_16_price_crossing_ma() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 16,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 가격이 이동평균선들과 교차 중인지 확인
+        assert!(!result.unwrap()); // 가격이 모든 MA 아래에 있으므로 false
+    }
+
+    #[test]
+    fn test_filter_type_17_convergence_divergence() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 17,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 수렴 후 발산 시작 확인
+        assert!(!result.unwrap()); // 충분한 데이터가 없어서 false
+    }
+
+    #[test]
+    fn test_filter_type_18_divergence_convergence() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 18,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 발산 후 수렴 시작 확인
+        assert!(!result.unwrap()); // 충분한 데이터가 없어서 false
+    }
+
+    #[test]
+    fn test_filter_type_19_parallel_movement() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 19,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 이동평균선들이 평행 이동 중인지 확인
+        assert!(result.unwrap()); // 실제로는 평행 이동으로 판단됨
+    }
+
+    #[test]
+    fn test_filter_type_20_near_crossover() {
+        let candles = create_test_candles();
+        let params = MovingAverageParams {
+            periods: vec![5, 20],
+            filter_type: 20,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_moving_average("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // 이동평균선들이 교차점 근처인지 확인
+        assert!(!result.unwrap()); // 간격이 넓어서 false
     }
 }

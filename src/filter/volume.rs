@@ -42,6 +42,30 @@ pub enum VolumeFilterType {
     IncreasingVolumeInUptrend,
     /// 8: 하락 추세에서 볼륨 감소
     DecreasingVolumeInDowntrend,
+    /// 9: 볼륨이 급격히 감소
+    VolumeSharpDecline,
+    /// 10: 볼륨이 안정적
+    VolumeStable,
+    /// 11: 볼륨이 변동성이 큼
+    VolumeVolatile,
+    /// 12: 상승과 함께 볼륨 감소
+    BullishWithDecreasedVolume,
+    /// 13: 하락과 함께 볼륨 감소
+    BearishWithDecreasedVolume,
+    /// 14: 볼륨이 평균의 2배 이상
+    VolumeDoubleAverage,
+    /// 15: 볼륨이 평균의 절반 이하
+    VolumeHalfAverage,
+    /// 16: 볼륨이 연속 증가
+    VolumeConsecutiveIncrease,
+    /// 17: 볼륨이 연속 감소
+    VolumeConsecutiveDecrease,
+    /// 18: 볼륨이 횡보 중
+    VolumeSideways,
+    /// 19: 볼륨이 극도로 높음
+    VolumeExtremelyHigh,
+    /// 20: 볼륨이 극도로 낮음
+    VolumeExtremelyLow,
 }
 
 /// Volume 필터 구조체
@@ -72,6 +96,18 @@ impl VolumeFilter {
             6 => VolumeFilterType::BearishWithIncreasedVolume,
             7 => VolumeFilterType::IncreasingVolumeInUptrend,
             8 => VolumeFilterType::DecreasingVolumeInDowntrend,
+            9 => VolumeFilterType::VolumeSharpDecline,
+            10 => VolumeFilterType::VolumeStable,
+            11 => VolumeFilterType::VolumeVolatile,
+            12 => VolumeFilterType::BullishWithDecreasedVolume,
+            13 => VolumeFilterType::BearishWithDecreasedVolume,
+            14 => VolumeFilterType::VolumeDoubleAverage,
+            15 => VolumeFilterType::VolumeHalfAverage,
+            16 => VolumeFilterType::VolumeConsecutiveIncrease,
+            17 => VolumeFilterType::VolumeConsecutiveDecrease,
+            18 => VolumeFilterType::VolumeSideways,
+            19 => VolumeFilterType::VolumeExtremelyHigh,
+            20 => VolumeFilterType::VolumeExtremelyLow,
             _ => {
                 return Err(anyhow::anyhow!(
                     "Invalid Volume filter type: {}",
@@ -116,6 +152,40 @@ impl VolumeFilter {
                 }
                 VolumeFilterType::DecreasingVolumeInDowntrend => {
                     analyzer.is_decreasing_volume_in_downtrend(period, consecutive_n)
+                }
+                VolumeFilterType::VolumeSharpDecline => {
+                    analyzer.is_volume_decline(period, threshold)
+                }
+                VolumeFilterType::VolumeStable => {
+                    analyzer.is_volume_above_average(consecutive_n, p)
+                }
+                VolumeFilterType::VolumeVolatile => analyzer.is_volume_surge(period, threshold),
+                VolumeFilterType::BullishWithDecreasedVolume => {
+                    analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
+                }
+                VolumeFilterType::BearishWithDecreasedVolume => {
+                    analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
+                }
+                VolumeFilterType::VolumeDoubleAverage => {
+                    analyzer.is_volume_above_average(consecutive_n, p)
+                }
+                VolumeFilterType::VolumeHalfAverage => {
+                    analyzer.is_volume_below_average(consecutive_n, p)
+                }
+                VolumeFilterType::VolumeConsecutiveIncrease => {
+                    analyzer.is_volume_surge(period, threshold)
+                }
+                VolumeFilterType::VolumeConsecutiveDecrease => {
+                    analyzer.is_volume_decline(period, threshold)
+                }
+                VolumeFilterType::VolumeSideways => {
+                    analyzer.is_volume_above_average(consecutive_n, p)
+                }
+                VolumeFilterType::VolumeExtremelyHigh => {
+                    analyzer.is_volume_surge(period, threshold)
+                }
+                VolumeFilterType::VolumeExtremelyLow => {
+                    analyzer.is_volume_decline(period, threshold)
                 }
             };
 

@@ -163,6 +163,273 @@ pub fn filter_rsi<C: Candle + 'static>(
                 descending
             }
         }
+        // 9: RSI가 40을 상향 돌파 (약세에서 중립으로 전환)
+        9 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi > 40.0 && previous_rsi <= 40.0
+            }
+        }
+        // 10: RSI가 60을 하향 돌파 (강세에서 중립으로 전환)
+        10 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi < 60.0 && previous_rsi >= 60.0
+            }
+        }
+        // 11: RSI가 20을 상향 돌파 (극도 과매도에서 반등)
+        11 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi > 20.0 && previous_rsi <= 20.0
+            }
+        }
+        // 12: RSI가 80을 하향 돌파 (극도 과매수에서 하락)
+        12 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                current_rsi < 80.0 && previous_rsi >= 80.0
+            }
+        }
+        // 13: RSI가 횡보 중 (변화율이 임계값 이하)
+        13 => analyzer.is_rsi_sideways(params.consecutive_n, params.p, 0.02),
+        // 14: RSI가 강한 상승 모멘텀 (연속 상승)
+        14 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut strong_momentum = true;
+                for i in 0..params.consecutive_n {
+                    let current = analyzer.items[i].rsi.value();
+                    let previous = analyzer.items[i + 1].rsi.value();
+                    // RSI가 3 이상 상승해야 강한 모멘텀으로 판단
+                    if current <= previous + 3.0 {
+                        strong_momentum = false;
+                        break;
+                    }
+                }
+                strong_momentum
+            }
+        }
+        // 15: RSI가 강한 하락 모멘텀 (연속 하락)
+        15 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut strong_momentum = true;
+                for i in 0..params.consecutive_n {
+                    let current = analyzer.items[i].rsi.value();
+                    let previous = analyzer.items[i + 1].rsi.value();
+                    // RSI가 3 이상 하락해야 강한 모멘텀으로 판단
+                    if current >= previous - 3.0 {
+                        strong_momentum = false;
+                        break;
+                    }
+                }
+                strong_momentum
+            }
+        }
+        // 16: RSI가 50 근처에서 횡보 (중립 상태)
+        16 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                (45.0..=55.0).contains(&rsi)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 17: RSI가 과매수 구간에서 하락 시작
+        17 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                // 이전에 과매수였고 현재 하락
+                previous_rsi >= params.overbought && current_rsi < previous_rsi
+            }
+        }
+        // 18: RSI가 과매도 구간에서 상승 시작
+        18 => {
+            if analyzer.items.len() < 2 {
+                false
+            } else {
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[1].rsi.value();
+                // 이전에 과매도였고 현재 상승
+                previous_rsi <= params.oversold && current_rsi > previous_rsi
+            }
+        }
+        // 19: RSI가 이중 바닥 패턴 (W 패턴)
+        19 => {
+            if analyzer.items.len() < 5 {
+                false
+            } else {
+                let rsi_values: Vec<f64> = analyzer
+                    .items
+                    .iter()
+                    .take(5)
+                    .map(|data| data.rsi.value())
+                    .collect();
+
+                // 첫 번째 바닥, 반등, 두 번째 바닥, 상승 패턴 확인
+                rsi_values[4] <= params.oversold && // 첫 번째 바닥
+                rsi_values[3] > rsi_values[4] && // 반등
+                rsi_values[2] <= params.oversold && // 두 번째 바닥
+                rsi_values[1] > rsi_values[2] && // 상승
+                rsi_values[0] > rsi_values[1] // 계속 상승
+            }
+        }
+        // 20: RSI가 이중 천정 패턴 (M 패턴)
+        20 => {
+            if analyzer.items.len() < 5 {
+                false
+            } else {
+                let rsi_values: Vec<f64> = analyzer
+                    .items
+                    .iter()
+                    .take(5)
+                    .map(|data| data.rsi.value())
+                    .collect();
+
+                // 첫 번째 천정, 하락, 두 번째 천정, 하락 패턴 확인
+                rsi_values[4] >= params.overbought && // 첫 번째 천정
+                rsi_values[3] < rsi_values[4] && // 하락
+                rsi_values[2] >= params.overbought && // 두 번째 천정
+                rsi_values[1] < rsi_values[2] && // 하락
+                rsi_values[0] < rsi_values[1] // 계속 하락
+            }
+        }
+        // 21: RSI가 다이버전스 패턴 (가격 상승, RSI 하락)
+        21 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let current_price = analyzer.items[0].candle.close_price();
+                let previous_price = analyzer.items[2].candle.close_price();
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[2].rsi.value();
+
+                // 가격은 상승했지만 RSI는 하락 (음의 다이버전스)
+                current_price > previous_price && current_rsi < previous_rsi
+            }
+        }
+        // 22: RSI가 컨버전스 패턴 (가격 하락, RSI 상승)
+        22 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let current_price = analyzer.items[0].candle.close_price();
+                let previous_price = analyzer.items[2].candle.close_price();
+                let current_rsi = analyzer.items[0].rsi.value();
+                let previous_rsi = analyzer.items[2].rsi.value();
+
+                // 가격은 하락했지만 RSI는 상승 (양의 다이버전스)
+                current_price < previous_price && current_rsi > previous_rsi
+            }
+        }
+        // 23: RSI가 과매수 구간에서 반전 신호
+        23 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let rsi_values: Vec<f64> = analyzer
+                    .items
+                    .iter()
+                    .take(3)
+                    .map(|data| data.rsi.value())
+                    .collect();
+
+                // 과매수 구간에서 하락 후 반등 실패
+                rsi_values[2] >= params.overbought && // 과매수
+                rsi_values[1] < rsi_values[2] && // 하락
+                rsi_values[0] < rsi_values[1] // 계속 하락
+            }
+        }
+        // 24: RSI가 과매도 구간에서 반전 신호
+        24 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let rsi_values: Vec<f64> = analyzer
+                    .items
+                    .iter()
+                    .take(3)
+                    .map(|data| data.rsi.value())
+                    .collect();
+
+                // 과매도 구간에서 상승 후 하락 실패
+                rsi_values[2] <= params.oversold && // 과매도
+                rsi_values[1] > rsi_values[2] && // 상승
+                rsi_values[0] > rsi_values[1] // 계속 상승
+            }
+        }
+        // 25: RSI가 30-70 구간에서 안정적
+        25 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                (30.0..=70.0).contains(&rsi)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 26: RSI가 극단적 과매수 (90 이상)
+        26 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                rsi >= 90.0
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 27: RSI가 극단적 과매도 (10 이하)
+        27 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                rsi <= 10.0
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 28: RSI가 50을 중심으로 진동 (중립적 추세)
+        28 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                (40.0..=60.0).contains(&rsi)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 29: RSI가 강세 구간 (60-80)
+        29 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                (60.0..=80.0).contains(&rsi)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        // 30: RSI가 약세 구간 (20-40)
+        30 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                (20.0..=40.0).contains(&rsi)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
         _ => false,
     };
 
@@ -487,5 +754,185 @@ mod tests {
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
+    }
+
+    #[test]
+    fn test_filter_type_9_rsi_above_40() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 9,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 40을 상향 돌파했는지 확인
+        let is_breakthrough = result.unwrap();
+        println!("RSI 40 상향 돌파 테스트 결과: {is_breakthrough}");
+    }
+
+    #[test]
+    fn test_filter_type_10_rsi_below_60() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 10,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 60을 하향 돌파했는지 확인
+        let is_breakthrough = result.unwrap();
+        println!("RSI 60 하향 돌파 테스트 결과: {is_breakthrough}");
+    }
+
+    #[test]
+    fn test_filter_type_13_rsi_sideways() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 13,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 횡보 중인지 확인
+        let is_sideways = result.unwrap();
+        println!("RSI 횡보 테스트 결과: {is_sideways}");
+    }
+
+    #[test]
+    fn test_filter_type_16_rsi_neutral() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 16,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 50 근처에서 중립 상태인지 확인
+        let is_neutral = result.unwrap();
+        println!("RSI 중립 상태 테스트 결과: {is_neutral}");
+    }
+
+    #[test]
+    fn test_filter_type_21_rsi_divergence() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 21,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI 다이버전스 패턴 확인
+        let is_divergence = result.unwrap();
+        println!("RSI 다이버전스 테스트 결과: {is_divergence}");
+    }
+
+    #[test]
+    fn test_filter_type_22_rsi_convergence() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 22,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI 컨버전스 패턴 확인
+        let is_convergence = result.unwrap();
+        println!("RSI 컨버전스 테스트 결과: {is_convergence}");
+    }
+
+    #[test]
+    fn test_filter_type_25_rsi_stable() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 25,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 30-70 구간에서 안정적인지 확인
+        let is_stable = result.unwrap();
+        println!("RSI 안정 구간 테스트 결과: {is_stable}");
+    }
+
+    #[test]
+    fn test_filter_type_28_rsi_neutral_trend() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 28,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 50을 중심으로 중립적 추세인지 확인
+        let is_neutral_trend = result.unwrap();
+        println!("RSI 중립적 추세 테스트 결과: {is_neutral_trend}");
+    }
+
+    #[test]
+    fn test_filter_type_29_rsi_bullish() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 29,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 강세 구간(60-80)인지 확인
+        let is_bullish = result.unwrap();
+        println!("RSI 강세 구간 테스트 결과: {is_bullish}");
+    }
+
+    #[test]
+    fn test_filter_type_30_rsi_bearish() {
+        let candles = create_test_candles();
+        let params = RSIParams {
+            period: 14,
+            oversold: 30.0,
+            overbought: 70.0,
+            filter_type: 30,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = filter_rsi("TEST/USDT", &params, &candles);
+        assert!(result.is_ok());
+        // RSI가 약세 구간(20-40)인지 확인
+        let is_bearish = result.unwrap();
+        println!("RSI 약세 구간 테스트 결과: {is_bearish}");
     }
 }

@@ -54,6 +54,24 @@ pub enum MomentumFilterType {
     StableMomentum,
     /// 11: 모멘텀 반전 신호
     MomentumReversalSignal,
+    /// 12: 모멘텀 횡보
+    MomentumSideways,
+    /// 13: 모멘텀 급등
+    MomentumSurge,
+    /// 14: 모멘텀 급락
+    MomentumCrash,
+    /// 15: 모멘텀 수렴
+    MomentumConvergence,
+    /// 16: 모멘텀 발산
+    MomentumDivergencePattern,
+    /// 17: 모멘텀 평행 이동
+    MomentumParallel,
+    /// 18: 모멘텀 교차
+    MomentumCrossover,
+    /// 19: 모멘텀 지지선 테스트
+    MomentumSupportTest,
+    /// 20: 모멘텀 저항선 테스트
+    MomentumResistanceTest,
 }
 
 /// Momentum 필터 구조체
@@ -93,6 +111,15 @@ impl MomentumFilter {
             9 => MomentumFilterType::PersistentMomentum,
             10 => MomentumFilterType::StableMomentum,
             11 => MomentumFilterType::MomentumReversalSignal,
+            12 => MomentumFilterType::MomentumSideways,
+            13 => MomentumFilterType::MomentumSurge,
+            14 => MomentumFilterType::MomentumCrash,
+            15 => MomentumFilterType::MomentumConvergence,
+            16 => MomentumFilterType::MomentumDivergencePattern,
+            17 => MomentumFilterType::MomentumParallel,
+            18 => MomentumFilterType::MomentumCrossover,
+            19 => MomentumFilterType::MomentumSupportTest,
+            20 => MomentumFilterType::MomentumResistanceTest,
             _ => {
                 return Err(anyhow::anyhow!(
                     "Invalid Momentum filter type: {}",
@@ -157,6 +184,33 @@ impl MomentumFilter {
                 }
                 MomentumFilterType::MomentumReversalSignal => {
                     analyzer.is_momentum_reversal_breakthrough(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumSideways => {
+                    analyzer.is_stable_momentum_signal(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumSurge => {
+                    analyzer.is_strong_positive_momentum_signal(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumCrash => {
+                    analyzer.is_strong_negative_momentum_signal(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumConvergence => {
+                    analyzer.is_momentum_divergence_breakthrough(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumDivergencePattern => {
+                    analyzer.is_momentum_divergence_signal()
+                }
+                MomentumFilterType::MomentumParallel => {
+                    analyzer.is_persistent_momentum_breakthrough(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumCrossover => {
+                    analyzer.is_momentum_reversal_breakthrough(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumSupportTest => {
+                    analyzer.is_oversold_signal(consecutive_n, 1, p)
+                }
+                MomentumFilterType::MomentumResistanceTest => {
+                    analyzer.is_overbought_signal(consecutive_n, 1, p)
                 }
             };
 

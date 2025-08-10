@@ -423,12 +423,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         }
 
         // 최근 n개의 값들을 수집
-        let values: Vec<f64> = data
-            .iter()
-            .skip(p)
-            .take(n)
-            .map(get_value)
-            .collect();
+        let values: Vec<f64> = data.iter().skip(p).take(n).map(get_value).collect();
 
         if values.len() < n {
             return false;

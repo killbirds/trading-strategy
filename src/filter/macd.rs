@@ -132,6 +132,153 @@ pub fn filter_macd<C: Candle + 'static>(
                 current_data.macd.macd_line > 0.0 && current_data.macd.signal_line > 0.0
             }
         }
+        // 11: MACD와 시그널 모두 제로라인 아래에 있음 (강한 하락 추세)
+        11 => {
+            if analyzer.items.is_empty() {
+                false
+            } else {
+                let current_data = &analyzer.items[0];
+                current_data.macd.macd_line < 0.0 && current_data.macd.signal_line < 0.0
+            }
+        }
+        // 12: MACD 라인이 상승 중 (연속 상승)
+        12 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut ascending = true;
+                for i in 0..params.consecutive_n {
+                    if analyzer.items[i].macd.macd_line <= analyzer.items[i + 1].macd.macd_line {
+                        ascending = false;
+                        break;
+                    }
+                }
+                ascending
+            }
+        }
+        // 13: MACD 라인이 하락 중 (연속 하락)
+        13 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut descending = true;
+                for i in 0..params.consecutive_n {
+                    if analyzer.items[i].macd.macd_line >= analyzer.items[i + 1].macd.macd_line {
+                        descending = false;
+                        break;
+                    }
+                }
+                descending
+            }
+        }
+        // 14: 히스토그램이 확대 중 (모멘텀 강화)
+        14 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut expanding = true;
+                for i in 0..params.consecutive_n {
+                    let current_hist = analyzer.items[i].macd.histogram.abs();
+                    let previous_hist = analyzer.items[i + 1].macd.histogram.abs();
+                    if current_hist <= previous_hist {
+                        expanding = false;
+                        break;
+                    }
+                }
+                expanding
+            }
+        }
+        // 15: 히스토그램이 축소 중 (모멘텀 약화)
+        15 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut contracting = true;
+                for i in 0..params.consecutive_n {
+                    let current_hist = analyzer.items[i].macd.histogram.abs();
+                    let previous_hist = analyzer.items[i + 1].macd.histogram.abs();
+                    if current_hist >= previous_hist {
+                        contracting = false;
+                        break;
+                    }
+                }
+                contracting
+            }
+        }
+        // 16: MACD 다이버전스 (가격 상승, MACD 하락)
+        16 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let current_price = analyzer.items[0].candle.close_price();
+                let previous_price = analyzer.items[2].candle.close_price();
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let previous_macd = analyzer.items[2].macd.macd_line;
+
+                // 가격은 상승했지만 MACD는 하락 (음의 다이버전스)
+                current_price > previous_price && current_macd < previous_macd
+            }
+        }
+        // 17: MACD 컨버전스 (가격 하락, MACD 상승)
+        17 => {
+            if analyzer.items.len() < 3 {
+                false
+            } else {
+                let current_price = analyzer.items[0].candle.close_price();
+                let previous_price = analyzer.items[2].candle.close_price();
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let previous_macd = analyzer.items[2].macd.macd_line;
+
+                // 가격은 하락했지만 MACD는 상승 (양의 다이버전스)
+                current_price < previous_price && current_macd > previous_macd
+            }
+        }
+        // 18: MACD가 과매수 구간 (극도 상승)
+        18 => {
+            if analyzer.items.is_empty() {
+                false
+            } else {
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let avg_price = analyzer.items[0].candle.close_price();
+                let macd_ratio = current_macd / avg_price;
+
+                // MACD가 가격의 2% 이상일 때 과매수로 판단
+                macd_ratio >= 0.02
+            }
+        }
+        // 19: MACD가 과매도 구간 (극도 하락)
+        19 => {
+            if analyzer.items.is_empty() {
+                false
+            } else {
+                let current_macd = analyzer.items[0].macd.macd_line;
+                let avg_price = analyzer.items[0].candle.close_price();
+                let macd_ratio = current_macd / avg_price;
+
+                // MACD가 가격의 -2% 이하일 때 과매도로 판단
+                macd_ratio <= -0.02
+            }
+        }
+        // 20: MACD가 횡보 중 (변화율이 임계값 이하)
+        20 => {
+            if analyzer.items.len() < params.consecutive_n + 1 {
+                false
+            } else {
+                let mut sideways = true;
+                for i in 0..params.consecutive_n {
+                    let current_macd = analyzer.items[i].macd.macd_line;
+                    let previous_macd = analyzer.items[i + 1].macd.macd_line;
+                    let change_rate = (current_macd - previous_macd).abs() / previous_macd.abs();
+
+                    // 변화율이 5% 이상이면 횡보가 아님
+                    if change_rate > 0.05 {
+                        sideways = false;
+                        break;
+                    }
+                }
+                sideways
+            }
+        }
         _ => false,
     };
 
