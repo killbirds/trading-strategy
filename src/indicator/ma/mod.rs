@@ -191,4 +191,102 @@ mod tests {
         assert_eq!(MAType::SMA.to_string(), "SMA");
         assert_eq!(MAType::WMA.to_string(), "WMA");
     }
+
+    #[test]
+    fn test_ma_builder_factory_ema() {
+        let mut builder = MABuilderFactory::build::<TestCandle>(&MAType::EMA, 5);
+        let candles = create_test_candles();
+        let ma = builder.build(&candles);
+        assert_eq!(ma.period(), 5);
+        assert!(ma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_ma_builder_factory_sma() {
+        let mut builder = MABuilderFactory::build::<TestCandle>(&MAType::SMA, 5);
+        let candles = create_test_candles();
+        let ma = builder.build(&candles);
+        assert_eq!(ma.period(), 5);
+        assert!(ma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_ma_builder_factory_wma() {
+        let mut builder = MABuilderFactory::build::<TestCandle>(&MAType::WMA, 5);
+        let candles = create_test_candles();
+        let ma = builder.build(&candles);
+        assert_eq!(ma.period(), 5);
+        assert!(ma.get() > 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "이동평균 기간은 0보다 커야 합니다")]
+    fn test_ma_builder_factory_invalid_period() {
+        MABuilderFactory::build::<TestCandle>(&MAType::SMA, 0);
+    }
+
+    #[test]
+    fn test_mas_builder_factory_single_period() {
+        let periods = vec![5];
+        let mut builder = MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &periods);
+        let candles = create_test_candles();
+        let mas = builder.build(&candles);
+
+        assert_eq!(mas.len(), 1);
+        let ma = mas.get_by_key_index(0);
+        assert_eq!(ma.period(), 5);
+    }
+
+    #[test]
+    fn test_mas_builder_factory_multiple_periods() {
+        let periods = vec![5, 10, 20];
+        let mut builder = MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &periods);
+        let candles = create_test_candles();
+        let mas = builder.build(&candles);
+
+        assert_eq!(mas.len(), 3);
+        assert_eq!(mas.get_by_key_index(0).period(), 5);
+        assert_eq!(mas.get_by_key_index(1).period(), 10);
+        assert_eq!(mas.get_by_key_index(2).period(), 20);
+    }
+
+    #[test]
+    #[should_panic(expected = "이동평균 기간 목록이 비어 있습니다")]
+    fn test_mas_builder_factory_empty_periods() {
+        MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &[]);
+    }
+
+    #[test]
+    #[should_panic(expected = "이동평균 기간은 오름차순으로 정렬되어야 합니다")]
+    fn test_mas_builder_factory_unsorted_periods() {
+        let periods = vec![10, 5, 20];
+        MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &periods);
+    }
+
+    #[test]
+    #[should_panic(expected = "이동평균 기간은 오름차순으로 정렬되어야 합니다")]
+    fn test_mas_builder_factory_duplicate_periods() {
+        let periods = vec![5, 5, 10];
+        MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &periods);
+    }
+
+    #[test]
+    fn test_mas_builder_factory_next() {
+        let periods = vec![5, 10];
+        let mut builder = MAsBuilderFactory::build::<TestCandle>(&MAType::SMA, &periods);
+        let candles = create_test_candles();
+        let _mas = builder.build(&candles);
+
+        let new_candle = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 115.0,
+            high: 130.0,
+            low: 115.0,
+            close: 125.0,
+            volume: 1300.0,
+        };
+
+        let updated_mas = builder.next(&new_candle);
+        assert_eq!(updated_mas.len(), 2);
+    }
 }

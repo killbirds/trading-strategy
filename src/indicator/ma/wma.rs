@@ -5,22 +5,32 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
 
+/// 가중이동평균(WMA) 계산 빌더
+///
+/// 가중이동평균은 최근 데이터에 선형적으로 증가하는 가중치를 부여하는 이동평균입니다.
 #[derive(Debug)]
 pub struct WMABuilder<C: Candle> {
-    period: usize,
+    /// WMA 계산 기간
+    pub period: usize,
+    /// 가격 데이터 저장용 배열
     values: Vec<f64>,
     _phantom: PhantomData<C>,
 }
 
+/// 가중이동평균(WMA) 기술적 지표
+///
+/// 계산된 WMA 값을 저장하고 제공합니다.
 #[derive(Clone, Debug)]
 pub struct WMA {
+    /// WMA 계산 기간
     period: usize,
+    /// 계산된 WMA 값
     wma: f64,
 }
 
 impl Display for WMA {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WMA({}: {})", self.period, self.wma)
+        write!(f, "WMA({}: {:.2})", self.period, self.wma)
     }
 }
 
@@ -41,10 +51,13 @@ where
     /// 새 WMA 빌더 생성
     ///
     /// # Arguments
-    /// * `period` - 계산 기간
+    /// * `period` - WMA 계산 기간
     ///
     /// # Returns
-    /// * `WMABuilder` - 새 WMA 빌더 인스턴스
+    /// * `WMABuilder` - 새 빌더 인스턴스
+    ///
+    /// # Panics
+    /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(period: usize) -> Self {
         if period == 0 {
             panic!("WMA 기간은 0보다 커야 합니다");
@@ -52,15 +65,29 @@ where
 
         Self {
             period,
-            values: Vec::with_capacity(period),
+            values: Vec::with_capacity(period * 2),
             _phantom: PhantomData,
         }
     }
 
+    /// 저장소에서 WMA 지표 생성
+    ///
+    /// # Arguments
+    /// * `storage` - 캔들 데이터 저장소
+    ///
+    /// # Returns
+    /// * `WMA` - 계산된 WMA 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> WMA {
         self.build(&storage.get_time_ordered_items())
     }
 
+    /// 데이터 벡터에서 WMA 지표 생성
+    ///
+    /// # Arguments
+    /// * `data` - 캔들 데이터 벡터
+    ///
+    /// # Returns
+    /// * `WMA` - 계산된 WMA 지표
     pub fn build(&mut self, data: &[C]) -> WMA {
         if data.is_empty() {
             return WMA {
@@ -83,6 +110,13 @@ where
         }
     }
 
+    /// 새 캔들 데이터로 WMA 지표 업데이트
+    ///
+    /// # Arguments
+    /// * `data` - 새 캔들 데이터
+    ///
+    /// # Returns
+    /// * `WMA` - 업데이트된 WMA 지표
     pub fn next(&mut self, data: &C) -> WMA {
         // 새 가격 추가
         self.values.push(data.close_price());
@@ -93,7 +127,7 @@ where
             self.values.drain(0..excess);
         }
 
-        // 충분한 데이터가 없는 경우
+        // 충분한 데이터가 없는 경우 현재 가격 반환
         if self.values.len() < self.period {
             return WMA {
                 period: self.period,
@@ -109,14 +143,31 @@ where
         }
     }
 
+    /// WMA 값 계산
+    ///
+    /// 가중이동평균 공식: (p₁*1 + p₂*2 + ... + pₙ*n) / (1+2+...+n)
+    /// 여기서 p₁은 가장 오래된 데이터, pₙ은 가장 최신 데이터
     fn calculate_wma(&self) -> f64 {
-        let mut wma = 0.0;
         let len = self.values.len().min(self.period);
-        let weight_sum: f64 = (1..=len).sum::<usize>() as f64;
+        if len == 0 {
+            return 0.0;
+        }
 
-        for i in 0..len {
-            let weight = (len - i) as f64 / weight_sum;
-            wma += self.values[i] * weight;
+        // 최근 period 개만 사용 (가장 최근 데이터에 높은 가중치)
+        let start_idx = if self.values.len() > self.period {
+            self.values.len() - self.period
+        } else {
+            0
+        };
+        let slice = &self.values[start_idx..];
+
+        let weight_sum: f64 = (1..=len).sum::<usize>() as f64;
+        let mut wma = 0.0;
+
+        // 최신 데이터에 높은 가중치 부여 (slice의 마지막 요소가 가장 높은 가중치)
+        for (i, &value) in slice.iter().enumerate() {
+            let weight = (i + 1) as f64 / weight_sum;
+            wma += value * weight;
         }
 
         wma
@@ -137,41 +188,6 @@ where
 
     fn next(&mut self, data: &C) -> Box<dyn MA> {
         Box::new(self.next(data))
-    }
-}
-
-impl WMA {
-    /// 새로운 데이터로 WMA 업데이트
-    ///
-    /// # Arguments
-    /// * `data` - 새 캔들 데이터
-    ///
-    /// # Returns
-    /// * `Option<f64>` - 업데이트된 WMA 값
-    pub fn next<C: Candle>(&mut self, data: &C) -> Option<f64> {
-        if self.period == 0 {
-            return None;
-        }
-
-        // 현재 캔들의 가격
-        let price = data.close_price();
-
-        // 1. 데이터 크기 문제로 이 구현에서는 단일 값으로 WMA를 근사값 계산
-        // 2. 완전한 WMA 계산을 위해서는 period 크기의 최근 데이터 배열이 필요함
-
-        // 가중치 계산 (최신 데이터에 더 높은 가중치 부여)
-        // WMA 공식: (p₁*1 + p₂*2 + p₃*3 + ... + pₙ*n) / (1+2+3+...+n)
-        // 여기서는 현재 가격과 이전 WMA를 활용한 근사 계산
-
-        // 이전 WMA와 새 가격 간의 가중 평균
-        // 새 가격에 더 높은 가중치 부여 (period에 따라 조정)
-        let weight_new = 2.0 * (self.period as f64) / ((self.period + 1) * self.period) as f64;
-        let weight_old = 1.0 - weight_new;
-
-        // 가중 평균 계산
-        self.wma = price * weight_new + self.wma * weight_old;
-
-        Some(self.wma)
     }
 }
 
@@ -300,5 +316,184 @@ mod tests {
 
         // 상승 추세에서는 WMA 값이 증가해야 함
         assert!(wma2.get() >= wma1.get());
+    }
+
+    #[test]
+    fn test_wma_exact_calculation() {
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 20.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 120.0,
+                low: 105.0,
+                close: 30.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let mut builder = WMABuilder::new(3);
+        let wma = builder.build(&candles);
+
+        // WMA = (10*1 + 20*2 + 30*3) / (1+2+3) = (10 + 40 + 90) / 6 = 140 / 6 = 23.33...
+        let expected = (10.0 * 1.0 + 20.0 * 2.0 + 30.0 * 3.0) / 6.0;
+        assert!((wma.get() - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_wma_less_data_than_period() {
+        let candles = vec![TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 105.0,
+            volume: 1000.0,
+        }];
+
+        let mut builder = WMABuilder::new(5);
+        let wma = builder.build(&candles);
+
+        // 데이터가 period보다 적으면 가중 평균 계산
+        assert!(wma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_wma_consecutive_next() {
+        let mut builder = WMABuilder::new(3);
+
+        let candle1 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 100.0,
+            volume: 1000.0,
+        };
+        let wma1 = builder.next(&candle1);
+        // 데이터가 부족하면 현재 가격 반환
+        assert_eq!(wma1.get(), 100.0);
+
+        let candle2 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 110.0,
+            volume: 1100.0,
+        };
+        let wma2 = builder.next(&candle2);
+        assert_eq!(wma2.get(), 110.0);
+
+        let candle3 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 110.0,
+            high: 120.0,
+            low: 105.0,
+            close: 120.0,
+            volume: 1200.0,
+        };
+        let wma3 = builder.next(&candle3);
+        assert!(wma3.get() > 0.0);
+        // WMA는 최신 데이터에 더 높은 가중치를 주므로 120에 가까워야 함
+        assert!(wma3.get() > 100.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "WMA 기간은 0보다 커야 합니다")]
+    fn test_wma_invalid_period() {
+        WMABuilder::<TestCandle>::new(0);
+    }
+
+    #[test]
+    fn test_wma_tabuilder_trait() {
+        let candles = create_test_candles();
+        let mut builder = WMABuilder::new(2);
+
+        let ma: Box<dyn MA> = Box::new(builder.build(&candles));
+        assert_eq!(ma.period(), 2);
+        assert!(ma.get() > 0.0);
+
+        let new_candle = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 115.0,
+            high: 130.0,
+            low: 115.0,
+            close: 125.0,
+            volume: 1300.0,
+        };
+
+        let updated_ma: Box<dyn MA> = Box::new(builder.next(&new_candle));
+        assert_eq!(updated_ma.period(), 2);
+        assert!(updated_ma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_wma_weight_distribution() {
+        let mut builder = WMABuilder::new(4);
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 20.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 120.0,
+                low: 105.0,
+                close: 30.0,
+                volume: 1200.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 120.0,
+                high: 130.0,
+                low: 115.0,
+                close: 40.0,
+                volume: 1300.0,
+            },
+        ];
+
+        let wma = builder.build(&candles);
+
+        // WMA = (10*1 + 20*2 + 30*3 + 40*4) / (1+2+3+4) = (10 + 40 + 90 + 160) / 10 = 300 / 10 = 30.0
+        let expected = (10.0 * 1.0 + 20.0 * 2.0 + 30.0 * 3.0 + 40.0 * 4.0) / 10.0;
+        assert!((wma.get() - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_wma_empty_data() {
+        let mut builder = WMABuilder::<TestCandle>::new(5);
+        let wma = builder.build(&[]);
+
+        assert_eq!(wma.get(), 0.0);
+        assert_eq!(wma.period(), 5);
     }
 }

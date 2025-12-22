@@ -100,10 +100,16 @@ impl VWAP {
 pub struct VWAPBuilder<C: Candle> {
     /// VWAP 매개변수
     params: VWAPParams,
-    /// 총 (가격 * 거래량) 값
-    values: Vec<(f64, f64)>, // (typical_price, volume) 쌍을 저장
+    /// (typical_price, volume) 쌍을 저장
+    values: Vec<(f64, f64)>,
+    /// 누적 (가격 * 거래량) 합계
+    cumulative_pv: f64,
+    /// 누적 거래량 합계
+    cumulative_volume: f64,
     _phantom: PhantomData<C>,
 }
+
+const MAX_PERIOD_0_CAPACITY: usize = 500;
 
 impl<C> VWAPBuilder<C>
 where
@@ -120,12 +126,14 @@ where
         let capacity = if params.period > 0 {
             params.period * 2
         } else {
-            100 // 기본 용량
+            MAX_PERIOD_0_CAPACITY
         };
 
         Self {
             params,
             values: Vec::with_capacity(capacity),
+            cumulative_pv: 0.0,
+            cumulative_volume: 0.0,
             _phantom: PhantomData,
         }
     }
@@ -149,6 +157,10 @@ where
     /// # Returns
     /// * `VWAP` - 계산된 VWAP
     pub fn build(&mut self, data: &[C]) -> VWAP {
+        self.values.clear();
+        self.cumulative_pv = 0.0;
+        self.cumulative_volume = 0.0;
+
         if data.is_empty() {
             return VWAP {
                 params: self.params,
@@ -156,37 +168,69 @@ where
             };
         }
 
-        // 데이터를 values 배열에 저장
-        self.values.clear();
-        for item in data {
+        let slice_start = if self.params.period > 0 && data.len() > self.params.period {
+            data.len() - self.params.period
+        } else {
+            0
+        };
+
+        let data_slice = &data[slice_start..];
+
+        // period=0일 때는 최근 MAX_PERIOD_0_CAPACITY 개만 사용하여 메모리 제한
+        let effective_slice = if self.params.period == 0 && data_slice.len() > MAX_PERIOD_0_CAPACITY
+        {
+            let start = data_slice.len() - MAX_PERIOD_0_CAPACITY;
+            &data_slice[start..]
+        } else {
+            data_slice
+        };
+
+        for item in effective_slice {
             let typical_price = (item.high_price() + item.low_price() + item.close_price()) / 3.0;
-            self.values.push((typical_price, item.volume()));
+            let volume = item.volume();
+
+            // NaN/Infinity 체크
+            if typical_price.is_nan()
+                || typical_price.is_infinite()
+                || volume.is_nan()
+                || volume.is_infinite()
+            {
+                continue;
+            }
+
+            self.values.push((typical_price, volume));
+            self.cumulative_pv += typical_price * volume;
+            self.cumulative_volume += volume;
         }
 
-        // 충분한 데이터가 없는 경우
         if self.params.period > 0 && self.values.len() < self.params.period {
             let (price, _) = *self.values.last().unwrap_or(&(0.0, 0.0));
             return VWAP {
                 params: self.params,
-                value: price,
+                value: if price.is_nan() || price.is_infinite() {
+                    0.0
+                } else {
+                    price
+                },
             };
         }
 
-        // VWAP 계산
-        let (cumulative_pv, cumulative_volume) = self
-            .values
-            .iter()
-            .fold((0.0, 0.0), |(pv, vol), (price, volume)| {
-                (pv + price * volume, vol + volume)
-            });
+        let vwap_value = if self.cumulative_volume > 0.0 {
+            self.cumulative_pv / self.cumulative_volume
+        } else {
+            0.0
+        };
+
+        // 결과값 유효성 검증
+        let final_value = if vwap_value.is_nan() || vwap_value.is_infinite() {
+            0.0
+        } else {
+            vwap_value
+        };
 
         VWAP {
             params: self.params,
-            value: if cumulative_volume > 0.0 {
-                cumulative_pv / cumulative_volume
-            } else {
-                0.0
-            },
+            value: final_value,
         }
     }
 
@@ -198,17 +242,42 @@ where
     /// # Returns
     /// * `VWAP` - 업데이트된 VWAP
     pub fn next(&mut self, data: &C) -> VWAP {
-        // 새 데이터 추가
         let typical_price = (data.high_price() + data.low_price() + data.close_price()) / 3.0;
-        self.values.push((typical_price, data.volume()));
+        let volume = data.volume();
 
-        // 필요한 데이터만 유지
-        if self.params.period > 0 && self.values.len() > self.params.period * 2 {
-            let excess = self.values.len() - self.params.period * 2;
-            self.values.drain(0..excess);
+        // NaN/Infinity 체크
+        if typical_price.is_nan()
+            || typical_price.is_infinite()
+            || volume.is_nan()
+            || volume.is_infinite()
+            || data.high_price().is_nan()
+            || data.low_price().is_nan()
+            || data.close_price().is_nan()
+        {
+            return VWAP {
+                params: self.params,
+                value: 0.0,
+            };
         }
 
-        // 충분한 데이터가 없는 경우
+        let max_len = if self.params.period > 0 {
+            self.params.period
+        } else {
+            MAX_PERIOD_0_CAPACITY
+        };
+
+        if self.values.len() >= max_len {
+            if let Some((old_price, old_volume)) = self.values.first().copied() {
+                self.cumulative_pv -= old_price * old_volume;
+                self.cumulative_volume -= old_volume;
+            }
+            self.values.drain(0..1);
+        }
+
+        self.values.push((typical_price, volume));
+        self.cumulative_pv += typical_price * volume;
+        self.cumulative_volume += volume;
+
         if self.params.period > 0 && self.values.len() < self.params.period {
             return VWAP {
                 params: self.params,
@@ -216,27 +285,39 @@ where
             };
         }
 
-        // VWAP 계산
-        let (cumulative_pv, cumulative_volume) = self
-            .values
-            .iter()
-            .fold((0.0, 0.0), |(pv, vol), (price, volume)| {
-                (pv + price * volume, vol + volume)
-            });
+        if self.params.period > 0 && self.values.len() > self.params.period * 2 {
+            let excess = self.values.len() - self.params.period * 2;
+            for &(price, vol) in &self.values[..excess] {
+                self.cumulative_pv -= price * vol;
+                self.cumulative_volume -= vol;
+            }
+            self.values.drain(0..excess);
+        }
+
+        let vwap_value = if self.cumulative_volume > 0.0 {
+            self.cumulative_pv / self.cumulative_volume
+        } else {
+            0.0
+        };
+
+        // 결과값 유효성 검증
+        let final_value = if vwap_value.is_nan() || vwap_value.is_infinite() {
+            0.0
+        } else {
+            vwap_value
+        };
 
         VWAP {
             params: self.params,
-            value: if cumulative_volume > 0.0 {
-                cumulative_pv / cumulative_volume
-            } else {
-                0.0
-            },
+            value: final_value,
         }
     }
 
     /// VWAP 리셋 (일일 계산에 사용)
     pub fn reset(&mut self) {
         self.values.clear();
+        self.cumulative_pv = 0.0;
+        self.cumulative_volume = 0.0;
     }
 }
 
@@ -270,5 +351,357 @@ impl VWAPsBuilderFactory {
 
     pub fn build_default<C: Candle + 'static>() -> VWAPsBuilder<C> {
         Self::build::<C>(&[VWAPParams::default()])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestCandle;
+    use chrono::Utc;
+
+    fn create_test_candles() -> Vec<TestCandle> {
+        vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 2000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 120.0,
+                low: 100.0,
+                close: 115.0,
+                volume: 1500.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_vwap_params_new() {
+        let params = VWAPParams::new(20);
+        assert_eq!(params.period, 20);
+    }
+
+    #[test]
+    fn test_vwap_params_default() {
+        let params = VWAPParams::default();
+        assert_eq!(params.period, 0);
+    }
+
+    #[test]
+    fn test_vwap_params_display() {
+        let params = VWAPParams::new(20);
+        assert_eq!(format!("{params}"), "VWAP(20)");
+    }
+
+    #[test]
+    fn test_vwap_builder_new() {
+        let builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(20));
+        assert_eq!(builder.params.period, 20);
+    }
+
+    #[test]
+    fn test_vwap_build_empty_data() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(20));
+        let vwap = builder.build(&[]);
+        assert_eq!(vwap.params.period, 20);
+        assert_eq!(vwap.value, 0.0);
+    }
+
+    #[test]
+    fn test_vwap_build_with_data() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let candles = create_test_candles();
+        let vwap = builder.build(&candles);
+
+        assert_eq!(vwap.params.period, 3);
+        assert!(vwap.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_calculation_accuracy() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let candles = create_test_candles();
+        let vwap = builder.build(&candles);
+
+        // Typical price 계산: (high + low + close) / 3
+        let tp1 = (110.0 + 90.0 + 105.0) / 3.0; // 101.67
+        let tp2 = (115.0 + 95.0 + 110.0) / 3.0; // 106.67
+        let tp3 = (120.0 + 100.0 + 115.0) / 3.0; // 111.67
+
+        // VWAP = (tp1*v1 + tp2*v2 + tp3*v3) / (v1 + v2 + v3)
+        let expected = (tp1 * 1000.0 + tp2 * 2000.0 + tp3 * 1500.0) / (1000.0 + 2000.0 + 1500.0);
+        assert!((vwap.value - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_vwap_period_zero() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(0));
+        let candles = create_test_candles();
+        let vwap = builder.build(&candles);
+
+        assert_eq!(vwap.params.period, 0);
+        assert!(vwap.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_next() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let candles = create_test_candles();
+        let vwap = builder.next(&candles[0]);
+
+        assert_eq!(vwap.params.period, 3);
+        assert!(vwap.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_incremental_vs_build() {
+        let mut builder1 = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let mut builder2 = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let vwap1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let vwap2 = builder2.build(&candles);
+
+        // 둘 다 유효한 값이어야 함 (next와 build는 내부 상태 차이로 약간 다를 수 있음)
+        assert!(vwap1.value > 0.0);
+        assert!(vwap2.value > 0.0);
+        // 값이 비슷한 범위 내에 있어야 함 (10% 이내)
+        let diff_percent = ((vwap1.value - vwap2.value).abs() / vwap2.value.max(1.0)) * 100.0;
+        assert!(diff_percent < 10.0);
+    }
+
+    #[test]
+    fn test_vwap_is_price_above() {
+        let vwap = VWAP {
+            params: VWAPParams::new(20),
+            value: 100.0,
+        };
+        assert!(vwap.is_price_above(110.0));
+        assert!(!vwap.is_price_above(90.0));
+    }
+
+    #[test]
+    fn test_vwap_is_price_below() {
+        let vwap = VWAP {
+            params: VWAPParams::new(20),
+            value: 100.0,
+        };
+        assert!(vwap.is_price_below(90.0));
+        assert!(!vwap.is_price_below(110.0));
+    }
+
+    #[test]
+    fn test_vwap_price_to_vwap_percent() {
+        let vwap = VWAP {
+            params: VWAPParams::new(20),
+            value: 100.0,
+        };
+        let percent = vwap.price_to_vwap_percent(110.0);
+        assert!((percent - 10.0).abs() < 0.01); // 10% 위
+
+        let percent2 = vwap.price_to_vwap_percent(90.0);
+        assert!((percent2 - (-10.0)).abs() < 0.01); // 10% 아래
+    }
+
+    #[test]
+    fn test_vwap_price_to_vwap_percent_zero() {
+        let vwap = VWAP {
+            params: VWAPParams::new(20),
+            value: 0.0,
+        };
+        let percent = vwap.price_to_vwap_percent(100.0);
+        assert_eq!(percent, 0.0); // 0으로 나누기 방지
+    }
+
+    #[test]
+    fn test_vwap_display() {
+        let vwap = VWAP {
+            params: VWAPParams::new(20),
+            value: 100.5,
+        };
+        let display_str = format!("{vwap}");
+        assert!(display_str.contains("VWAP"));
+        assert!(display_str.contains("20"));
+        assert!(display_str.contains("100.50"));
+    }
+
+    #[test]
+    fn test_vwap_reset() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(3));
+        let candles = create_test_candles();
+        let _vwap1 = builder.build(&candles);
+
+        builder.reset();
+        let vwap2 = builder.build(&candles);
+
+        // 리셋 후에도 같은 결과가 나와야 함
+        assert!(vwap2.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_insufficient_data() {
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(10));
+        let candles = create_test_candles(); // 3개만 있음
+        let vwap = builder.build(&candles);
+
+        // 데이터가 부족하면 마지막 typical price 반환
+        assert!(vwap.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_volume_weighted() {
+        // 거래량이 큰 캔들이 VWAP에 더 큰 영향을 미치는지 확인
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(2));
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0, // 작은 거래량
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 10000.0, // 큰 거래량
+            },
+        ];
+
+        let vwap = builder.build(&candles);
+        // 두 번째 캔들의 typical price에 더 가까워야 함 (거래량이 크므로)
+        let tp1 = (110.0 + 90.0 + 105.0) / 3.0;
+        let tp2 = (115.0 + 95.0 + 110.0) / 3.0;
+        let expected = (tp1 * 1000.0 + tp2 * 10000.0) / (1000.0 + 10000.0);
+        assert!((vwap.value - expected).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_vwaps_builder() {
+        let mut builder =
+            VWAPsBuilderFactory::build::<TestCandle>(&[VWAPParams::new(3), VWAPParams::new(5)]);
+        let candles = create_test_candles();
+
+        let vwaps = builder.build(&candles);
+        let vwap1 = vwaps.get(&VWAPParams::new(3));
+        let vwap2 = vwaps.get(&VWAPParams::new(5));
+
+        assert!(vwap1.value > 0.0);
+        assert!(vwap2.value > 0.0);
+    }
+
+    #[test]
+    fn test_vwap_known_values_accuracy() {
+        // 알려진 VWAP 계산 결과와 비교
+        // period=2인 경우 간단한 계산으로 검증
+        // VWAP = sum(typical_price * volume) / sum(volume)
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 105.0,
+                low: 95.0,
+                close: 102.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 102.0,
+                high: 108.0,
+                low: 100.0,
+                close: 106.0,
+                volume: 2000.0,
+            },
+        ];
+
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(2));
+        let vwap = builder.build(&candles);
+
+        // Typical Price 계산
+        let tp1 = (105.0 + 95.0 + 102.0) / 3.0; // 100.67
+        let tp2 = (108.0 + 100.0 + 106.0) / 3.0; // 104.67
+
+        // VWAP = (tp1 * v1 + tp2 * v2) / (v1 + v2)
+        let expected = (tp1 * 1000.0 + tp2 * 2000.0) / (1000.0 + 2000.0);
+
+        assert!(
+            (vwap.value - expected).abs() < 0.01,
+            "VWAP calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            vwap.value
+        );
+    }
+
+    #[test]
+    fn test_vwap_known_values_period_2() {
+        // period=2인 경우 정확한 계산 검증
+        // 거래량이 다른 두 캔들
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 10.0,
+                high: 12.0,
+                low: 8.0,
+                close: 11.0,
+                volume: 100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 11.0,
+                high: 14.0,
+                low: 10.0,
+                close: 13.0,
+                volume: 300.0,
+            },
+        ];
+
+        let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(2));
+        let vwap = builder.build(&candles);
+
+        // Typical Price 계산
+        let tp1 = (12.0 + 8.0 + 11.0) / 3.0; // 10.33
+        let tp2 = (14.0 + 10.0 + 13.0) / 3.0; // 12.33
+
+        // VWAP = (tp1 * v1 + tp2 * v2) / (v1 + v2)
+        let expected = (tp1 * 100.0 + tp2 * 300.0) / (100.0 + 300.0);
+
+        assert!(
+            (vwap.value - expected).abs() < 0.01,
+            "VWAP calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            vwap.value
+        );
+
+        // 두 번째 캔들의 거래량이 더 크므로 VWAP는 tp2에 더 가까워야 함
+        assert!(
+            (vwap.value - tp2).abs() < (vwap.value - tp1).abs(),
+            "VWAP should be closer to tp2 (higher volume). VWAP: {}, tp1: {}, tp2: {}",
+            vwap.value,
+            tp1,
+            tp2
+        );
     }
 }

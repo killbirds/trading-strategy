@@ -196,7 +196,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Returns
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
     ///
-
     fn is_all(&self, is_fn: impl Fn(&Data) -> bool, n: usize, p: usize) -> bool {
         let data = self.datum();
         // 데이터 길이 검증
@@ -218,7 +217,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Returns
     /// * `bool` - 돌파 패턴이 확인되면 true
     ///
-
     fn is_break_through_by_satisfying(
         &self,
         is_fn: impl Fn(&Data) -> bool + Copy,

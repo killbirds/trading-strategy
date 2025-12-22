@@ -126,13 +126,32 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         println!("+DI values: {pdi_values:?}");
         println!("-DI values: {ndi_values:?}");
 
-        // ADX 증가 추세 또는 최대값(100) 유지 확인
+        // ADX 증가 추세 또는 높은 값에서 안정적 유지 확인
+        // ADX가 이미 매우 높은 값(80 이상)인 경우, 작은 감소에도 불구하고 높은 값을 유지하는 것도 추세 강화로 간주
         let mut adx_increasing = true;
-        for i in 1..=n {
-            // 현재 값이 이전 값보다 작고, 이전 값이 100이 아닌 경우 증가 추세가 아님
-            if adx_values[i] < adx_values[i - 1] && adx_values[i - 1] < 100.0 {
-                adx_increasing = false;
-                break;
+        let mut adx_stable_high = false;
+
+        // 평균 ADX 값 계산
+        let avg_adx: f64 = adx_values.iter().sum::<f64>() / adx_values.len() as f64;
+
+        // ADX가 매우 높은 값에서 시작하는 경우 (80 이상)
+        if avg_adx >= 80.0 {
+            // 높은 값에서 안정적으로 유지되는지 확인 (변동폭이 작고 최소값이 80 이상)
+            let min_adx = adx_values.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+            let max_adx = adx_values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+            let adx_range = max_adx - min_adx;
+
+            // 높은 값에서 안정적으로 유지되거나 (변동폭이 작음) 또는 증가하는 경우
+            adx_stable_high =
+                min_adx >= 80.0 && (adx_range < 5.0 || adx_values[0] >= adx_values[n]);
+        } else {
+            // 일반적인 경우: ADX가 증가하는지 확인
+            for i in 1..=n {
+                // 현재 값이 이전 값보다 작고, 이전 값이 100이 아닌 경우 증가 추세가 아님
+                if adx_values[i] < adx_values[i - 1] && adx_values[i - 1] < 100.0 {
+                    adx_increasing = false;
+                    break;
+                }
             }
         }
 
@@ -150,11 +169,12 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
 
         // 디버그 로깅
         println!(
-            "ADX increasing: {adx_increasing}, DI strength: {di_strength}, ADX strong: {adx_strong}"
+            "ADX increasing: {adx_increasing}, ADX stable high: {adx_stable_high}, DI strength: {di_strength}, ADX strong: {adx_strong}"
         );
 
         // 모든 조건을 만족해야 추세 강화로 판단
-        adx_increasing && di_strength && adx_strong
+        // 높은 값에서 안정적으로 유지되는 경우도 추세 강화로 간주
+        (adx_increasing || adx_stable_high) && di_strength && adx_strong
     }
 
     /// 추세 강도가 감소하는지 확인 (현재 ADX가 이전 ADX보다 작은지)

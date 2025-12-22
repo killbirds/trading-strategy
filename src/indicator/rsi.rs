@@ -4,42 +4,6 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
 
-/// RSI 계산 함수
-fn calculate_rsi(values: &[f64], period: usize) -> f64 {
-    if values.len() < period + 1 {
-        return 50.0;
-    }
-
-    let mut gains = Vec::with_capacity(values.len());
-    let mut losses = Vec::with_capacity(values.len());
-
-    // 가격 변화량 계산
-    for i in 1..values.len() {
-        let change = values[i] - values[i - 1];
-        gains.push(if change > 0.0 { change } else { 0.0 });
-        losses.push(if change < 0.0 { -change } else { 0.0 });
-    }
-
-    // 첫 번째 평균 게인/로스 계산
-    let mut avg_gain = gains.iter().take(period).sum::<f64>() / period as f64;
-    let mut avg_loss = losses.iter().take(period).sum::<f64>() / period as f64;
-
-    // 나머지 기간에 대해 지수이동평균으로 업데이트
-    for i in period..gains.len() {
-        let smoothing_factor = 1.0 / period as f64;
-        avg_gain = (avg_gain * (1.0 - smoothing_factor)) + (gains[i] * smoothing_factor);
-        avg_loss = (avg_loss * (1.0 - smoothing_factor)) + (losses[i] * smoothing_factor);
-    }
-
-    // RSI 계산
-    if avg_loss < 0.000001 {
-        return 100.0;
-    }
-
-    let rs = avg_gain / avg_loss;
-    100.0 - (100.0 / (1.0 + rs))
-}
-
 /// 상대강도지수(RSI) 기술적 지표 빌더
 ///
 /// RSI 지표를 계산하고 업데이트하는 빌더
@@ -47,8 +11,12 @@ fn calculate_rsi(values: &[f64], period: usize) -> f64 {
 pub struct RSIBuilder<C: Candle> {
     /// RSI 계산 기간
     period: usize,
-    /// RSI 계산을 위한 내부 지표 객체
+    /// 종가 데이터 (최근 period + 1개만 유지)
     values: Vec<f64>,
+    /// 이전 평균 게인 (Wilder's smoothing용)
+    previous_avg_gain: Option<f64>,
+    /// 이전 평균 로스 (Wilder's smoothing용)
+    previous_avg_loss: Option<f64>,
     _phantom: PhantomData<C>,
 }
 
@@ -144,7 +112,9 @@ where
 
         Self {
             period,
-            values: Vec::with_capacity(period * 2),
+            values: Vec::with_capacity(period + 2),
+            previous_avg_gain: None,
+            previous_avg_loss: None,
             _phantom: PhantomData,
         }
     }
@@ -175,26 +145,98 @@ where
             };
         }
 
-        // 데이터를 values 배열에 저장
+        // 상태 초기화
         self.values.clear();
-        for item in data {
-            self.values.push(item.close_price());
-        }
+        self.previous_avg_gain = None;
+        self.previous_avg_loss = None;
 
-        // 충분한 데이터가 없는 경우
-        if self.values.len() < self.period {
-            return RSI {
-                period: self.period,
-                value: 50.0,
-            };
+        // 데이터를 순차적으로 처리하여 RSI 계산
+        let mut rsi_value = 50.0;
+        for candle in data {
+            rsi_value = self.next_value(candle);
         }
-
-        // RSI 계산
-        let rsi = calculate_rsi(&self.values, self.period);
 
         RSI {
             period: self.period,
-            value: rsi,
+            value: rsi_value,
+        }
+    }
+
+    /// 다음 캔들 데이터로 RSI 값 계산 (내부용)
+    fn next_value(&mut self, candle: &C) -> f64 {
+        // 새 가격 추가
+        self.values.push(candle.close_price());
+
+        // 필요한 데이터만 유지 (period + 1개만 필요)
+        if self.values.len() > self.period + 1 {
+            let excess = self.values.len() - (self.period + 1);
+            self.values.drain(0..excess);
+        }
+
+        // 충분한 데이터가 없는 경우 (최소 2개 필요)
+        if self.values.len() < 2 {
+            return 50.0;
+        }
+
+        // 가격 변화량 계산
+        let idx = self.values.len() - 1;
+        let change = self.values[idx] - self.values[idx - 1];
+        let gain = if change > 0.0 { change } else { 0.0 };
+        let loss = if change < 0.0 { -change } else { 0.0 };
+
+        // RSI 계산 (Wilder's smoothing)
+        let (avg_gain, avg_loss) = if let (Some(prev_avg_gain), Some(prev_avg_loss)) =
+            (self.previous_avg_gain, self.previous_avg_loss)
+        {
+            // Wilder's smoothing으로 업데이트
+            // avg = (prev_avg * (period - 1) + current) / period
+            let new_avg_gain =
+                (prev_avg_gain * (self.period as f64 - 1.0) + gain) / self.period as f64;
+            let new_avg_loss =
+                (prev_avg_loss * (self.period as f64 - 1.0) + loss) / self.period as f64;
+            (new_avg_gain, new_avg_loss)
+        } else if self.values.len() > self.period {
+            // 처음 계산할 때는 period개의 gain/loss 평균 사용
+            let mut gain_sum = 0.0;
+            let mut loss_sum = 0.0;
+            for i in 1..=self.period {
+                let ch = self.values[i] - self.values[i - 1];
+                gain_sum += if ch > 0.0 { ch } else { 0.0 };
+                loss_sum += if ch < 0.0 { -ch } else { 0.0 };
+            }
+            (gain_sum / self.period as f64, loss_sum / self.period as f64)
+        } else {
+            // 충분한 데이터가 없는 경우
+            return 50.0;
+        };
+
+        // 계산된 평균값 저장
+        self.previous_avg_gain = Some(avg_gain);
+        self.previous_avg_loss = Some(avg_loss);
+
+        // RSI 계산
+        // avg_loss가 0에 가까우면 RSI는 100에 가까워짐
+        if avg_loss < 0.000001 {
+            return 100.0;
+        }
+
+        // NaN/Infinity 체크
+        if avg_gain.is_nan()
+            || avg_loss.is_nan()
+            || avg_gain.is_infinite()
+            || avg_loss.is_infinite()
+        {
+            return 50.0;
+        }
+
+        let rs = avg_gain / avg_loss;
+        let rsi = 100.0 - (100.0 / (1.0 + rs));
+
+        // 결과값 유효성 검증
+        if rsi.is_nan() || rsi.is_infinite() {
+            50.0
+        } else {
+            rsi.clamp(0.0, 100.0)
         }
     }
 
@@ -206,29 +248,10 @@ where
     /// # Returns
     /// * `RSI` - 업데이트된 RSI 지표
     pub fn next(&mut self, data: &C) -> RSI {
-        // 새 가격 추가
-        self.values.push(data.close_price());
-
-        // 필요한 데이터만 유지
-        if self.values.len() > self.period * 2 {
-            let excess = self.values.len() - self.period * 2;
-            self.values.drain(0..excess);
-        }
-
-        // 충분한 데이터가 없는 경우
-        if self.values.len() < self.period {
-            return RSI {
-                period: self.period,
-                value: 50.0,
-            };
-        }
-
-        // RSI 계산
-        let rsi = calculate_rsi(&self.values, self.period);
-
+        let rsi_value = self.next_value(data);
         RSI {
             period: self.period,
-            value: rsi,
+            value: rsi_value,
         }
     }
 }
@@ -409,5 +432,257 @@ mod tests {
             let rsi = builder.next(candle);
             assert!(rsi.value() >= 0.0 && rsi.value() <= 100.0);
         }
+    }
+
+    #[test]
+    fn test_rsi_all_gains() {
+        // 모든 가격이 상승하는 경우 RSI는 100에 가까워야 함
+        let mut builder = RSIBuilder::<TestCandle>::new(2);
+        let mut candles = Vec::new();
+        let base_price = 100.0;
+
+        for i in 0..10 {
+            candles.push(TestCandle {
+                timestamp: Utc::now().timestamp() + i as i64,
+                open: base_price + i as f64,
+                high: base_price + i as f64 + 1.0,
+                low: base_price + i as f64 - 0.5,
+                close: base_price + (i + 1) as f64,
+                volume: 1000.0,
+            });
+        }
+
+        let rsi = builder.build(&candles);
+        assert!(rsi.value() > 50.0);
+        assert!(rsi.value() <= 100.0);
+    }
+
+    #[test]
+    fn test_rsi_all_losses() {
+        // 모든 가격이 하락하는 경우 RSI는 0에 가까워야 함
+        let mut builder = RSIBuilder::<TestCandle>::new(2);
+        let mut candles = Vec::new();
+        let base_price = 100.0;
+
+        for i in 0..10 {
+            candles.push(TestCandle {
+                timestamp: Utc::now().timestamp() + i as i64,
+                open: base_price - i as f64,
+                high: base_price - i as f64 + 0.5,
+                low: base_price - i as f64 - 1.0,
+                close: base_price - (i + 1) as f64,
+                volume: 1000.0,
+            });
+        }
+
+        let rsi = builder.build(&candles);
+        assert!(rsi.value() < 50.0);
+        assert!(rsi.value() >= 0.0);
+    }
+
+    #[test]
+    fn test_rsi_incremental_vs_build() {
+        // next를 여러 번 호출한 결과와 build를 한 번 호출한 결과가 같아야 함
+        let mut builder1 = RSIBuilder::<TestCandle>::new(14);
+        let mut builder2 = RSIBuilder::<TestCandle>::new(14);
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let rsi1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let rsi2 = builder2.build(&candles);
+
+        // 마지막 값이 같아야 함 (약간의 부동소수점 오차 허용)
+        assert!((rsi1.value() - rsi2.value()).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_rsi_period_2_known_values() {
+        // period=2인 경우 알려진 값으로 테스트
+        let mut builder = RSIBuilder::<TestCandle>::new(2);
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 105.0,
+                low: 95.0,
+                close: 102.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 102.0,
+                high: 107.0,
+                low: 97.0,
+                close: 105.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 105.0,
+                high: 110.0,
+                low: 100.0,
+                close: 108.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let rsi = builder.build(&candles);
+        assert!(rsi.value() >= 0.0 && rsi.value() <= 100.0);
+        // period=2이고 모든 가격이 상승하므로 RSI는 높아야 함
+        assert!(rsi.value() > 50.0);
+    }
+
+    #[test]
+    fn test_rsi_empty_data() {
+        let mut builder = RSIBuilder::<TestCandle>::new(14);
+        let empty: Vec<TestCandle> = vec![];
+        let rsi = builder.build(&empty);
+        assert_eq!(rsi.value(), 50.0);
+        assert_eq!(rsi.period(), 14);
+    }
+
+    #[test]
+    fn test_rsi_insufficient_data() {
+        let mut builder = RSIBuilder::<TestCandle>::new(14);
+        let candles = vec![TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 105.0,
+            low: 95.0,
+            close: 102.0,
+            volume: 1000.0,
+        }];
+        let rsi = builder.build(&candles);
+        assert_eq!(rsi.value(), 50.0);
+    }
+
+    #[test]
+    fn test_rsi_known_values_accuracy() {
+        // 알려진 RSI 계산 결과와 비교
+        // period=2인 경우 간단한 계산으로 검증
+        // 데이터: [100, 102, 104, 106, 108] (모두 상승)
+        // period=2일 때:
+        // - 첫 2개 변화: +2, +2
+        // - avg_gain = (2+2)/2 = 2.0, avg_loss = 0.0
+        // - RS = 2.0/0.0 = inf, RSI = 100.0
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 102.0,
+                low: 99.0,
+                close: 100.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 100.0,
+                high: 103.0,
+                low: 99.0,
+                close: 102.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 102.0,
+                high: 105.0,
+                low: 101.0,
+                close: 104.0,
+                volume: 1200.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 3,
+                open: 104.0,
+                high: 107.0,
+                low: 103.0,
+                close: 106.0,
+                volume: 1300.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 4,
+                open: 106.0,
+                high: 109.0,
+                low: 105.0,
+                close: 108.0,
+                volume: 1400.0,
+            },
+        ];
+
+        let mut builder = RSIBuilder::<TestCandle>::new(2);
+        let rsi = builder.build(&candles);
+
+        // 모든 가격이 상승하므로 RSI는 100에 가까워야 함
+        assert!(
+            rsi.value() > 90.0,
+            "RSI should be high for all gains. Got: {}",
+            rsi.value()
+        );
+    }
+
+    #[test]
+    fn test_rsi_known_values_period_2() {
+        // period=2인 경우 정확한 계산 검증
+        // 데이터: [100, 98, 96, 94, 92] (모두 하락)
+        // period=2일 때:
+        // - 첫 2개 변화: -2, -2
+        // - avg_gain = 0.0, avg_loss = (2+2)/2 = 2.0
+        // - RS = 0.0/2.0 = 0.0, RSI = 100 - 100/(1+0) = 0.0
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 101.0,
+                low: 97.0,
+                close: 100.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 100.0,
+                high: 99.0,
+                low: 97.0,
+                close: 98.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 98.0,
+                high: 97.0,
+                low: 95.0,
+                close: 96.0,
+                volume: 1200.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 3,
+                open: 96.0,
+                high: 95.0,
+                low: 93.0,
+                close: 94.0,
+                volume: 1300.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 4,
+                open: 94.0,
+                high: 93.0,
+                low: 91.0,
+                close: 92.0,
+                volume: 1400.0,
+            },
+        ];
+
+        let mut builder = RSIBuilder::<TestCandle>::new(2);
+        let rsi = builder.build(&candles);
+
+        // 모든 가격이 하락하므로 RSI는 0에 가까워야 함
+        assert!(
+            rsi.value() < 10.0,
+            "RSI should be low for all losses. Got: {}",
+            rsi.value()
+        );
     }
 }

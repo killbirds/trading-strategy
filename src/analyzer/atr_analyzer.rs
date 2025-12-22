@@ -35,20 +35,20 @@ impl<C: Candle> AnalyzerDataOps<C> for ATRAnalyzerData<C> {}
 
 /// ATR 분석기
 #[derive(Debug)]
-pub struct ATRAnalyzer<C: Candle> {
+pub struct ATRAnalyzer<C: Candle + 'static> {
     /// ATR 빌더
     pub atrsbuilder: ATRsBuilder<C>,
     /// 분석 데이터 히스토리
     pub items: Vec<ATRAnalyzerData<C>>,
 }
 
-impl<C: Candle> Display for ATRAnalyzer<C> {
+impl<C: Candle + 'static> Display for ATRAnalyzer<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ATRAnalyzer {{ items: {} }}", self.items.len())
     }
 }
 
-impl<C: Candle> ATRAnalyzer<C> {
+impl<C: Candle + 'static> ATRAnalyzer<C> {
     /// 새 ATR 분석기 생성
     pub fn new(periods: &[usize], storage: &CandleStore<C>) -> ATRAnalyzer<C> {
         let atrsbuilder = ATRsBuilderFactory::build(periods);
@@ -268,7 +268,6 @@ impl<C: Candle> ATRAnalyzer<C> {
     /// # Returns
     /// * `bool` - n개 연속으로 고변동성이면 true
     ///
-
     pub fn is_high_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
@@ -291,7 +290,6 @@ impl<C: Candle> ATRAnalyzer<C> {
     /// # Returns
     /// * `bool` - n개 연속으로 저변동성이면 true
     ///
-
     pub fn is_low_volatility(&self, n: usize, period: usize, threshold: f64, p: usize) -> bool {
         self.is_all(
             |data| {
@@ -334,7 +332,7 @@ impl<C: Candle> ATRAnalyzer<C> {
     }
 }
 
-impl<C: Candle> AnalyzerOps<ATRAnalyzerData<C>, C> for ATRAnalyzer<C> {
+impl<C: Candle + 'static> AnalyzerOps<ATRAnalyzerData<C>, C> for ATRAnalyzer<C> {
     fn next_data(&mut self, candle: C) -> ATRAnalyzerData<C> {
         let atrs = self.atrsbuilder.next(&candle);
         ATRAnalyzerData::new(candle, atrs)

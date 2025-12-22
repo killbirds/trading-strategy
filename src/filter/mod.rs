@@ -923,7 +923,7 @@ mod tests {
     // 실제 필터 사용 예시를 보여주는 함수
     fn test_example_filter_usage() {
         // 빌더 함수를 사용한 필터 생성
-        let filter_list = vec![
+        let filter_list = [
             // RSI 과매수 필터 (RSI > 70인 코인 제외)
             create_rsi_filter(14, 30.0, 70.0, 0, 1),
             // 이동평균선 필터 (5일선이 20일선 위에 있을 때)
@@ -1027,7 +1027,7 @@ mod tests {
     #[test]
     fn test_copys_filter_usage() {
         // CopyS 필터 사용 예시
-        let copys_filters = vec![
+        let copys_filters = [
             // CopyS 매수 신호 필터
             create_copys_filter(14, 70.0, 30.0, 0, 2),
             // CopyS 매도 신호 필터

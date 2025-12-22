@@ -73,15 +73,16 @@ fn test_adx_strong_trend() {
     let mut analyzer = ADXAnalyzer::new(&periods, &storage);
 
     // 강한 상승 추세를 나타내는 캔들 데이터 생성
-    for i in 0..20 {
-        let price = 100.0 + i as f64;
+    // ADX가 제대로 계산되려면 명확한 방향성 움직임이 필요함 (close != open)
+    for i in 0..30 {
+        let base_price = 100.0 + (i as f64 * 2.0);
         let candle = TestCandle {
             timestamp: i as i64,
-            open: price,
-            high: price + 1.0,
-            low: price - 1.0,
-            close: price,
-            volume: 1000.0,
+            open: base_price - 1.0,
+            high: base_price + 2.0,
+            low: base_price - 2.0,
+            close: base_price + 1.0, // 상승 추세: close > open
+            volume: 1000.0 + (i * 100) as f64,
         };
         storage.add(candle);
     }

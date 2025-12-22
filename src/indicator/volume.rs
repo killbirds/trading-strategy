@@ -31,6 +31,56 @@ pub struct Volume {
     pub volume_ratio: f64,
 }
 
+impl Volume {
+    /// 볼륨 기간 반환
+    ///
+    /// # Returns
+    /// * `usize` - 볼륨 계산 기간
+    pub fn period(&self) -> usize {
+        self.period
+    }
+
+    /// 고거래량 상태인지 확인
+    ///
+    /// # Arguments
+    /// * `threshold` - 고거래량 기준값 (기본값 1.5)
+    ///
+    /// # Returns
+    /// * `bool` - 고거래량 여부
+    pub fn is_high_volume(&self, threshold: Option<f64>) -> bool {
+        let threshold_value = threshold.unwrap_or(1.5);
+        self.volume_ratio >= threshold_value
+    }
+
+    /// 저거래량 상태인지 확인
+    ///
+    /// # Arguments
+    /// * `threshold` - 저거래량 기준값 (기본값 0.5)
+    ///
+    /// # Returns
+    /// * `bool` - 저거래량 여부
+    pub fn is_low_volume(&self, threshold: Option<f64>) -> bool {
+        let threshold_value = threshold.unwrap_or(0.5);
+        self.volume_ratio <= threshold_value
+    }
+
+    /// 평균 거래량 이상인지 확인
+    ///
+    /// # Returns
+    /// * `bool` - 평균 이상 여부
+    pub fn is_above_average(&self) -> bool {
+        self.volume_ratio >= 1.0
+    }
+
+    /// 평균 거래량 이하인지 확인
+    ///
+    /// # Returns
+    /// * `bool` - 평균 이하 여부
+    pub fn is_below_average(&self) -> bool {
+        self.volume_ratio <= 1.0
+    }
+}
+
 impl Display for Volume {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -60,8 +110,58 @@ where
         VolumeBuilder {
             period,
             accumulated_volume: 0.0,
-            data_buffer: Vec::with_capacity(period),
+            data_buffer: Vec::with_capacity(period * 2),
             _phantom: PhantomData,
+        }
+    }
+
+    /// 평균 거래량 계산
+    ///
+    /// # Arguments
+    /// * `count` - 데이터 개수
+    ///
+    /// # Returns
+    /// * `f64` - 평균 거래량
+    fn calculate_average_volume(&self, count: usize) -> f64 {
+        if count > 0 {
+            self.accumulated_volume / count as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// 볼륨 비율 계산
+    ///
+    /// # Arguments
+    /// * `current_volume` - 현재 거래량
+    /// * `average_volume` - 평균 거래량
+    ///
+    /// # Returns
+    /// * `f64` - 볼륨 비율
+    fn calculate_volume_ratio(&self, current_volume: f64, average_volume: f64) -> f64 {
+        if average_volume > 0.0 {
+            current_volume / average_volume
+        } else {
+            1.0
+        }
+    }
+
+    /// Volume 구조체 생성
+    ///
+    /// # Arguments
+    /// * `current_volume` - 현재 거래량
+    ///
+    /// # Returns
+    /// * `Volume` - 생성된 볼륨 지표
+    fn create_volume(&self, current_volume: f64) -> Volume {
+        let average_volume = self.calculate_average_volume(self.data_buffer.len());
+        let volume_ratio = self.calculate_volume_ratio(current_volume, average_volume);
+
+        Volume {
+            period: self.period,
+            average_volume,
+            current_volume,
+            volume_ratio,
         }
     }
 
@@ -93,7 +193,7 @@ where
                 period: self.period,
                 average_volume: 0.0,
                 current_volume: 0.0,
-                volume_ratio: 1.0, // 기본값
+                volume_ratio: 1.0,
             };
         }
 
@@ -104,35 +204,15 @@ where
             0
         };
 
+        // 필요한 데이터만 버퍼에 추가 (next() 호출을 위해)
         for candle in &data[slice_start..] {
-            self.data_buffer.push(candle.volume());
-            self.accumulated_volume += candle.volume();
+            let volume = candle.volume();
+            self.data_buffer.push(volume);
+            self.accumulated_volume += volume;
         }
 
-        let current_volume = if let Some(last) = data.last() {
-            last.volume()
-        } else {
-            0.0
-        };
-
-        let average_volume = if !self.data_buffer.is_empty() {
-            self.accumulated_volume / self.data_buffer.len() as f64
-        } else {
-            0.0
-        };
-
-        let volume_ratio = if average_volume > 0.0 {
-            current_volume / average_volume
-        } else {
-            1.0
-        };
-
-        Volume {
-            period: self.period,
-            average_volume,
-            current_volume,
-            volume_ratio,
-        }
+        let current_volume = data.last().map(|c| c.volume()).unwrap_or(0.0);
+        self.create_volume(current_volume)
     }
 
     /// 새 캔들 데이터로 볼륨 지표 업데이트
@@ -143,36 +223,30 @@ where
     /// # Returns
     /// * `Volume` - 업데이트된 볼륨 지표
     pub fn next(&mut self, data: &C) -> Volume {
+        let current_volume = data.volume();
+
+        // period를 초과하는 경우 가장 오래된 데이터 제거
         if self.data_buffer.len() >= self.period {
-            // 가장 오래된 데이터 제거
-            if let Some(oldest) = self.data_buffer.first().cloned() {
+            if let Some(oldest) = self.data_buffer.first().copied() {
                 self.accumulated_volume -= oldest;
             }
-            self.data_buffer.remove(0);
+            self.data_buffer.drain(0..1);
         }
 
-        let current_volume = data.volume();
+        // 새 데이터 추가
         self.data_buffer.push(current_volume);
         self.accumulated_volume += current_volume;
 
-        let average_volume = if !self.data_buffer.is_empty() {
-            self.accumulated_volume / self.data_buffer.len() as f64
-        } else {
-            0.0
-        };
-
-        let volume_ratio = if average_volume > 0.0 {
-            current_volume / average_volume
-        } else {
-            1.0
-        };
-
-        Volume {
-            period: self.period,
-            average_volume,
-            current_volume,
-            volume_ratio,
+        // 버퍼 크기 제한 (period * 2로 제한하여 효율성 유지)
+        if self.data_buffer.len() > self.period * 2 {
+            let excess = self.data_buffer.len() - self.period * 2;
+            for &volume in &self.data_buffer[..excess] {
+                self.accumulated_volume -= volume;
+            }
+            self.data_buffer.drain(0..excess);
         }
+
+        self.create_volume(current_volume)
     }
 }
 
@@ -350,5 +424,186 @@ mod tests {
         let vol3 = builder.next(&candles[2]);
         assert_eq!(vol3.average_volume, 1150.0); // (1100 + 1200) / 2
         assert_eq!(vol3.current_volume, 1200.0);
+    }
+
+    #[test]
+    fn test_volume_period() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 1200.0,
+            volume_ratio: 1.2,
+        };
+        assert_eq!(volume.period(), 20);
+    }
+
+    #[test]
+    fn test_volume_is_high_volume() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 1600.0,
+            volume_ratio: 1.6,
+        };
+        assert!(volume.is_high_volume(None));
+        assert!(volume.is_high_volume(Some(1.5)));
+        assert!(!volume.is_high_volume(Some(2.0)));
+    }
+
+    #[test]
+    fn test_volume_is_low_volume() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 400.0,
+            volume_ratio: 0.4,
+        };
+        assert!(volume.is_low_volume(None));
+        assert!(volume.is_low_volume(Some(0.5)));
+        assert!(!volume.is_low_volume(Some(0.3)));
+    }
+
+    #[test]
+    fn test_volume_is_above_average() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 1200.0,
+            volume_ratio: 1.2,
+        };
+        assert!(volume.is_above_average());
+        assert!(!volume.is_below_average());
+    }
+
+    #[test]
+    fn test_volume_is_below_average() {
+        let volume = Volume {
+            period: 20,
+            average_volume: 1000.0,
+            current_volume: 800.0,
+            volume_ratio: 0.8,
+        };
+        assert!(!volume.is_above_average());
+        assert!(volume.is_below_average());
+    }
+
+    #[test]
+    fn test_volume_known_values_accuracy() {
+        // 알려진 Volume 계산 결과와 비교
+        // period=2인 경우 간단한 계산으로 검증
+        // 평균 거래량 = (v1 + v2) / 2
+        // 거래량 비율 = 현재 거래량 / 평균 거래량
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1500.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 110.0,
+                high: 120.0,
+                low: 100.0,
+                close: 115.0,
+                volume: 2000.0,
+            },
+        ];
+
+        let mut builder = VolumeBuilder::<TestCandle>::new(2);
+        let volume = builder.build(&candles);
+
+        // 평균 거래량 = (1500 + 2000) / 2 = 1750
+        let expected_avg = (1500.0 + 2000.0) / 2.0;
+        assert!(
+            (volume.average_volume - expected_avg).abs() < 0.01,
+            "Average volume calculation mismatch. Expected: {}, Got: {}",
+            expected_avg,
+            volume.average_volume
+        );
+
+        // 현재 거래량 = 2000
+        assert_eq!(
+            volume.current_volume, 2000.0,
+            "Current volume should be 2000. Got: {}",
+            volume.current_volume
+        );
+
+        // 거래량 비율 = 2000 / 1750 = 1.143
+        let expected_ratio = 2000.0 / expected_avg;
+        assert!(
+            (volume.volume_ratio - expected_ratio).abs() < 0.01,
+            "Volume ratio calculation mismatch. Expected: {}, Got: {}",
+            expected_ratio,
+            volume.volume_ratio
+        );
+    }
+
+    #[test]
+    fn test_volume_known_values_period_2() {
+        // period=2인 경우 정확한 계산 검증
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 500.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1000.0,
+            },
+        ];
+
+        let mut builder = VolumeBuilder::<TestCandle>::new(2);
+        let volume = builder.build(&candles);
+
+        // 평균 거래량 = (500 + 1000) / 2 = 750
+        let expected_avg = (500.0 + 1000.0) / 2.0;
+        assert!(
+            (volume.average_volume - expected_avg).abs() < 0.01,
+            "Average volume calculation mismatch. Expected: {}, Got: {}",
+            expected_avg,
+            volume.average_volume
+        );
+
+        // 현재 거래량 = 1000
+        assert_eq!(
+            volume.current_volume, 1000.0,
+            "Current volume should be 1000. Got: {}",
+            volume.current_volume
+        );
+
+        // 거래량 비율 = 1000 / 750 = 1.333
+        let expected_ratio = 1000.0 / expected_avg;
+        assert!(
+            (volume.volume_ratio - expected_ratio).abs() < 0.01,
+            "Volume ratio calculation mismatch. Expected: {}, Got: {}",
+            expected_ratio,
+            volume.volume_ratio
+        );
+
+        // 거래량이 평균보다 높으므로 is_above_average는 true
+        assert!(
+            volume.is_above_average(),
+            "Volume should be above average. Ratio: {}",
+            volume.volume_ratio
+        );
     }
 }

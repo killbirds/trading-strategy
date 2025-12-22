@@ -52,7 +52,7 @@ impl BollingerBandsIndicator {
         Self {
             period,
             multiplier,
-            values: Vec::with_capacity(period * 2),
+            values: Vec::with_capacity(period + 1),
         }
     }
 
@@ -60,9 +60,9 @@ impl BollingerBandsIndicator {
         let price = input.close_price();
         self.values.push(price);
 
-        // 필요한 데이터만 유지
-        if self.values.len() > self.period * 2 {
-            let excess = self.values.len() - self.period * 2;
+        // 필요한 데이터만 유지 (period만 필요)
+        if self.values.len() > self.period {
+            let excess = self.values.len() - self.period;
             self.values.drain(0..excess);
         }
 
@@ -81,14 +81,36 @@ impl BollingerBandsIndicator {
         // 표준편차 계산
         let std_dev = calculate_standard_deviation(&self.values, self.period);
 
+        // NaN/Infinity 체크
+        if mean.is_nan() || mean.is_infinite() || std_dev.is_nan() || std_dev.is_infinite() {
+            return BollingerBandsOutput {
+                average: price,
+                upper: price,
+                lower: price,
+            };
+        }
+
         // 볼린저 밴드 계산
         let upper = mean + (std_dev * self.multiplier);
         let lower = mean - (std_dev * self.multiplier);
 
+        // 결과값 유효성 검증
         BollingerBandsOutput {
-            average: mean,
-            upper,
-            lower,
+            average: if mean.is_nan() || mean.is_infinite() {
+                price
+            } else {
+                mean
+            },
+            upper: if upper.is_nan() || upper.is_infinite() {
+                price
+            } else {
+                upper
+            },
+            lower: if lower.is_nan() || lower.is_infinite() {
+                price
+            } else {
+                lower
+            },
         }
     }
 }
@@ -148,11 +170,30 @@ impl BollingerBands {
         self.lower
     }
 
+    /// 계산 기간 반환
+    ///
+    /// # Returns
+    /// * `usize` - 볼린저 밴드 계산 기간
+    pub fn period(&self) -> usize {
+        self.period
+    }
+
+    /// 표준편차 승수 반환
+    ///
+    /// # Returns
+    /// * `f64` - 표준편차 승수
+    pub fn multiplier(&self) -> f64 {
+        self.multiplier
+    }
+
     /// 현재 밴드폭 계산
     ///
     /// # Returns
     /// * `f64` - 밴드폭 (상단 - 하단) / 중간
     pub fn bandwidth(&self) -> f64 {
+        if self.middle().abs() < f64::EPSILON {
+            return 0.0;
+        }
         (self.upper() - self.lower()) / self.middle()
     }
 
@@ -237,7 +278,6 @@ where
     /// * `BollingerBands` - 계산된 볼린저 밴드 지표
     pub fn build(&mut self, data: &[C]) -> BollingerBands {
         if data.is_empty() {
-            // 빈 데이터의 경우 기본값 반환 (모든 밴드가 0인 볼린저 밴드)
             return BollingerBands {
                 middle: 0.0,
                 upper: 0.0,
@@ -247,6 +287,9 @@ where
             };
         }
 
+        // 인디케이터 초기화
+        self.indicator.values.clear();
+
         let bband = data.iter().fold(
             BollingerBandsOutput {
                 average: 0.0,
@@ -255,6 +298,20 @@ where
             },
             |_, item| self.indicator.next(item),
         );
+
+        // 충분한 데이터가 없는 경우 마지막 가격 사용
+        if self.indicator.values.len() < self.period
+            && let Some(last_candle) = data.last()
+        {
+            let price = last_candle.close_price();
+            return BollingerBands {
+                middle: price,
+                upper: price,
+                lower: price,
+                period: self.period,
+                multiplier: self.multiplier,
+            };
+        }
 
         BollingerBands {
             middle: bband.average,
@@ -531,5 +588,142 @@ mod tests {
         let high_vol = builder.build(&high_vol_candles);
         let high_bandwidth = high_vol.bandwidth();
         assert!(high_bandwidth > low_bandwidth); // 높은 변동성에서 밴드폭이 큼
+    }
+
+    #[test]
+    fn test_bband_period_and_multiplier() {
+        let mut builder = BollingerBandsBuilder::<TestCandle>::new(20, 2.5);
+        let candles = create_test_candles();
+        let bband = builder.build(&candles);
+
+        assert_eq!(bband.period(), 20);
+        assert_eq!(bband.multiplier(), 2.5);
+    }
+
+    #[test]
+    fn test_bband_known_values_accuracy() {
+        // 알려진 볼린저 밴드 계산 결과와 비교
+        // period=3, multiplier=2.0인 경우
+        // 데이터: [10.0, 11.0, 12.0]
+        // SMA = (10+11+12)/3 = 11.0
+        // 표준편차 계산:
+        //   variance = ((10-11)^2 + (11-11)^2 + (12-11)^2) / 3 = (1+0+1)/3 = 2/3
+        //   std_dev = sqrt(2/3) ≈ 0.816
+        // upper = 11.0 + 2.0 * 0.816 ≈ 12.633
+        // lower = 11.0 - 2.0 * 0.816 ≈ 9.367
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 10.0,
+                high: 10.5,
+                low: 9.5,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 10.0,
+                high: 11.5,
+                low: 9.5,
+                close: 11.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 11.0,
+                high: 12.5,
+                low: 10.5,
+                close: 12.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let mut builder = BollingerBandsBuilder::<TestCandle>::new(3, 2.0);
+        let bband = builder.build(&candles);
+
+        // SMA 검증
+        let expected_sma = (10.0 + 11.0 + 12.0) / 3.0;
+        assert!(
+            (bband.middle - expected_sma).abs() < 0.01,
+            "SMA calculation mismatch. Expected: {}, Got: {}",
+            expected_sma,
+            bband.middle
+        );
+
+        // 표준편차 계산 검증
+        let variance = ((10.0 - expected_sma).powi(2)
+            + (11.0 - expected_sma).powi(2)
+            + (12.0 - expected_sma).powi(2))
+            / 3.0;
+        let std_dev = variance.sqrt();
+        let expected_upper = expected_sma + 2.0 * std_dev;
+        let expected_lower = expected_sma - 2.0 * std_dev;
+
+        assert!(
+            (bband.upper - expected_upper).abs() < 0.01,
+            "Upper band calculation mismatch. Expected: {}, Got: {}",
+            expected_upper,
+            bband.upper
+        );
+        assert!(
+            (bband.lower - expected_lower).abs() < 0.01,
+            "Lower band calculation mismatch. Expected: {}, Got: {}",
+            expected_lower,
+            bband.lower
+        );
+    }
+
+    #[test]
+    fn test_bband_known_values_period_2() {
+        // period=2, multiplier=2.0인 경우 간단한 계산
+        // 데이터: [10.0, 12.0]
+        // SMA = (10+12)/2 = 11.0
+        // 표준편차 = sqrt(((10-11)^2 + (12-11)^2) / 2) = sqrt(1) = 1.0
+        // upper = 11.0 + 2.0 * 1.0 = 13.0
+        // lower = 11.0 - 2.0 * 1.0 = 9.0
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 10.0,
+                high: 10.5,
+                low: 9.5,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 10.0,
+                high: 12.5,
+                low: 9.5,
+                close: 12.0,
+                volume: 1100.0,
+            },
+        ];
+
+        let mut builder = BollingerBandsBuilder::<TestCandle>::new(2, 2.0);
+        let bband = builder.build(&candles);
+
+        let expected_sma = 11.0;
+        assert!(
+            (bband.middle - expected_sma).abs() < 0.01,
+            "SMA calculation mismatch. Expected: {}, Got: {}",
+            expected_sma,
+            bband.middle
+        );
+
+        let expected_upper = 13.0;
+        let expected_lower = 9.0;
+        assert!(
+            (bband.upper - expected_upper).abs() < 0.01,
+            "Upper band calculation mismatch. Expected: {}, Got: {}",
+            expected_upper,
+            bband.upper
+        );
+        assert!(
+            (bband.lower - expected_lower).abs() < 0.01,
+            "Lower band calculation mismatch. Expected: {}, Got: {}",
+            expected_lower,
+            bband.lower
+        );
     }
 }

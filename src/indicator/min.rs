@@ -65,8 +65,11 @@ where
             };
         }
 
-        // 최소값 계산
-        let min = self.values.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        // 최소값 계산 (최근 period 개만 사용)
+        let start_idx = self.values.len() - self.period;
+        let min = self.values[start_idx..]
+            .iter()
+            .fold(f64::INFINITY, |a, &b| a.min(b));
 
         MIN {
             period: self.period,
@@ -92,8 +95,11 @@ where
             };
         }
 
-        // 최소값 계산
-        let min = self.values.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        // 최소값 계산 (최근 period 개만 사용)
+        let start_idx = self.values.len() - self.period;
+        let min = self.values[start_idx..]
+            .iter()
+            .fold(f64::INFINITY, |a, &b| a.min(b));
 
         MIN {
             period: self.period,
@@ -263,5 +269,118 @@ mod tests {
         let min1 = builder.next(&consolidation_candles[0]);
         let min2 = builder.next(&consolidation_candles[1]);
         assert_eq!(min2.min, min1.min); // 횡보장에서 최소값이 유지
+    }
+
+    #[test]
+    fn test_build_method() {
+        let mut builder = MINBuilder::<TestCandle>::new(2);
+        let candles = create_test_candles();
+
+        // build 메서드로 최소값 계산
+        let min = builder.build(&candles);
+        assert_eq!(min.period, 2);
+        assert_eq!(min.min, 80.0); // 마지막 2개 중 최소값 (85.0, 80.0)
+    }
+
+    #[test]
+    fn test_build_empty_data() {
+        let mut builder = MINBuilder::<TestCandle>::new(2);
+        let empty_candles: Vec<TestCandle> = vec![];
+
+        let min = builder.build(&empty_candles);
+        assert_eq!(min.period, 2);
+        assert_eq!(min.min, 0.0); // 빈 데이터일 때 0.0 반환
+    }
+
+    #[test]
+    fn test_build_insufficient_data() {
+        let mut builder = MINBuilder::<TestCandle>::new(5);
+        let candles = create_test_candles(); // 3개만 있음
+
+        let min = builder.build(&candles);
+        assert_eq!(min.period, 5);
+        assert_eq!(min.min, 80.0); // 마지막 값 반환
+    }
+
+    #[test]
+    fn test_min_known_values_accuracy() {
+        // 알려진 MIN 계산 결과와 비교
+        // period=2인 경우 간단한 계산으로 검증
+        // 최소값 = min(최근 period개의 low)
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 105.0,
+                high: 115.0,
+                low: 90.0,
+                close: 110.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 110.0,
+                high: 120.0,
+                low: 85.0,
+                close: 115.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let mut builder = MINBuilder::<TestCandle>::new(2);
+        let min = builder.build(&candles);
+
+        // 최근 2개의 low: 90.0, 85.0
+        // 최소값 = min(90.0, 85.0) = 85.0
+        let expected = 85.0;
+        assert!(
+            (min.min - expected).abs() < 0.01,
+            "MIN calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            min.min
+        );
+    }
+
+    #[test]
+    fn test_min_known_values_period_2() {
+        // period=2인 경우 정확한 계산 검증
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 105.0,
+                low: 98.0,
+                close: 102.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 102.0,
+                high: 108.0,
+                low: 96.0,
+                close: 104.0,
+                volume: 1100.0,
+            },
+        ];
+
+        let mut builder = MINBuilder::<TestCandle>::new(2);
+        let min = builder.build(&candles);
+
+        // 최근 2개의 low: 98.0, 96.0
+        // 최소값 = min(98.0, 96.0) = 96.0
+        let expected = 96.0;
+        assert!(
+            (min.min - expected).abs() < 0.01,
+            "MIN calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            min.min
+        );
     }
 }

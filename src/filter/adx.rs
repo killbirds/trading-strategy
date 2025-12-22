@@ -617,9 +617,7 @@ mod tests {
         let result = filter_adx("TEST", params, &candles);
         assert!(result.is_ok());
         let is_trend_strength_higher = result.unwrap();
-        println!(
-            "추세 강도 > 방향성 테스트 결과: {is_trend_strength_higher}"
-        );
+        println!("추세 강도 > 방향성 테스트 결과: {is_trend_strength_higher}");
     }
 
     #[test]

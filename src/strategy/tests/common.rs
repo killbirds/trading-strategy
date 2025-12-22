@@ -218,24 +218,24 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
             }
         }
         // 포지션이 있는 경우 매도 신호 확인
-        else if let Some((entry_price, quantity)) = position {
-            if strategy.should_exit(candle) {
-                let exit_price = candle.close_price();
-                let profit = (exit_price - entry_price) * quantity;
-                let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;
+        else if let Some((entry_price, quantity)) = position
+            && strategy.should_exit(candle)
+        {
+            let exit_price = candle.close_price();
+            let profit = (exit_price - entry_price) * quantity;
+            let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;
 
-                trades.push(profit_percentage);
-                capital += profit;
-                position = None;
+            trades.push(profit_percentage);
+            capital += profit;
+            position = None;
 
-                // 자산 최고점 업데이트
-                if capital > equity_peak {
-                    equity_peak = capital;
-                } else {
-                    let current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
-                    if current_drawdown > max_drawdown {
-                        max_drawdown = current_drawdown;
-                    }
+            // 자산 최고점 업데이트
+            if capital > equity_peak {
+                equity_peak = capital;
+            } else {
+                let current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
+                if current_drawdown > max_drawdown {
+                    max_drawdown = current_drawdown;
                 }
             }
         }

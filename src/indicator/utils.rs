@@ -30,7 +30,7 @@ pub mod moving_average {
     /// * `period` - 계산 기간
     ///
     /// # Returns
-    /// * `f64` - 계산된 SMA 값
+    /// * `f64` - 계산된 SMA 값 (데이터가 부족하거나 period가 0이면 0.0 반환)
     pub fn calculate_sma(values: &[f64], period: usize) -> f64 {
         if values.is_empty() || period == 0 {
             return 0.0;
@@ -342,10 +342,18 @@ pub fn detect_price_spike<C: Candle>(data: &[C], threshold_percent: Option<f64>)
     }
 
     let threshold = threshold_percent.unwrap_or(3.0);
-    let last = data.last().unwrap();
+    let last = match data.last() {
+        Some(candle) => candle,
+        None => return false,
+    };
     let prev = &data[data.len() - 2];
 
-    let percent_change = ((last.close_price() - prev.close_price()) / prev.close_price()) * 100.0;
+    let prev_close = prev.close_price();
+    if prev_close == 0.0 {
+        return false;
+    }
+
+    let percent_change = ((last.close_price() - prev_close) / prev_close) * 100.0;
     percent_change.abs() >= threshold
 }
 

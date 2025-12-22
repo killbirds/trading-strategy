@@ -3,7 +3,7 @@
 
 use crate::indicator::orderbook::{
     LiquidityLevel, MarketPressure, OrderBook, OrderBookAnalysis, OrderBookAnalyzer,
-    find_significant_levels, OrderBookLevel2,
+    SupportResistanceLevel, find_significant_levels,
 };
 use serde::{Deserialize, Serialize};
 
@@ -49,7 +49,7 @@ pub struct OrderBookDataPoint {
     /// Liquidity level
     pub liquidity: LiquidityLevel,
     /// Significant support/resistance levels
-    pub significant_levels: Vec<OrderBookLevel2>,
+    pub significant_levels: Vec<SupportResistanceLevel>,
 }
 
 /// Trend direction based on orderbook analysis
@@ -110,7 +110,7 @@ pub struct OrderBookAnalysisResult {
     /// Is the orderbook suitable for trading
     pub is_tradeable: bool,
     /// Significant support/resistance levels
-    pub significant_levels: Vec<OrderBookLevel2>,
+    pub significant_levels: Vec<SupportResistanceLevel>,
     /// Suggested buy price
     pub suggested_buy_price: f64,
     /// Suggested sell price
@@ -166,7 +166,8 @@ impl OrderBookTimeSeriesAnalyzer {
         let analysis = self.analyzer.analyze(orderbook);
         let pressure = self.analyzer.get_market_pressure(orderbook);
         let liquidity = self.analyzer.get_liquidity_level(orderbook);
-        let significant_levels = find_significant_levels(orderbook, self.config.min_volume_percentile);
+        let significant_levels =
+            find_significant_levels(orderbook, self.config.min_volume_percentile);
         let is_tradeable = self.analyzer.is_tradeable(orderbook);
 
         // Create data point
@@ -190,16 +191,12 @@ impl OrderBookTimeSeriesAnalyzer {
         let confidence = self.calculate_confidence(&analysis, liquidity, &trend);
 
         // Calculate suggested prices
-        let suggested_buy_price = self.analyzer.get_optimal_price(
-            orderbook,
-            self.config.default_aggression,
-            true,
-        );
-        let suggested_sell_price = self.analyzer.get_optimal_price(
-            orderbook,
-            self.config.default_aggression,
-            false,
-        );
+        let suggested_buy_price =
+            self.analyzer
+                .get_optimal_price(orderbook, self.config.default_aggression, true);
+        let suggested_sell_price =
+            self.analyzer
+                .get_optimal_price(orderbook, self.config.default_aggression, false);
 
         OrderBookAnalysisResult {
             current: analysis,
@@ -224,18 +221,22 @@ impl OrderBookTimeSeriesAnalyzer {
 
         // Calculate average imbalance for recent vs older data
         let recent_count = (self.history.len() / 3).max(1);
-        let recent_avg: f64 = self.history
+        let recent_avg: f64 = self
+            .history
             .iter()
             .take(recent_count)
             .map(|dp| dp.analysis.imbalance_ratio)
-            .sum::<f64>() / recent_count as f64;
+            .sum::<f64>()
+            / recent_count as f64;
 
-        let older_avg: f64 = self.history
+        let older_avg: f64 = self
+            .history
             .iter()
             .skip(recent_count)
             .take(recent_count)
             .map(|dp| dp.analysis.imbalance_ratio)
-            .sum::<f64>() / recent_count as f64;
+            .sum::<f64>()
+            / recent_count as f64;
 
         let change = recent_avg - older_avg;
         let threshold = 0.05;
@@ -341,7 +342,8 @@ impl OrderBookTimeSeriesAnalyzer {
         };
 
         // Factor 4: Data sufficiency
-        let data_factor = (self.history.len() as f64 / self.config.history_size as f64).min(1.0) * 0.15;
+        let data_factor =
+            (self.history.len() as f64 / self.config.history_size as f64).min(1.0) * 0.15;
         confidence += data_factor;
 
         confidence.min(1.0)
@@ -400,7 +402,8 @@ impl OrderBookTimeSeriesAnalyzer {
 
     /// Get optimal sell price considering aggression  
     pub fn get_optimal_sell_price(&self, orderbook: &OrderBook, aggression: f64) -> f64 {
-        self.analyzer.get_optimal_price(orderbook, aggression, false)
+        self.analyzer
+            .get_optimal_price(orderbook, aggression, false)
     }
 
     /// Estimate slippage for a buy order
@@ -410,7 +413,8 @@ impl OrderBookTimeSeriesAnalyzer {
 
     /// Estimate slippage for a sell order
     pub fn estimate_sell_slippage(&self, orderbook: &OrderBook, order_size: f64) -> f64 {
-        self.analyzer.estimate_slippage(orderbook, order_size, false)
+        self.analyzer
+            .estimate_slippage(orderbook, order_size, false)
     }
 
     /// Get VWAP for a buy order

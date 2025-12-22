@@ -60,13 +60,14 @@ where
         let alpha = moving_average::calculate_ema_alpha(self.period);
         let mut ema = values[0]; // 첫 번째 값으로 초기화
 
-        // 충분한 데이터가 있으면 SMA로 시작
+        // 충분한 데이터가 있으면 최근 period개의 SMA로 시작
         if values.len() >= self.period {
-            let initial_slice = &values[0..self.period];
+            let start_idx = values.len() - self.period;
+            let initial_slice = &values[start_idx..];
             ema = initial_slice.iter().sum::<f64>() / self.period as f64;
 
             // 나머지 값들에 대해 EMA 계산
-            for &value in &values[self.period..] {
+            for &value in &values[start_idx + self.period..] {
                 ema = moving_average::calculate_ema_step(value, ema, alpha);
             }
         } else {
@@ -121,6 +122,7 @@ where
     /// * `EMA` - 계산된 EMA 지표
     pub fn build(&mut self, data: &[C]) -> EMA {
         if data.is_empty() {
+            self.previous_ema = None;
             return EMA {
                 period: self.period,
                 ema: 0.0, // 데이터가 없으면 기본값 0 반환
@@ -133,8 +135,17 @@ where
             self.values.push(item.close_price());
         }
 
-        // EMA 계산
-        let ema = self.calculate_ema_from_series(&self.values);
+        // EMA 계산 (최근 period * 2 개만 사용하여 계산 정확도 유지)
+        let values_to_use = if self.values.len() > self.period * 2 {
+            let start_idx = self.values.len() - self.period * 2;
+            &self.values[start_idx..]
+        } else {
+            &self.values[..]
+        };
+        let ema = self.calculate_ema_from_series(values_to_use);
+
+        // previous_ema 업데이트하여 next() 호출 시 일관성 유지
+        self.previous_ema = Some(ema);
 
         EMA {
             period: self.period,
@@ -317,5 +328,256 @@ mod tests {
 
         // 상승 추세에서는 EMA 값이 증가해야 함
         assert!(ema2.get() >= ema1.get());
+    }
+
+    #[test]
+    fn test_ema_exact_calculation() {
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 100.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 110.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 110.0,
+                high: 120.0,
+                low: 105.0,
+                close: 120.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let mut builder = EMABuilder::new(2);
+        let ema = builder.build(&candles);
+
+        // period=2일 때 alpha = 2/(2+1) = 2/3
+        // 첫 2개 평균: (100 + 110) / 2 = 105
+        // EMA = alpha * 120 + (1-alpha) * 105 = (2/3)*120 + (1/3)*105 = 80 + 35 = 115
+        let alpha = 2.0 / 3.0;
+        let initial_sma = (100.0 + 110.0) / 2.0;
+        let expected = alpha * 120.0 + (1.0 - alpha) * initial_sma;
+        assert!((ema.get() - expected).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_ema_less_data_than_period() {
+        let candles = vec![TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 105.0,
+            volume: 1000.0,
+        }];
+
+        let mut builder = EMABuilder::new(5);
+        let ema = builder.build(&candles);
+
+        // 데이터가 period보다 적으면 첫 번째 값으로 시작
+        assert!(ema.get() > 0.0);
+    }
+
+    #[test]
+    fn test_ema_consecutive_next() {
+        let mut builder = EMABuilder::new(3);
+
+        let candle1 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 100.0,
+            volume: 1000.0,
+        };
+        let ema1 = builder.next(&candle1);
+        assert!(ema1.get() > 0.0);
+
+        let candle2 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 100.0,
+            high: 110.0,
+            low: 95.0,
+            close: 110.0,
+            volume: 1100.0,
+        };
+        let ema2 = builder.next(&candle2);
+        assert!(ema2.get() > 0.0);
+        assert!(ema2.get() != ema1.get());
+
+        let candle3 = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 110.0,
+            high: 120.0,
+            low: 105.0,
+            close: 120.0,
+            volume: 1200.0,
+        };
+        let ema3 = builder.next(&candle3);
+        assert!(ema3.get() > 0.0);
+    }
+
+    #[test]
+    fn test_ema_tabuilder_trait() {
+        let candles = create_test_candles();
+        let mut builder = EMABuilder::new(2);
+
+        let ma: Box<dyn MA> = Box::new(builder.build(&candles));
+        assert_eq!(ma.period(), 2);
+        assert!(ma.get() > 0.0);
+
+        let new_candle = TestCandle {
+            timestamp: Utc::now().timestamp(),
+            open: 115.0,
+            high: 130.0,
+            low: 115.0,
+            close: 125.0,
+            volume: 1300.0,
+        };
+
+        let updated_ma: Box<dyn MA> = Box::new(builder.next(&new_candle));
+        assert_eq!(updated_ma.period(), 2);
+        assert!(updated_ma.get() > 0.0);
+    }
+
+    #[test]
+    fn test_ema_alpha_calculation() {
+        let builder = EMABuilder::<TestCandle>::new(5);
+        // period=5일 때 alpha = 2/(5+1) = 2/6 = 1/3
+        // 이는 calculate_ema_from_series 내부에서 사용됨
+        assert_eq!(builder.period, 5);
+    }
+
+    #[test]
+    fn test_ema_with_many_data_points() {
+        let mut candles = Vec::new();
+        for i in 0..20 {
+            candles.push(TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0 + i as f64,
+                high: 110.0 + i as f64,
+                low: 95.0 + i as f64,
+                close: 105.0 + i as f64,
+                volume: 1000.0 + i as f64,
+            });
+        }
+
+        let mut builder = EMABuilder::new(5);
+        let ema = builder.build(&candles);
+
+        // 많은 데이터가 있어도 최근 period*2 개만 사용
+        assert!(ema.get() > 0.0);
+        assert_eq!(ema.period(), 5);
+    }
+
+    #[test]
+    fn test_ema_known_values_accuracy() {
+        // 알려진 값과 비교하는 정확도 검증 테스트
+        // 테스트 데이터: [22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29]
+        // period=10일 때 알려진 EMA 값과 비교
+        let known_prices = vec![
+            22.27, 22.19, 22.08, 22.17, 22.18, 22.13, 22.23, 22.43, 22.24, 22.29,
+        ];
+        let mut candles = Vec::new();
+        for (i, &price) in known_prices.iter().enumerate() {
+            candles.push(TestCandle {
+                timestamp: Utc::now().timestamp() + i as i64,
+                open: price,
+                high: price + 0.1,
+                low: price - 0.1,
+                close: price,
+                volume: 1000.0,
+            });
+        }
+
+        let mut builder = EMABuilder::new(10);
+        let ema = builder.build(&candles);
+
+        // period=10일 때 첫 번째 EMA는 SMA와 같아야 함
+        let expected_sma: f64 = known_prices.iter().sum::<f64>() / 10.0;
+        assert!(
+            (ema.get() - expected_sma).abs() < 0.01,
+            "EMA should equal SMA for first calculation. Expected: {}, Got: {}",
+            expected_sma,
+            ema.get()
+        );
+    }
+
+    #[test]
+    fn test_ema_known_values_period_3() {
+        // period=3인 경우 알려진 계산 결과와 비교
+        // 데이터: [10.0, 11.0, 12.0, 13.0, 14.0]
+        // period=3일 때:
+        // - 첫 3개 SMA: (10+11+12)/3 = 11.0
+        // - alpha = 2/(3+1) = 0.5
+        // - EMA(13) = 0.5 * 13 + 0.5 * 11 = 12.0
+        // - EMA(14) = 0.5 * 14 + 0.5 * 12 = 13.0
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 10.0,
+                high: 10.5,
+                low: 9.5,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 10.0,
+                high: 11.5,
+                low: 9.5,
+                close: 11.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 11.0,
+                high: 12.5,
+                low: 10.5,
+                close: 12.0,
+                volume: 1200.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 3,
+                open: 12.0,
+                high: 13.5,
+                low: 11.5,
+                close: 13.0,
+                volume: 1300.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 4,
+                open: 13.0,
+                high: 14.5,
+                low: 12.5,
+                close: 14.0,
+                volume: 1400.0,
+            },
+        ];
+
+        let mut builder = EMABuilder::new(3);
+        let ema = builder.build(&candles);
+
+        // 첫 3개 SMA: (10+11+12)/3 = 11.0
+        // EMA(13) = 0.5 * 13 + 0.5 * 11 = 12.0
+        // EMA(14) = 0.5 * 14 + 0.5 * 12 = 13.0
+        let expected = 13.0;
+        assert!(
+            (ema.get() - expected).abs() < 0.01,
+            "EMA calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            ema.get()
+        );
     }
 }

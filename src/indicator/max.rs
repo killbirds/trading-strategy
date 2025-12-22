@@ -65,8 +65,11 @@ where
             };
         }
 
-        // 최대값 계산
-        let max = self.values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        // 최대값 계산 (최근 period 개만 사용)
+        let start_idx = self.values.len() - self.period;
+        let max = self.values[start_idx..]
+            .iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
         MAX {
             period: self.period,
@@ -92,8 +95,11 @@ where
             };
         }
 
-        // 최대값 계산
-        let max = self.values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+        // 최대값 계산 (최근 period 개만 사용)
+        let start_idx = self.values.len() - self.period;
+        let max = self.values[start_idx..]
+            .iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
 
         MAX {
             period: self.period,
@@ -263,5 +269,118 @@ mod tests {
         let max1 = builder.next(&consolidation_candles[0]);
         let max2 = builder.next(&consolidation_candles[1]);
         assert_eq!(max2.max, max1.max); // 횡보장에서 최대값이 유지
+    }
+
+    #[test]
+    fn test_build_method() {
+        let mut builder = MAXBuilder::<TestCandle>::new(2);
+        let candles = create_test_candles();
+
+        // build 메서드로 최대값 계산
+        let max = builder.build(&candles);
+        assert_eq!(max.period, 2);
+        assert_eq!(max.max, 120.0); // 마지막 2개 중 최대값 (115.0, 120.0)
+    }
+
+    #[test]
+    fn test_build_empty_data() {
+        let mut builder = MAXBuilder::<TestCandle>::new(2);
+        let empty_candles: Vec<TestCandle> = vec![];
+
+        let max = builder.build(&empty_candles);
+        assert_eq!(max.period, 2);
+        assert_eq!(max.max, 0.0); // 빈 데이터일 때 0.0 반환
+    }
+
+    #[test]
+    fn test_build_insufficient_data() {
+        let mut builder = MAXBuilder::<TestCandle>::new(5);
+        let candles = create_test_candles(); // 3개만 있음
+
+        let max = builder.build(&candles);
+        assert_eq!(max.period, 5);
+        assert_eq!(max.max, 120.0); // 마지막 값 반환
+    }
+
+    #[test]
+    fn test_max_known_values_accuracy() {
+        // 알려진 MAX 계산 결과와 비교
+        // period=2인 경우 간단한 계산으로 검증
+        // 최대값 = max(최근 period개의 high)
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 105.0,
+                low: 95.0,
+                close: 102.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 102.0,
+                high: 110.0,
+                low: 100.0,
+                close: 108.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 2,
+                open: 108.0,
+                high: 115.0,
+                low: 105.0,
+                close: 112.0,
+                volume: 1200.0,
+            },
+        ];
+
+        let mut builder = MAXBuilder::<TestCandle>::new(2);
+        let max = builder.build(&candles);
+
+        // 최근 2개의 high: 110.0, 115.0
+        // 최대값 = max(110.0, 115.0) = 115.0
+        let expected = 115.0;
+        assert!(
+            (max.max - expected).abs() < 0.01,
+            "MAX calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            max.max
+        );
+    }
+
+    #[test]
+    fn test_max_known_values_period_2() {
+        // period=2인 경우 정확한 계산 검증
+        let candles = vec![
+            TestCandle {
+                timestamp: Utc::now().timestamp(),
+                open: 100.0,
+                high: 102.0,
+                low: 98.0,
+                close: 101.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: Utc::now().timestamp() + 1,
+                open: 101.0,
+                high: 108.0,
+                low: 100.0,
+                close: 106.0,
+                volume: 1100.0,
+            },
+        ];
+
+        let mut builder = MAXBuilder::<TestCandle>::new(2);
+        let max = builder.build(&candles);
+
+        // 최근 2개의 high: 102.0, 108.0
+        // 최대값 = max(102.0, 108.0) = 108.0
+        let expected = 108.0;
+        assert!(
+            (max.max - expected).abs() < 0.01,
+            "MAX calculation mismatch. Expected: {}, Got: {}",
+            expected,
+            max.max
+        );
     }
 }

@@ -37,7 +37,12 @@ pub struct OrderBook {
 }
 
 impl OrderBook {
-    pub fn new(symbol: String, bids: Vec<OrderBookLevel>, asks: Vec<OrderBookLevel>, timestamp: i64) -> Self {
+    pub fn new(
+        symbol: String,
+        bids: Vec<OrderBookLevel>,
+        asks: Vec<OrderBookLevel>,
+        timestamp: i64,
+    ) -> Self {
         Self {
             symbol,
             bids,
@@ -47,11 +52,22 @@ impl OrderBook {
     }
 
     /// Create from tuple vectors (price, quantity)
-    pub fn from_tuples(symbol: String, bids: Vec<(f64, f64)>, asks: Vec<(f64, f64)>, timestamp: i64) -> Self {
+    pub fn from_tuples(
+        symbol: String,
+        bids: Vec<(f64, f64)>,
+        asks: Vec<(f64, f64)>,
+        timestamp: i64,
+    ) -> Self {
         Self {
             symbol,
-            bids: bids.into_iter().map(|(p, q)| OrderBookLevel::new(p, q)).collect(),
-            asks: asks.into_iter().map(|(p, q)| OrderBookLevel::new(p, q)).collect(),
+            bids: bids
+                .into_iter()
+                .map(|(p, q)| OrderBookLevel::new(p, q))
+                .collect(),
+            asks: asks
+                .into_iter()
+                .map(|(p, q)| OrderBookLevel::new(p, q))
+                .collect(),
             timestamp,
         }
     }
@@ -92,31 +108,70 @@ impl OrderBook {
 
     /// Calculate total bid depth (volume)
     pub fn bid_depth(&self) -> f64 {
-        self.bids.iter().map(|l| l.quantity).sum()
+        self.bids
+            .iter()
+            .filter_map(|l| {
+                if l.quantity > 0.0 {
+                    Some(l.quantity)
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 
     /// Calculate total ask depth (volume)
     pub fn ask_depth(&self) -> f64 {
-        self.asks.iter().map(|l| l.quantity).sum()
+        self.asks
+            .iter()
+            .filter_map(|l| {
+                if l.quantity > 0.0 {
+                    Some(l.quantity)
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 
     /// Calculate total bid value (price * quantity)
     pub fn bid_value(&self) -> f64 {
-        self.bids.iter().map(|l| l.value()).sum()
+        self.bids
+            .iter()
+            .filter_map(|l| {
+                if l.price > 0.0 && l.quantity > 0.0 {
+                    Some(l.value())
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 
     /// Calculate total ask value (price * quantity)
     pub fn ask_value(&self) -> f64 {
-        self.asks.iter().map(|l| l.value()).sum()
+        self.asks
+            .iter()
+            .filter_map(|l| {
+                if l.price > 0.0 && l.quantity > 0.0 {
+                    Some(l.value())
+                } else {
+                    None
+                }
+            })
+            .sum()
     }
 
     /// Calculate bid depth up to a certain price percentage from best bid
     pub fn bid_depth_within_percent(&self, percent: f64) -> f64 {
         if let Some(best_bid) = self.best_bid() {
-            let threshold = best_bid * (1.0 - percent / 100.0);
+            if best_bid <= 0.0 || percent < 0.0 {
+                return 0.0;
+            }
+            let threshold = best_bid * (1.0 - percent / 100.0).max(0.0);
             self.bids
                 .iter()
-                .filter(|l| l.price >= threshold)
+                .filter(|l| l.price >= threshold && l.quantity > 0.0)
                 .map(|l| l.quantity)
                 .sum()
         } else {
@@ -127,10 +182,13 @@ impl OrderBook {
     /// Calculate ask depth up to a certain price percentage from best ask
     pub fn ask_depth_within_percent(&self, percent: f64) -> f64 {
         if let Some(best_ask) = self.best_ask() {
+            if best_ask <= 0.0 || percent < 0.0 {
+                return 0.0;
+            }
             let threshold = best_ask * (1.0 + percent / 100.0);
             self.asks
                 .iter()
-                .filter(|l| l.price <= threshold)
+                .filter(|l| l.price <= threshold && l.quantity > 0.0)
                 .map(|l| l.quantity)
                 .sum()
         } else {
@@ -227,12 +285,18 @@ impl MarketPressure {
 
     /// Check if this indicates buying pressure
     pub fn is_bullish(&self) -> bool {
-        matches!(self, MarketPressure::StrongBuy | MarketPressure::ModerateBuy)
+        matches!(
+            self,
+            MarketPressure::StrongBuy | MarketPressure::ModerateBuy
+        )
     }
 
     /// Check if this indicates selling pressure
     pub fn is_bearish(&self) -> bool {
-        matches!(self, MarketPressure::StrongSell | MarketPressure::ModerateSell)
+        matches!(
+            self,
+            MarketPressure::StrongSell | MarketPressure::ModerateSell
+        )
     }
 }
 
@@ -282,9 +346,9 @@ pub struct OrderBookAnalyzer {
 impl Default for OrderBookAnalyzer {
     fn default() -> Self {
         Self {
-            depth_percent: 1.0, // 1% from best price
+            depth_percent: 1.0,                // 1% from best price
             reference_order_size: 1_000_000.0, // 1M KRW
-            max_spread_percent: 1.0, // 1% max spread
+            max_spread_percent: 1.0,           // 1% max spread
         }
     }
 }
@@ -306,6 +370,11 @@ impl OrderBookAnalyzer {
         let mid_price = orderbook.mid_price().unwrap_or(0.0);
         let spread_percent = orderbook.spread_percent().unwrap_or(0.0);
 
+        // Validate basic orderbook integrity
+        if best_bid <= 0.0 || best_ask <= 0.0 || best_ask <= best_bid {
+            return OrderBookAnalysis::default();
+        }
+
         // Calculate depth within percentage
         let bid_depth = orderbook.bid_depth_within_percent(self.depth_percent);
         let ask_depth = orderbook.ask_depth_within_percent(self.depth_percent);
@@ -325,12 +394,14 @@ impl OrderBookAnalyzer {
         let liquidity_score = self.calculate_liquidity_score(orderbook);
 
         // Calculate suggested prices
-        let (suggested_buy_price, suggested_sell_price) = 
+        let (suggested_buy_price, suggested_sell_price) =
             self.calculate_suggested_prices(orderbook, imbalance_ratio);
 
         // Estimate slippage
-        let estimated_buy_slippage = self.estimate_slippage(orderbook, self.reference_order_size, true);
-        let estimated_sell_slippage = self.estimate_slippage(orderbook, self.reference_order_size, false);
+        let estimated_buy_slippage =
+            self.estimate_slippage(orderbook, self.reference_order_size, true);
+        let estimated_sell_slippage =
+            self.estimate_slippage(orderbook, self.reference_order_size, false);
 
         OrderBookAnalysis {
             best_bid,
@@ -354,7 +425,7 @@ impl OrderBookAnalyzer {
     fn calculate_liquidity_score(&self, orderbook: &OrderBook) -> f64 {
         let spread_percent = orderbook.spread_percent().unwrap_or(100.0);
         let total_depth = orderbook.bid_depth() + orderbook.ask_depth();
-        
+
         // Spread component (lower spread = higher score)
         let spread_score = if spread_percent <= 0.0 {
             1.0
@@ -373,7 +444,11 @@ impl OrderBookAnalyzer {
     }
 
     /// Calculate suggested buy and sell prices based on orderbook analysis
-    fn calculate_suggested_prices(&self, orderbook: &OrderBook, imbalance_ratio: f64) -> (f64, f64) {
+    fn calculate_suggested_prices(
+        &self,
+        orderbook: &OrderBook,
+        imbalance_ratio: f64,
+    ) -> (f64, f64) {
         let best_bid = orderbook.best_bid().unwrap_or(0.0);
         let best_ask = orderbook.best_ask().unwrap_or(0.0);
         let spread = orderbook.spread().unwrap_or(0.0);
@@ -399,31 +474,19 @@ impl OrderBookAnalyzer {
         (suggested_buy_price, suggested_sell_price)
     }
 
-    /// Estimate slippage for a given order size
-    /// Returns slippage as percentage
-    pub fn estimate_slippage(&self, orderbook: &OrderBook, order_size: f64, is_buy: bool) -> f64 {
-        let orders = if is_buy {
-            &orderbook.asks
-        } else {
-            &orderbook.bids
-        };
-
-        let reference_price = if is_buy {
-            orderbook.best_ask().unwrap_or(0.0)
-        } else {
-            orderbook.best_bid().unwrap_or(0.0)
-        };
-
-        if reference_price <= 0.0 || orders.is_empty() {
-            return 0.0;
-        }
-
+    /// Calculate fill details for a given order size
+    /// Returns (total_cost, total_quantity, remaining_size)
+    fn calculate_fill_details(
+        &self,
+        orders: &[OrderBookLevel],
+        order_size: f64,
+    ) -> (f64, f64, f64) {
         let mut remaining_size = order_size;
         let mut total_cost = 0.0;
         let mut total_quantity = 0.0;
 
         for level in orders {
-            if remaining_size <= 0.0 {
+            if remaining_size <= 0.0 || level.price <= 0.0 || level.quantity <= 0.0 {
                 break;
             }
 
@@ -435,6 +498,34 @@ impl OrderBookAnalyzer {
             total_quantity += fill_quantity;
             remaining_size -= fill_value;
         }
+
+        (total_cost, total_quantity, remaining_size)
+    }
+
+    /// Estimate slippage for a given order size
+    /// Returns slippage as percentage
+    pub fn estimate_slippage(&self, orderbook: &OrderBook, order_size: f64, is_buy: bool) -> f64 {
+        let orders = if is_buy {
+            &orderbook.asks
+        } else {
+            &orderbook.bids
+        };
+
+        let reference_price = if is_buy {
+            orderbook.best_ask()
+        } else {
+            orderbook.best_bid()
+        };
+
+        let Some(reference_price) = reference_price else {
+            return 0.0;
+        };
+
+        if reference_price <= 0.0 || orders.is_empty() || order_size <= 0.0 {
+            return 0.0;
+        }
+
+        let (total_cost, total_quantity, _) = self.calculate_fill_details(orders, order_size);
 
         if total_quantity <= 0.0 {
             return 0.0;
@@ -458,23 +549,15 @@ impl OrderBookAnalyzer {
             &orderbook.bids
         };
 
-        let mut remaining_size = order_size;
-        let mut total_cost = 0.0;
-        let mut total_quantity = 0.0;
-
-        for level in orders {
-            if remaining_size <= 0.0 {
-                break;
-            }
-
-            let level_value = level.value();
-            let fill_value = remaining_size.min(level_value);
-            let fill_quantity = fill_value / level.price;
-
-            total_cost += fill_value;
-            total_quantity += fill_quantity;
-            remaining_size -= fill_value;
+        if orders.is_empty() || order_size <= 0.0 {
+            return if is_buy {
+                orderbook.best_ask().unwrap_or(0.0)
+            } else {
+                orderbook.best_bid().unwrap_or(0.0)
+            };
         }
+
+        let (total_cost, total_quantity, _) = self.calculate_fill_details(orders, order_size);
 
         if total_quantity > 0.0 {
             total_cost / total_quantity
@@ -516,12 +599,7 @@ impl OrderBookAnalyzer {
 
     /// Get optimal order price based on aggression level
     /// aggression: 0.0 = most passive, 1.0 = most aggressive
-    pub fn get_optimal_price(
-        &self,
-        orderbook: &OrderBook,
-        aggression: f64,
-        is_buy: bool,
-    ) -> f64 {
+    pub fn get_optimal_price(&self, orderbook: &OrderBook, aggression: f64, is_buy: bool) -> f64 {
         let best_bid = orderbook.best_bid().unwrap_or(0.0);
         let best_ask = orderbook.best_ask().unwrap_or(0.0);
         let spread = orderbook.spread().unwrap_or(0.0);
@@ -539,7 +617,7 @@ impl OrderBookAnalyzer {
 
 /// Support/Resistance level detected from orderbook
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OrderBookLevel2 {
+pub struct SupportResistanceLevel {
     /// Price level
     pub price: f64,
     /// Total volume at this level
@@ -551,7 +629,10 @@ pub struct OrderBookLevel2 {
 }
 
 /// Find significant support/resistance levels from orderbook
-pub fn find_significant_levels(orderbook: &OrderBook, min_volume_percentile: f64) -> Vec<OrderBookLevel2> {
+pub fn find_significant_levels(
+    orderbook: &OrderBook,
+    min_volume_percentile: f64,
+) -> Vec<SupportResistanceLevel> {
     let mut levels = Vec::new();
 
     // Calculate volume threshold
@@ -559,25 +640,35 @@ pub fn find_significant_levels(orderbook: &OrderBook, min_volume_percentile: f64
         .bids
         .iter()
         .chain(orderbook.asks.iter())
-        .map(|l| l.quantity)
+        .filter_map(|l| {
+            if l.quantity > 0.0 {
+                Some(l.quantity)
+            } else {
+                None
+            }
+        })
         .collect();
 
     if all_volumes.is_empty() {
         return levels;
     }
 
-    let mut sorted_volumes = all_volumes.clone();
+    let mut sorted_volumes = all_volumes;
     sorted_volumes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    
-    let percentile_idx = ((sorted_volumes.len() as f64) * (min_volume_percentile / 100.0)) as usize;
-    let threshold = sorted_volumes.get(percentile_idx.min(sorted_volumes.len() - 1)).copied().unwrap_or(0.0);
+
+    let percentile_idx =
+        ((sorted_volumes.len() as f64) * (min_volume_percentile / 100.0).clamp(0.0, 1.0)) as usize;
+    let threshold = sorted_volumes
+        .get(percentile_idx.min(sorted_volumes.len().saturating_sub(1)))
+        .copied()
+        .unwrap_or(0.0);
     let max_volume = sorted_volumes.last().copied().unwrap_or(1.0);
 
     // Find support levels (large bid orders)
     for level in &orderbook.bids {
         if level.quantity >= threshold {
             let strength = (level.quantity / max_volume).min(1.0);
-            levels.push(OrderBookLevel2 {
+            levels.push(SupportResistanceLevel {
                 price: level.price,
                 volume: level.quantity,
                 is_support: true,
@@ -590,7 +681,7 @@ pub fn find_significant_levels(orderbook: &OrderBook, min_volume_percentile: f64
     for level in &orderbook.asks {
         if level.quantity >= threshold {
             let strength = (level.quantity / max_volume).min(1.0);
-            levels.push(OrderBookLevel2 {
+            levels.push(SupportResistanceLevel {
                 price: level.price,
                 volume: level.quantity,
                 is_support: false,
@@ -610,14 +701,14 @@ mod tests {
         OrderBook::from_tuples(
             "TEST".to_string(),
             vec![
-                (100.0, 10.0),  // Best bid
+                (100.0, 10.0), // Best bid
                 (99.0, 20.0),
                 (98.0, 30.0),
                 (97.0, 15.0),
                 (96.0, 25.0),
             ],
             vec![
-                (101.0, 8.0),   // Best ask
+                (101.0, 8.0), // Best ask
                 (102.0, 18.0),
                 (103.0, 28.0),
                 (104.0, 12.0),
@@ -630,7 +721,7 @@ mod tests {
     #[test]
     fn test_orderbook_basics() {
         let ob = create_test_orderbook();
-        
+
         assert_eq!(ob.best_bid(), Some(100.0));
         assert_eq!(ob.best_ask(), Some(101.0));
         assert_eq!(ob.spread(), Some(1.0));
@@ -640,21 +731,21 @@ mod tests {
     #[test]
     fn test_orderbook_depth() {
         let ob = create_test_orderbook();
-        
+
         let bid_depth = ob.bid_depth();
         let ask_depth = ob.ask_depth();
-        
+
         assert_eq!(bid_depth, 100.0); // 10 + 20 + 30 + 15 + 25
-        assert_eq!(ask_depth, 88.0);  // 8 + 18 + 28 + 12 + 22
+        assert_eq!(ask_depth, 88.0); // 8 + 18 + 28 + 12 + 22
     }
 
     #[test]
     fn test_orderbook_analysis() {
         let ob = create_test_orderbook();
         let analyzer = OrderBookAnalyzer::default();
-        
+
         let analysis = analyzer.analyze(&ob);
-        
+
         assert_eq!(analysis.best_bid, 100.0);
         assert_eq!(analysis.best_ask, 101.0);
         assert!(analysis.imbalance_ratio > 0.0); // More bids than asks
@@ -666,25 +757,28 @@ mod tests {
         // Test bullish
         assert!(MarketPressure::from_imbalance(0.5).is_bullish());
         assert!(MarketPressure::from_imbalance(0.15).is_bullish());
-        
+
         // Test bearish
         assert!(MarketPressure::from_imbalance(-0.5).is_bearish());
         assert!(MarketPressure::from_imbalance(-0.15).is_bearish());
-        
+
         // Test neutral
         assert_eq!(MarketPressure::from_imbalance(0.0), MarketPressure::Neutral);
-        assert_eq!(MarketPressure::from_imbalance(0.05), MarketPressure::Neutral);
+        assert_eq!(
+            MarketPressure::from_imbalance(0.05),
+            MarketPressure::Neutral
+        );
     }
 
     #[test]
     fn test_slippage_estimation() {
         let ob = create_test_orderbook();
         let analyzer = OrderBookAnalyzer::new(1.0, 1000.0, 1.0);
-        
+
         // Small order should have minimal slippage
         let small_slippage = analyzer.estimate_slippage(&ob, 500.0, true);
         assert!(small_slippage < 1.0);
-        
+
         // Large order should have more slippage
         let large_slippage = analyzer.estimate_slippage(&ob, 5000.0, true);
         assert!(large_slippage >= small_slippage);
@@ -694,21 +788,76 @@ mod tests {
     fn test_optimal_price() {
         let ob = create_test_orderbook();
         let analyzer = OrderBookAnalyzer::default();
-        
+
         // Passive buy = at bid
         let passive_buy = analyzer.get_optimal_price(&ob, 0.0, true);
         assert_eq!(passive_buy, 100.0);
-        
+
         // Aggressive buy = at ask
         let aggressive_buy = analyzer.get_optimal_price(&ob, 1.0, true);
         assert_eq!(aggressive_buy, 101.0);
-        
+
         // Passive sell = at ask
         let passive_sell = analyzer.get_optimal_price(&ob, 0.0, false);
         assert_eq!(passive_sell, 101.0);
-        
+
         // Aggressive sell = at bid
         let aggressive_sell = analyzer.get_optimal_price(&ob, 1.0, false);
         assert_eq!(aggressive_sell, 100.0);
+    }
+
+    #[test]
+    fn test_empty_orderbook() {
+        let ob = OrderBook::new("TEST".to_string(), Vec::new(), Vec::new(), 0);
+        let analyzer = OrderBookAnalyzer::default();
+
+        assert_eq!(ob.best_bid(), None);
+        assert_eq!(ob.best_ask(), None);
+        assert_eq!(ob.bid_depth(), 0.0);
+        assert_eq!(ob.ask_depth(), 0.0);
+
+        let analysis = analyzer.analyze(&ob);
+        assert_eq!(analysis.best_bid, 0.0);
+        assert_eq!(analysis.best_ask, 0.0);
+    }
+
+    #[test]
+    fn test_invalid_orderbook() {
+        let ob = OrderBook::from_tuples(
+            "TEST".to_string(),
+            vec![(100.0, 10.0), (101.0, 20.0)], // Invalid: bid > ask
+            vec![(99.0, 10.0)],                 // Invalid: ask < bid
+            0,
+        );
+        let analyzer = OrderBookAnalyzer::default();
+        let analysis = analyzer.analyze(&ob);
+
+        // Should handle gracefully - returns default when invalid (best_ask <= best_bid)
+        assert_eq!(analysis.best_bid, 0.0);
+        assert_eq!(analysis.best_ask, 0.0);
+    }
+
+    #[test]
+    fn test_calculate_vwap() {
+        let ob = create_test_orderbook();
+        let analyzer = OrderBookAnalyzer::default();
+
+        let vwap = analyzer.calculate_vwap(&ob, 1000.0, true);
+        assert!(vwap > 0.0);
+        assert!(vwap >= ob.best_ask().unwrap());
+
+        let vwap_sell = analyzer.calculate_vwap(&ob, 1000.0, false);
+        assert!(vwap_sell > 0.0);
+        assert!(vwap_sell <= ob.best_bid().unwrap());
+    }
+
+    #[test]
+    fn test_find_significant_levels() {
+        let ob = create_test_orderbook();
+        let levels = find_significant_levels(&ob, 50.0);
+
+        assert!(!levels.is_empty());
+        assert!(levels.iter().any(|l| l.is_support));
+        assert!(levels.iter().any(|l| !l.is_support));
     }
 }

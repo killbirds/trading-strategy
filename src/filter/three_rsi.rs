@@ -532,9 +532,7 @@ mod tests {
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_overbought = result.unwrap();
-        println!(
-            "Three RSI 극도 과매수 테스트 결과: {is_extreme_overbought}"
-        );
+        println!("Three RSI 극도 과매수 테스트 결과: {is_extreme_overbought}");
     }
 
     #[test]
