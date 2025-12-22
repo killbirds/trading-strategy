@@ -9,6 +9,7 @@ pub mod ma;
 pub mod macd;
 pub mod max;
 pub mod min;
+pub mod orderbook;
 pub mod rsi;
 pub mod supertrend;
 pub mod utils;

@@ -24,6 +24,7 @@ pub mod ma_analyzer;
 pub mod macd_analyzer;
 pub mod market_structure_analyzer;
 pub mod momentum_analyzer;
+pub mod orderbook_analyzer;
 pub mod price_action_analyzer;
 pub mod risk_management_analyzer;
 pub mod rsi_analyzer;
@@ -54,6 +55,10 @@ pub use market_structure_analyzer::{
 pub use momentum_analyzer::{
     DivergenceType, MomentumAnalysis, MomentumAnalyzer, MomentumAnalyzerData, MomentumDirection,
     MomentumDivergence, MomentumIndicators, MomentumState, OverBoughtOverSold,
+};
+pub use orderbook_analyzer::{
+    OrderBookAnalysisResult, OrderBookAnalyzerConfig, OrderBookDataPoint, OrderBookSignal,
+    OrderBookTimeSeriesAnalyzer, OrderBookTrend,
 };
 pub use price_action_analyzer::{
     CandlePattern, PriceActionAnalyzer, PriceActionAnalyzerData, PriceTrend, SwingPoint, SwingType,
