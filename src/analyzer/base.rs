@@ -165,7 +165,9 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Panics
     /// * 인덱스가 범위를 벗어나면 패닉 발생
     fn get_value(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
-        self.get(index).map(get_value).unwrap()
+        self.get(index)
+            .map(get_value)
+            .unwrap_or_else(|| panic!("Index {} out of bounds", index))
     }
 
     /// 특정 인덱스 데이터의 수익률 계산
@@ -183,7 +185,12 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         self.datum()
             .get(index)
             .map(|data| data.get_rate_of_return(&get_value))
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Index {} out of bounds for rate of return calculation",
+                    index
+                )
+            })
     }
 
     /// n개의 연속된 데이터가 특정 조건을 모두 만족하는지 확인

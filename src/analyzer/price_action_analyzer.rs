@@ -461,8 +461,14 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
         }
 
         let recent_candles = &candles[..self.trend_period];
-        let first_price = recent_candles.last().unwrap().close_price();
-        let last_price = recent_candles.first().unwrap().close_price();
+        let first_price = recent_candles
+            .last()
+            .map(|c| c.close_price())
+            .unwrap_or(0.0);
+        let last_price = recent_candles
+            .first()
+            .map(|c| c.close_price())
+            .unwrap_or(0.0);
         let price_change = (last_price - first_price) / first_price;
 
         // 가격 변화의 강도에 따라 추세 분류

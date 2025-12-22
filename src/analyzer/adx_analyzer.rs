@@ -121,11 +121,6 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             ndi_values.push(ndi);
         }
 
-        // 디버그 로깅
-        println!("ADX values: {adx_values:?}");
-        println!("+DI values: {pdi_values:?}");
-        println!("-DI values: {ndi_values:?}");
-
         // ADX 증가 추세 또는 높은 값에서 안정적 유지 확인
         // ADX가 이미 매우 높은 값(80 이상)인 경우, 작은 감소에도 불구하고 높은 값을 유지하는 것도 추세 강화로 간주
         let mut adx_increasing = true;
@@ -167,11 +162,6 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         // ADX 최소값 확인 (25 이상)
         let adx_strong = adx_values.iter().all(|&adx| adx >= 25.0);
 
-        // 디버그 로깅
-        println!(
-            "ADX increasing: {adx_increasing}, ADX stable high: {adx_stable_high}, DI strength: {di_strength}, ADX strong: {adx_strong}"
-        );
-
         // 모든 조건을 만족해야 추세 강화로 판단
         // 높은 값에서 안정적으로 유지되는 경우도 추세 강화로 간주
         (adx_increasing || adx_stable_high) && di_strength && adx_strong
@@ -191,9 +181,6 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             .map(|data| data.get_adx(period))
             .collect();
 
-        // 디버그 로깅
-        println!("ADX values for trend weakening: {adx_values:?}");
-
         // 연속된 감소 횟수 확인
         let mut decreasing_count = 0;
         for i in 0..n {
@@ -204,9 +191,6 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
 
         // 첫 번째와 마지막 값의 차이로 전체적인 감소 추세 확인
         let total_change = adx_values[n] - adx_values[0];
-
-        // 디버그 로깅
-        println!("Decreasing count: {decreasing_count}, Total change: {total_change}");
 
         // n개 중 최소 50% 이상이 감소하고, 전체적으로도 감소했다면 추세 약화로 판단
         decreasing_count >= (n as f64 * 0.5).ceil() as usize && total_change > 0.0
@@ -235,12 +219,6 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             .map(|data| data.get_adx(period))
             .collect();
 
-        // 디버그 로깅
-        println!("ADX Trend Reversal Analysis:");
-        println!("Period: {period}");
-        println!("Recent ADX values ({n}): {recent_adx:?}");
-        println!("Previous ADX values ({m}): {previous_adx:?}");
-
         // 최근 n개 기간의 평균 ADX
         let recent_avg = recent_adx.iter().sum::<f64>() / n as f64;
 
@@ -255,25 +233,16 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
 
         // ADX 최소값 확인 (20 이상)
         let recent_min_adx = recent_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-        let previous_min_adx = previous_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));
-
-        // 디버그 로깅
-        println!("Recent average: {recent_avg:.2}, Previous average: {previous_avg:.2}");
-        println!("Recent change: {recent_change:.2}%, Previous change: {previous_change:.2}%");
-        println!("Recent min ADX: {recent_min_adx:.2}, Previous min ADX: {previous_min_adx:.2}");
 
         // 조건:
         // 1. 최근 ADX 평균이 이전 ADX 평균보다 높음
         // 2. 최근 ADX가 이전 ADX보다 증가하는 추세를 보임 (변화율 기준)
         // 3. 이전 ADX가 증가하는 추세를 보였음 (변화율 기준)
         // 4. 최근 ADX의 최소값이 20 이상
-        let is_reversal = recent_avg > previous_avg
+        recent_avg > previous_avg
             && recent_change > 0.0
             && previous_change > 0.0
-            && recent_min_adx >= 20.0;
-
-        println!("Is trend reversal: {is_reversal}");
-        is_reversal
+            && recent_min_adx >= 20.0
     }
 
     /// n개의 연속 데이터에서 ADX가 횡보 상태인지 확인

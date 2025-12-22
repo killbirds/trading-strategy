@@ -344,13 +344,13 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
 
         let weekly_returns: Vec<f64> = candles
             .chunks(7)
-            .map(|week| {
+            .filter_map(|week| {
                 if week.len() < 2 {
-                    return 0.0;
+                    return None;
                 }
-                let start = week.last().unwrap().close_price();
-                let end = week.first().unwrap().close_price();
-                ((end - start) / start).abs()
+                let start = week.last()?.close_price();
+                let end = week.first()?.close_price();
+                Some(((end - start) / start).abs())
             })
             .collect();
 
@@ -368,7 +368,7 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         }
 
         let mut max_drawdown = 0.0;
-        let mut peak = candles.last().unwrap().close_price();
+        let mut peak = candles.last().map(|c| c.close_price()).unwrap_or(0.0);
 
         for candle in candles.iter().rev() {
             let current_price = candle.close_price();
@@ -442,8 +442,11 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
             return 0.0;
         }
 
-        let total_return = (candles[0].close_price() - candles.last().unwrap().close_price())
-            / candles.last().unwrap().close_price();
+        let last_price = candles.last().map(|c| c.close_price()).unwrap_or(0.0);
+        if last_price == 0.0 {
+            return 0.0;
+        }
+        let total_return = (candles[0].close_price() - last_price) / last_price;
         let volatility = self.calculate_volatility(candles);
 
         if volatility == 0.0 {
