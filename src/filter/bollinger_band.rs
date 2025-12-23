@@ -1,7 +1,6 @@
-use super::BollingerBandParams;
+use super::{BollingerBandFilterType, BollingerBandParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::bband_analyzer::BBandAnalyzer;
-use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
@@ -12,26 +11,23 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
     candles: &[C],
 ) -> Result<bool> {
     log::debug!(
-        "볼린저 밴드 필터 적용 - 기간: {}, 편차 배수: {}, 타입: {}, 연속성: {}",
+        "볼린저 밴드 필터 적용 - 기간: {}, 편차 배수: {}, 타입: {:?}, 연속성: {}",
         params.period,
         params.dev_mult,
         params.filter_type,
         params.consecutive_n
     );
 
-    if candles.len() < params.period {
-        log::debug!(
-            "코인 {} 캔들 데이터 부족: {} < {}",
-            coin,
-            candles.len(),
-            params.period
-        );
+    // 파라미터 검증
+    utils::validate_period(params.period, "BollingerBand")?;
+
+    // 경계 조건 체크
+    if !utils::check_sufficient_candles(candles.len(), params.period, coin) {
         return Ok(false);
     }
 
     // 캔들 데이터로 CandleStore 생성
-    let candles_vec = candles.to_vec();
-    let candle_store = CandleStore::new(candles_vec, candles.len() * 2, false);
+    let candle_store = utils::create_candle_store(candles);
 
     // BBandAnalyzer 생성
     let analyzer = BBandAnalyzer::new(params.period, params.dev_mult, &candle_store);
@@ -42,196 +38,214 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
     log::debug!("코인 {coin} 볼린저 밴드 - 상단: {upper:.2}, 중간: {middle:.2}, 하단: {lower:.2}");
 
     let result = match params.filter_type {
-        // 0: 가격이 상단밴드 위에 있는 경우 (과매수 상태)
-        0 => analyzer.is_above_upper_band(params.consecutive_n, params.p),
-        // 1: 가격이 하단밴드 아래에 있는 경우 (과매도 상태)
-        1 => analyzer.is_below_lower_band(params.consecutive_n, params.p),
-        // 2: 가격이 밴드 내에 있는 경우
-        2 => {
+        BollingerBandFilterType::AboveUpperBand => {
+            analyzer.is_above_upper_band(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::BelowLowerBand => {
+            analyzer.is_below_lower_band(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::InsideBand => {
             !analyzer.is_above_upper_band(params.consecutive_n, params.p)
                 && !analyzer.is_below_lower_band(params.consecutive_n, params.p)
         }
-        // 3: 가격이 밴드 밖에 있는 경우 (변동성 큼)
-        3 => {
+        BollingerBandFilterType::OutsideBand => {
             analyzer.is_above_upper_band(params.consecutive_n, params.p)
                 || analyzer.is_below_lower_band(params.consecutive_n, params.p)
         }
-        // 4: 가격이 중간밴드보다 위에 있는 경우 (상승 추세)
-        4 => analyzer.is_above_middle_band(params.consecutive_n, params.p),
-        // 5: 가격이 중간밴드보다 아래에 있는 경우 (하락 추세)
-        5 => analyzer.is_below_middle_band(params.consecutive_n, params.p),
-        // 6: 밴드 폭이 충분히 넓은지 확인 (변동성 충분)
-        6 => analyzer.is_band_width_sufficient(params.p),
-        // 7: 하단 밴드 아래에서 위로 돌파한 경우 (상승 반전 신호)
-        7 => analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p),
-        // 8: 스퀴즈 돌파 - 밴드가 좁아진 후 상위선을 돌파하는 경우
-        8 => analyzer.is_squeeze_breakout_with_close_above_upper(5),
-        // 9: 향상된 스퀴즈 돌파 - 밴드가 좁아지다가 좁은 상태를 유지한 후 상위선을 돌파
-        9 => analyzer.is_enhanced_squeeze_breakout_with_close_above_upper(3, 2, 0.02),
-        // 10: 스퀴즈 상태 확인 - 밴드 폭이 좁은 상태
-        10 => analyzer.is_band_width_squeeze(params.consecutive_n, 0.02, params.p),
-        // 11: 밴드 폭 좁아지는 중 (스퀴즈 진행 중)
-        11 => analyzer.is_band_width_narrowing(params.consecutive_n),
-        // 12: 스퀴즈 상태에서 확장 시작 (변동성 증가 시작)
-        12 => analyzer.is_squeeze_expansion_start(0.02),
-        // 13: 가격이 상단 밴드에서 아래로 돌파한 경우 (과매수 해제)
-        13 => analyzer.is_break_through_upper_band_from_below(params.consecutive_n, params.p),
-        // 14: 가격이 하단 밴드에서 위로 돌파한 경우 (과매도 해제)
-        14 => analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p),
-        // 15: 밴드 폭이 확장 중 (변동성 증가)
-        15 => !analyzer.is_band_width_narrowing(params.consecutive_n),
-        // 16: 가격이 중간 밴드 근처에서 횡보 (중립 상태)
-        16 => analyzer.is_middle_band_sideways(params.consecutive_n, params.p, 0.02),
-        // 17: 상단 밴드가 횡보 중 (저항선 형성)
-        17 => analyzer.is_upper_band_sideways(params.consecutive_n, params.p, 0.02),
-        // 18: 하단 밴드가 횡보 중 (지지선 형성)
-        18 => analyzer.is_lower_band_sideways(params.consecutive_n, params.p, 0.02),
-        // 19: 밴드 폭이 횡보 중 (변동성 안정)
-        19 => analyzer.is_band_width_sideways(params.consecutive_n, params.p, 0.02),
-        // 20: 가격이 상단 밴드에 터치 후 하락 (저항선 테스트)
-        20 => {
-            if analyzer.items.len() < 2 {
+        BollingerBandFilterType::AboveMiddleBand => {
+            analyzer.is_above_middle_band(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::BelowMiddleBand => {
+            analyzer.is_below_middle_band(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::BandWidthSufficient => analyzer.is_band_width_sufficient(params.p),
+        BollingerBandFilterType::BreakThroughLowerBand => {
+            analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::SqueezeBreakout => {
+            analyzer.is_squeeze_breakout_with_close_above_upper(params.squeeze_breakout_period)
+        }
+        BollingerBandFilterType::EnhancedSqueezeBreakout => analyzer
+            .is_enhanced_squeeze_breakout_with_close_above_upper(
+                params.enhanced_narrowing_period,
+                params.enhanced_squeeze_period,
+                params.squeeze_threshold,
+            ),
+        BollingerBandFilterType::SqueezeState => {
+            analyzer.is_band_width_squeeze(params.consecutive_n, params.squeeze_threshold, params.p)
+        }
+        BollingerBandFilterType::BandWidthNarrowing => {
+            analyzer.is_band_width_narrowing(params.consecutive_n)
+        }
+        BollingerBandFilterType::SqueezeExpansionStart => {
+            analyzer.is_squeeze_expansion_start(params.squeeze_threshold)
+        }
+        BollingerBandFilterType::BreakThroughUpperBand => {
+            analyzer.is_break_through_upper_band_from_below(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::BreakThroughLowerBandFromBelow => {
+            analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p)
+        }
+        BollingerBandFilterType::BandWidthExpanding => {
+            !analyzer.is_band_width_narrowing(params.consecutive_n)
+        }
+        BollingerBandFilterType::MiddleBandSideways => analyzer.is_middle_band_sideways(
+            params.consecutive_n,
+            params.p,
+            params.squeeze_threshold,
+        ),
+        BollingerBandFilterType::UpperBandSideways => analyzer.is_upper_band_sideways(
+            params.consecutive_n,
+            params.p,
+            params.squeeze_threshold,
+        ),
+        BollingerBandFilterType::LowerBandSideways => analyzer.is_lower_band_sideways(
+            params.consecutive_n,
+            params.p,
+            params.squeeze_threshold,
+        ),
+        BollingerBandFilterType::BandWidthSideways => analyzer.is_band_width_sideways(
+            params.consecutive_n,
+            params.p,
+            params.squeeze_threshold,
+        ),
+        BollingerBandFilterType::UpperBandTouch => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current = &analyzer.items[0];
-                let previous = &analyzer.items[1];
-
-                // 이전에 상단 밴드에 터치했고 현재 하락
-                previous.candle.close_price() >= previous.bband.upper() * 0.99
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
+                previous.candle.close_price()
+                    >= previous.bband.upper() * params.upper_touch_threshold
                     && current.candle.close_price() < current.bband.upper()
             }
         }
-        // 21: 가격이 하단 밴드에 터치 후 상승 (지지선 테스트)
-        21 => {
-            if analyzer.items.len() < 2 {
+        BollingerBandFilterType::LowerBandTouch => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current = &analyzer.items[0];
-                let previous = &analyzer.items[1];
-
-                // 이전에 하단 밴드에 터치했고 현재 상승
-                previous.candle.close_price() <= previous.bband.lower() * 1.01
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
+                previous.candle.close_price()
+                    <= previous.bband.lower() * params.lower_touch_threshold
                     && current.candle.close_price() > current.bband.lower()
             }
         }
-        // 22: 밴드 폭이 임계값을 돌파 (변동성 급증)
-        22 => analyzer.is_band_width_threshold_breakthrough(
-            params.consecutive_n,
-            1,
-            0.05, // 5% 임계값
-            params.p,
-        ),
-        // 23: 가격이 밴드 중앙에서 상단으로 이동 중 (상승 모멘텀)
-        23 => {
-            if analyzer.items.len() < 2 {
+        BollingerBandFilterType::BandWidthThresholdBreakthrough => analyzer
+            .is_band_width_threshold_breakthrough(
+                params.consecutive_n,
+                1,
+                params.medium_threshold,
+                params.p,
+            ),
+        BollingerBandFilterType::PriceMovingToUpperFromMiddle => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current = &analyzer.items[0];
-                let previous = &analyzer.items[1];
-
-                // 이전에는 중간 밴드 근처, 현재는 상단 밴드 근처
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
                 let prev_middle_dist =
                     (previous.candle.close_price() - previous.bband.middle()).abs();
                 let current_upper_dist =
                     (current.candle.close_price() - current.bband.upper()).abs();
                 let band_width = previous.bband.upper() - previous.bband.lower();
-
-                prev_middle_dist < band_width * 0.1 && current_upper_dist < band_width * 0.1
+                let threshold = params.large_threshold;
+                prev_middle_dist < band_width * threshold
+                    && current_upper_dist < band_width * threshold
             }
         }
-        // 24: 가격이 밴드 중앙에서 하단으로 이동 중 (하락 모멘텀)
-        24 => {
-            if analyzer.items.len() < 2 {
+        BollingerBandFilterType::PriceMovingToLowerFromMiddle => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current = &analyzer.items[0];
-                let previous = &analyzer.items[1];
-
-                // 이전에는 중간 밴드 근처, 현재는 하단 밴드 근처
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
                 let prev_middle_dist =
                     (previous.candle.close_price() - previous.bband.middle()).abs();
                 let current_lower_dist =
                     (current.candle.close_price() - current.bband.lower()).abs();
                 let band_width = previous.bband.upper() - previous.bband.lower();
-
-                prev_middle_dist < band_width * 0.1 && current_lower_dist < band_width * 0.1
+                let threshold = params.large_threshold;
+                prev_middle_dist < band_width * threshold
+                    && current_lower_dist < band_width * threshold
             }
         }
-        // 25: 밴드가 수렴 후 발산 시작 (변동성 증가 전조)
-        25 => {
-            if analyzer.items.len() < 3 {
+        BollingerBandFilterType::BandConvergenceThenDivergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
                 let current_width =
-                    analyzer.items[0].bband.upper() - analyzer.items[0].bband.lower();
-                let prev_width = analyzer.items[1].bband.upper() - analyzer.items[1].bband.lower();
-                let prev_prev_width =
-                    analyzer.items[2].bband.upper() - analyzer.items[2].bband.lower();
-
-                // 이전에 수렴했다가 현재 발산하기 시작
+                    analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
+                let prev_width = analyzer.items[params.p + 1].bband.upper()
+                    - analyzer.items[params.p + 1].bband.lower();
+                let prev_prev_width = analyzer.items[params.p + 2].bband.upper()
+                    - analyzer.items[params.p + 2].bband.lower();
                 prev_width < prev_prev_width && current_width > prev_width
             }
         }
-        // 26: 밴드가 발산 후 수렴 시작 (변동성 감소 전조)
-        26 => {
-            if analyzer.items.len() < 3 {
+        BollingerBandFilterType::BandDivergenceThenConvergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
                 let current_width =
-                    analyzer.items[0].bband.upper() - analyzer.items[0].bband.lower();
-                let prev_width = analyzer.items[1].bband.upper() - analyzer.items[1].bband.lower();
-                let prev_prev_width =
-                    analyzer.items[2].bband.upper() - analyzer.items[2].bband.lower();
-
-                // 이전에 발산했다가 현재 수렴하기 시작
+                    analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
+                let prev_width = analyzer.items[params.p + 1].bband.upper()
+                    - analyzer.items[params.p + 1].bband.lower();
+                let prev_prev_width = analyzer.items[params.p + 2].bband.upper()
+                    - analyzer.items[params.p + 2].bband.lower();
                 prev_width > prev_prev_width && current_width < prev_width
             }
         }
-        // 27: 가격이 밴드 내에서 상단으로 이동 중 (상승 압력)
-        27 => analyzer.is_all(
+        BollingerBandFilterType::PriceMovingToUpperWithinBand => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let middle = data.bband.middle();
                 let upper = data.bband.upper();
-
-                // 가격이 중간 밴드와 상단 밴드 사이에 있고, 중간보다 위에 있음
                 price > middle && price < upper
             },
             params.consecutive_n,
             params.p,
         ),
-        // 28: 가격이 밴드 내에서 하단으로 이동 중 (하락 압력)
-        28 => analyzer.is_all(
+        BollingerBandFilterType::PriceMovingToLowerWithinBand => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let middle = data.bband.middle();
                 let lower = data.bband.lower();
-
-                // 가격이 하단 밴드와 중간 밴드 사이에 있고, 중간보다 아래에 있음
                 price < middle && price > lower
             },
             params.consecutive_n,
             params.p,
         ),
-        // 29: 밴드 폭이 평균 대비 좁음 (저변동성)
-        29 => {
-            let current_width = analyzer.items[0].bband.upper() - analyzer.items[0].bband.lower();
-            let avg_price = analyzer.items[0].candle.close_price();
-            let width_ratio = current_width / avg_price;
-
-            // 밴드 폭이 가격의 2% 이하일 때 저변동성으로 판단
-            width_ratio <= 0.02
+        BollingerBandFilterType::LowVolatility => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let current_width =
+                    analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
+                let avg_price = analyzer.items[params.p].candle.close_price();
+                if avg_price == 0.0 {
+                    false
+                } else {
+                    let width_ratio = current_width / avg_price;
+                    width_ratio <= params.squeeze_threshold
+                }
+            }
         }
-        // 30: 밴드 폭이 평균 대비 넓음 (고변동성)
-        30 => {
-            let current_width = analyzer.items[0].bband.upper() - analyzer.items[0].bband.lower();
-            let avg_price = analyzer.items[0].candle.close_price();
-            let width_ratio = current_width / avg_price;
-
-            // 밴드 폭이 가격의 5% 이상일 때 고변동성으로 판단
-            width_ratio >= 0.05
+        BollingerBandFilterType::HighVolatility => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let current_width =
+                    analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
+                let avg_price = analyzer.items[params.p].candle.close_price();
+                if avg_price == 0.0 {
+                    false
+                } else {
+                    let width_ratio = current_width / avg_price;
+                    width_ratio >= params.medium_threshold
+                }
+            }
         }
-        _ => false,
     };
 
     Ok(result)
@@ -357,9 +371,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -374,9 +389,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 1,
+            filter_type: 1.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -391,9 +407,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 13,
+            filter_type: 13.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -408,9 +425,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 14,
+            filter_type: 14.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -425,9 +443,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 15,
+            filter_type: 15.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -442,9 +461,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 16,
+            filter_type: 16.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -459,9 +479,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 20,
+            filter_type: 20.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -476,9 +497,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 21,
+            filter_type: 21.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -493,9 +515,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 29,
+            filter_type: 29.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -510,9 +533,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 30,
+            filter_type: 30.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -527,9 +551,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -542,9 +567,10 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 99, // 유효하지 않은 필터 타입
+            filter_type: 99.into(), // 유효하지 않은 필터 타입
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_bollinger_band("TEST/USDT", &params, &candles);
         assert!(result.is_ok());

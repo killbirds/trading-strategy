@@ -1,7 +1,6 @@
-use super::MACDParams;
+use super::{MACDFilterType, MACDParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::macd_analyzer::MACDAnalyzer;
-use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
@@ -12,7 +11,7 @@ pub fn filter_macd<C: Candle + 'static>(
     candles: &[C],
 ) -> Result<bool> {
     log::debug!(
-        "MACD 필터 적용 - 빠른 기간: {}, 느린 기간: {}, 시그널 기간: {}, 타입: {}, 연속성: {}",
+        "MACD 필터 적용 - 빠른 기간: {}, 느린 기간: {}, 시그널 기간: {}, 타입: {:?}, 연속성: {}",
         params.fast_period,
         params.slow_period,
         params.signal_period,
@@ -20,21 +19,19 @@ pub fn filter_macd<C: Candle + 'static>(
         params.consecutive_n
     );
 
+    // 파라미터 검증
+    utils::validate_period(params.fast_period, "MACD fast_period")?;
+    utils::validate_period(params.slow_period, "MACD slow_period")?;
+    utils::validate_period(params.signal_period, "MACD signal_period")?;
+
     // 필터링 로직
     let required_length = params.slow_period + params.signal_period + params.consecutive_n; // 최소 필요 캔들 수
-    if candles.len() < required_length {
-        log::debug!(
-            "코인 {} 캔들 데이터 부족: {} < {}",
-            coin,
-            candles.len(),
-            required_length
-        );
+    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
         return Ok(false);
     }
 
     // 캔들 데이터로 CandleStore 생성
-    let candles_vec = candles.to_vec();
-    let candle_store = CandleStore::new(candles_vec, candles.len() * 2, false);
+    let candle_store = utils::create_candle_store(candles);
 
     // MACDAnalyzer 생성
     let analyzer = MACDAnalyzer::new(
@@ -44,111 +41,112 @@ pub fn filter_macd<C: Candle + 'static>(
         &candle_store,
     );
 
-    log::debug!("코인 {coin} MACD",);
+    log::debug!("코인 {coin} MACD 분석기 생성 완료");
 
     let result = match params.filter_type {
-        // 0: MACD 라인이 시그널 라인 위에 있는 경우 (상승 추세)
-        0 => {
-            if analyzer.items.len() < params.consecutive_n {
+        MACDFilterType::MacdAboveSignal => analyzer.is_all(
+            |data| data.is_macd_above_signal(),
+            params.consecutive_n,
+            params.p,
+        ),
+        MACDFilterType::MacdBelowSignal => analyzer.is_all(
+            |data| data.is_macd_below_signal(),
+            params.consecutive_n,
+            params.p,
+        ),
+        MACDFilterType::SignalCrossAbove => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                analyzer.is_all(
-                    |data| data.is_macd_above_signal(),
-                    params.consecutive_n,
-                    params.p,
-                )
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
+                let current_macd_above_signal = current.macd.macd_line > current.macd.signal_line;
+                let previous_macd_below_signal =
+                    previous.macd.macd_line < previous.macd.signal_line;
+                current_macd_above_signal && previous_macd_below_signal
             }
         }
-        // 1: MACD 라인이 시그널 라인 아래에 있는 경우 (하락 추세)
-        1 => {
-            if analyzer.items.len() < params.consecutive_n {
+        MACDFilterType::SignalCrossBelow => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                analyzer.is_all(
-                    |data| data.is_macd_below_signal(),
-                    params.consecutive_n,
-                    params.p,
-                )
+                let current = &analyzer.items[params.p];
+                let previous = &analyzer.items[params.p + 1];
+                let current_macd_below_signal = current.macd.macd_line < current.macd.signal_line;
+                let previous_macd_above_signal =
+                    previous.macd.macd_line > previous.macd.signal_line;
+                current_macd_below_signal && previous_macd_above_signal
             }
         }
-        // 2: MACD 라인이 시그널 라인을 상향 돌파한 경우 (매수 신호)
-        2 => analyzer.is_macd_crossed_above_signal(params.consecutive_n, 1),
-        // 3: MACD 라인이 시그널 라인을 하향 돌파한 경우 (매도 신호)
-        3 => analyzer.is_macd_crossed_below_signal(params.consecutive_n, 1),
-        // 4: 히스토그램이 임계값보다 큰 경우 (강한 상승)
-        4 => {
+        MACDFilterType::HistogramAboveThreshold => {
             analyzer.is_histogram_above_threshold(params.threshold, params.consecutive_n, params.p)
         }
-        // 5: 히스토그램이 임계값보다 작은 경우 (강한 하락)
-        5 => {
+        MACDFilterType::HistogramBelowThreshold => {
             analyzer.is_histogram_below_threshold(params.threshold, params.consecutive_n, params.p)
         }
-        // 6: MACD 라인이 제로라인을 상향 돌파 (강한 상승 신호)
-        6 => {
-            if analyzer.items.len() < 2 {
+        MACDFilterType::ZeroLineCrossAbove => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let previous_macd = analyzer.items[1].macd.macd_line;
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let previous_macd = analyzer.items[params.p + 1].macd.macd_line;
                 current_macd > 0.0 && previous_macd <= 0.0
             }
         }
-        // 7: MACD 라인이 제로라인을 하향 돌파 (강한 하락 신호)
-        7 => {
-            if analyzer.items.len() < 2 {
+        MACDFilterType::ZeroLineCrossBelow => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let previous_macd = analyzer.items[1].macd.macd_line;
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let previous_macd = analyzer.items[params.p + 1].macd.macd_line;
                 current_macd < 0.0 && previous_macd >= 0.0
             }
         }
-        // 8: 히스토그램이 양수에서 음수로 전환 (모멘텀 약화)
-        8 => {
-            if analyzer.items.len() < 2 {
+        MACDFilterType::HistogramNegativeTurn => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_hist = analyzer.items[0].macd.histogram;
-                let previous_hist = analyzer.items[1].macd.histogram;
+                let current_hist = analyzer.items[params.p].macd.histogram;
+                let previous_hist = analyzer.items[params.p + 1].macd.histogram;
                 current_hist < 0.0 && previous_hist >= 0.0
             }
         }
-        // 9: 히스토그램이 음수에서 양수로 전환 (모멘텀 강화)
-        9 => {
-            if analyzer.items.len() < 2 {
+        MACDFilterType::HistogramPositiveTurn => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_hist = analyzer.items[0].macd.histogram;
-                let previous_hist = analyzer.items[1].macd.histogram;
+                let current_hist = analyzer.items[params.p].macd.histogram;
+                let previous_hist = analyzer.items[params.p + 1].macd.histogram;
                 current_hist > 0.0 && previous_hist <= 0.0
             }
         }
-        // 10: MACD와 시그널 모두 제로라인 위에 있음 (강한 상승 추세)
-        10 => {
-            if analyzer.items.is_empty() {
+        MACDFilterType::StrongUptrend => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let current_data = &analyzer.items[0];
+                let current_data = &analyzer.items[params.p];
                 current_data.macd.macd_line > 0.0 && current_data.macd.signal_line > 0.0
             }
         }
-        // 11: MACD와 시그널 모두 제로라인 아래에 있음 (강한 하락 추세)
-        11 => {
-            if analyzer.items.is_empty() {
+        MACDFilterType::StrongDowntrend => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let current_data = &analyzer.items[0];
+                let current_data = &analyzer.items[params.p];
                 current_data.macd.macd_line < 0.0 && current_data.macd.signal_line < 0.0
             }
         }
-        // 12: MACD 라인이 상승 중 (연속 상승)
-        12 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        MACDFilterType::MacdRising => {
+            // Note: Uses strict comparison (<=) to ensure each consecutive value is strictly greater
+            // This means MACD must be strictly increasing, not just non-decreasing
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut ascending = true;
                 for i in 0..params.consecutive_n {
-                    if analyzer.items[i].macd.macd_line <= analyzer.items[i + 1].macd.macd_line {
+                    if analyzer.items[params.p + i].macd.macd_line
+                        <= analyzer.items[params.p + i + 1].macd.macd_line
+                    {
                         ascending = false;
                         break;
                     }
@@ -156,14 +154,17 @@ pub fn filter_macd<C: Candle + 'static>(
                 ascending
             }
         }
-        // 13: MACD 라인이 하락 중 (연속 하락)
-        13 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        MACDFilterType::MacdFalling => {
+            // Note: Uses strict comparison (>=) to ensure each consecutive value is strictly less
+            // This means MACD must be strictly decreasing, not just non-increasing
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut descending = true;
                 for i in 0..params.consecutive_n {
-                    if analyzer.items[i].macd.macd_line >= analyzer.items[i + 1].macd.macd_line {
+                    if analyzer.items[params.p + i].macd.macd_line
+                        >= analyzer.items[params.p + i + 1].macd.macd_line
+                    {
                         descending = false;
                         break;
                     }
@@ -171,15 +172,14 @@ pub fn filter_macd<C: Candle + 'static>(
                 descending
             }
         }
-        // 14: 히스토그램이 확대 중 (모멘텀 강화)
-        14 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        MACDFilterType::HistogramExpanding => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut expanding = true;
                 for i in 0..params.consecutive_n {
-                    let current_hist = analyzer.items[i].macd.histogram.abs();
-                    let previous_hist = analyzer.items[i + 1].macd.histogram.abs();
+                    let current_hist = analyzer.items[params.p + i].macd.histogram.abs();
+                    let previous_hist = analyzer.items[params.p + i + 1].macd.histogram.abs();
                     if current_hist <= previous_hist {
                         expanding = false;
                         break;
@@ -188,15 +188,14 @@ pub fn filter_macd<C: Candle + 'static>(
                 expanding
             }
         }
-        // 15: 히스토그램이 축소 중 (모멘텀 약화)
-        15 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        MACDFilterType::HistogramContracting => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut contracting = true;
                 for i in 0..params.consecutive_n {
-                    let current_hist = analyzer.items[i].macd.histogram.abs();
-                    let previous_hist = analyzer.items[i + 1].macd.histogram.abs();
+                    let current_hist = analyzer.items[params.p + i].macd.histogram.abs();
+                    let previous_hist = analyzer.items[params.p + i + 1].macd.histogram.abs();
                     if current_hist >= previous_hist {
                         contracting = false;
                         break;
@@ -205,73 +204,71 @@ pub fn filter_macd<C: Candle + 'static>(
                 contracting
             }
         }
-        // 16: MACD 다이버전스 (가격 상승, MACD 하락)
-        16 => {
-            if analyzer.items.len() < 3 {
+        MACDFilterType::Divergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[0].candle.close_price();
-                let previous_price = analyzer.items[2].candle.close_price();
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let previous_macd = analyzer.items[2].macd.macd_line;
-
-                // 가격은 상승했지만 MACD는 하락 (음의 다이버전스)
+                let current_price = analyzer.items[params.p].candle.close_price();
+                let previous_price = analyzer.items[params.p + 2].candle.close_price();
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let previous_macd = analyzer.items[params.p + 2].macd.macd_line;
                 current_price > previous_price && current_macd < previous_macd
             }
         }
-        // 17: MACD 컨버전스 (가격 하락, MACD 상승)
-        17 => {
-            if analyzer.items.len() < 3 {
+        MACDFilterType::Convergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[0].candle.close_price();
-                let previous_price = analyzer.items[2].candle.close_price();
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let previous_macd = analyzer.items[2].macd.macd_line;
-
-                // 가격은 하락했지만 MACD는 상승 (양의 다이버전스)
+                let current_price = analyzer.items[params.p].candle.close_price();
+                let previous_price = analyzer.items[params.p + 2].candle.close_price();
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let previous_macd = analyzer.items[params.p + 2].macd.macd_line;
                 current_price < previous_price && current_macd > previous_macd
             }
         }
-        // 18: MACD가 과매수 구간 (극도 상승)
-        18 => {
-            if analyzer.items.is_empty() {
+        MACDFilterType::Overbought => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let avg_price = analyzer.items[0].candle.close_price();
-                let macd_ratio = current_macd / avg_price;
-
-                // MACD가 가격의 2% 이상일 때 과매수로 판단
-                macd_ratio >= 0.02
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let avg_price = analyzer.items[params.p].candle.close_price();
+                if avg_price == 0.0 {
+                    false
+                } else {
+                    let macd_ratio = current_macd / avg_price;
+                    macd_ratio >= params.overbought_threshold
+                }
             }
         }
-        // 19: MACD가 과매도 구간 (극도 하락)
-        19 => {
-            if analyzer.items.is_empty() {
+        MACDFilterType::Oversold => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let current_macd = analyzer.items[0].macd.macd_line;
-                let avg_price = analyzer.items[0].candle.close_price();
-                let macd_ratio = current_macd / avg_price;
-
-                // MACD가 가격의 -2% 이하일 때 과매도로 판단
-                macd_ratio <= -0.02
+                let current_macd = analyzer.items[params.p].macd.macd_line;
+                let avg_price = analyzer.items[params.p].candle.close_price();
+                if avg_price == 0.0 {
+                    false
+                } else {
+                    let macd_ratio = current_macd / avg_price;
+                    macd_ratio <= -params.oversold_threshold
+                }
             }
         }
-        // 20: MACD가 횡보 중 (변화율이 임계값 이하)
-        20 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        MACDFilterType::Sideways => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut sideways = true;
                 for i in 0..params.consecutive_n {
-                    let current_macd = analyzer.items[i].macd.macd_line;
-                    let previous_macd = analyzer.items[i + 1].macd.macd_line;
-                    let change_rate = (current_macd - previous_macd).abs() / previous_macd.abs();
-
-                    // 변화율이 5% 이상이면 횡보가 아님
-                    if change_rate > 0.05 {
+                    let current_macd = analyzer.items[params.p + i].macd.macd_line;
+                    let previous_macd = analyzer.items[params.p + i + 1].macd.macd_line;
+                    let prev_abs = previous_macd.abs();
+                    if prev_abs == 0.0 {
+                        sideways = false;
+                        break;
+                    }
+                    let change_rate = (current_macd - previous_macd).abs() / prev_abs;
+                    if change_rate > params.sideways_threshold {
                         sideways = false;
                         break;
                     }
@@ -279,7 +276,6 @@ pub fn filter_macd<C: Candle + 'static>(
                 sideways
             }
         }
-        _ => false,
     };
 
     Ok(result)

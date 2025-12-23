@@ -1,57 +1,39 @@
-use super::ADXParams;
+use super::{ADXFilterType, ADXParams, utils};
 use crate::analyzer::adx_analyzer::ADXAnalyzer;
-use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 pub fn filter_adx<C: Candle + 'static>(
     coin: &str,
-    params: ADXParams,
+    params: &ADXParams,
     candles: &[C],
 ) -> Result<bool> {
-    // 파라미터 유효성 검증
-    if params.period == 0 {
-        return Err(anyhow::anyhow!(
-            "ADX 파라미터 오류: period는 0보다 커야 합니다"
-        ));
-    }
-    if !(0.0..=100.0).contains(&params.threshold) {
-        return Err(anyhow::anyhow!(
-            "ADX 파라미터 오류: threshold는 0에서 100 사이여야 합니다"
-        ));
-    }
-    if !(0..=30).contains(&params.filter_type) {
-        return Err(anyhow::anyhow!(
-            "ADX 파라미터 오류: filter_type은 0에서 30 사이여야 합니다"
-        ));
-    }
-
     log::debug!(
-        "ADX 필터 적용 - 기간: {}, 임계값: {}, 타입: {}, 연속성: {}",
+        "ADX 필터 적용 - 기간: {}, 임계값: {}, 타입: {:?}, 연속성: {}",
         params.period,
         params.threshold,
         params.filter_type,
         params.consecutive_n
     );
 
+    // 파라미터 유효성 검증
+    utils::validate_period(params.period, "ADX")?;
+    if !(0.0..=100.0).contains(&params.threshold) {
+        return Err(anyhow::anyhow!(
+            "ADX 파라미터 오류: threshold는 0에서 100 사이여야 합니다"
+        ));
+    }
+
     // 필터링할 코인 식별
     let required_length = params.period * 2 + params.consecutive_n; // ADX 계산에 필요한 최소 기간 + 연속성
 
-    if candles.len() < required_length {
-        log::debug!(
-            "코인 {} 캔들 데이터 부족: {} < {}",
-            coin,
-            candles.len(),
-            required_length
-        );
+    // 경계 조건 체크
+    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
         return Ok(false);
     }
 
-    // Vec<C>로 캔들 데이터 복사 (CandleStore 생성용)
-    let candles_vec = candles.to_vec();
-
     // CandleStore 생성 및 ADXAnalyzer 초기화
-    let candle_store = CandleStore::new(candles_vec, candles.len() * 2, false);
+    let candle_store = utils::create_candle_store(candles);
 
     // ADXAnalyzer 생성 (trading-strategy의 analyzer 사용)
     let adx_periods = vec![params.period];
@@ -60,303 +42,374 @@ pub fn filter_adx<C: Candle + 'static>(
     // analyzer에서 ADX 값 가져오기
     let adx = analyzer.get_adx(params.period);
 
-    // +DI, -DI 값은 ADXAnalyzer에서 직접 제공하지 않으므로 계산
-    // 여기서는 기존 함수를 사용하거나 필터링 로직을 수정해야 함
-    let (_, pdi, mdi) = calculate_directional_indicators(candles, params.period);
-
     if adx.is_nan() {
         log::debug!("코인 {coin} ADX 계산 실패");
         return Ok(false);
     }
 
-    log::debug!("코인 {coin} ADX: {adx:.2}, +DI: {pdi:.2}, -DI: {mdi:.2}");
+    // 로그 출력용으로 +DI, -DI 값 가져오기
+    if let Some(adx_data) = analyzer
+        .items
+        .first()
+        .map(|data| data.adxs.get(&params.period))
+    {
+        log::debug!(
+            "코인 {coin} ADX: {adx:.2}, +DI: {:.2}, -DI: {:.2}",
+            adx_data.plus_di,
+            adx_data.minus_di
+        );
+    }
 
     let result = match params.filter_type {
-        // 0: ADX가 임계값보다 낮은 경우 (약한 추세)
-        0 => {
+        ADXFilterType::BelowThreshold => {
             if params.threshold == 25.0 {
                 // 기본 임계값 25인 경우 is_weak_trend 함수 사용
                 analyzer.is_weak_trend(params.consecutive_n, params.p)
             } else {
-                adx <= params.threshold
+                // 다른 임계값의 경우 consecutive_n과 p를 고려하여 확인
+                if analyzer.items.len() < params.p + params.consecutive_n {
+                    false
+                } else {
+                    analyzer
+                        .items
+                        .iter()
+                        .skip(params.p)
+                        .take(params.consecutive_n)
+                        .all(|data| data.get_adx(params.period) <= params.threshold)
+                }
             }
         }
-        // 1: ADX가 임계값보다 높은 경우 (강한 추세)
-        1 => {
+        ADXFilterType::AboveThreshold => {
             if params.threshold == 25.0 {
-                // 기본 임계값 25인 경우 is_strong_trend 함수 사용
                 analyzer.is_strong_trend(params.consecutive_n, params.p)
             } else if params.threshold == 50.0 {
-                // 임계값 50인 경우 is_very_strong_trend 함수 사용
                 analyzer.is_very_strong_trend(params.consecutive_n, params.p)
             } else {
-                adx > params.threshold
+                // 다른 임계값의 경우 consecutive_n과 p를 고려하여 확인
+                if analyzer.items.len() < params.p + params.consecutive_n {
+                    false
+                } else {
+                    analyzer
+                        .items
+                        .iter()
+                        .skip(params.p)
+                        .take(params.consecutive_n)
+                        .all(|data| data.get_adx(params.period) > params.threshold)
+                }
             }
         }
-        // 2: +DI가 -DI보다 높은 경우 (상승 추세)
-        2 => pdi > mdi,
-        // 3: -DI가 +DI보다 높은 경우 (하락 추세)
-        3 => mdi > pdi,
-        // 4: ADX가 임계값보다 높고 +DI가 -DI보다 높은 경우 (강한 상승 추세)
-        4 => adx > params.threshold && pdi > mdi,
-        // 5: ADX가 임계값보다 높고 -DI가 +DI보다 높은 경우 (강한 하락 추세)
-        5 => adx > params.threshold && mdi > pdi,
-        // 6: ADX가 상승하는 중 (추세 강화)
-        6 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::PDIAboveMDI => {
+            // consecutive_n과 p를 고려
+            if analyzer.items.len() < params.p + params.consecutive_n {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                !prev_adx.is_nan() && adx > prev_adx
+                analyzer
+                    .items
+                    .iter()
+                    .skip(params.p)
+                    .take(params.consecutive_n)
+                    .all(|data| {
+                        let adx_data = data.adxs.get(&params.period);
+                        adx_data.plus_di > adx_data.minus_di
+                    })
             }
         }
-        // 7: ADX가 하락하는 중 (추세 약화)
-        7 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::MDIAbovePDI => {
+            // consecutive_n과 p를 고려
+            if analyzer.items.len() < params.p + params.consecutive_n {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                !prev_adx.is_nan() && adx < prev_adx
+                analyzer
+                    .items
+                    .iter()
+                    .skip(params.p)
+                    .take(params.consecutive_n)
+                    .all(|data| {
+                        let adx_data = data.adxs.get(&params.period);
+                        adx_data.minus_di > adx_data.plus_di
+                    })
             }
         }
-        // 8: +DI와 -DI의 간격이 넓어지는 중 (추세 명확화)
-        8 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::StrongUptrend => {
+            // consecutive_n과 p를 고려
+            if analyzer.items.len() < params.p + params.consecutive_n {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
-                let current_gap = (pdi - mdi).abs();
-                let prev_gap = (prev_pdi - prev_mdi).abs();
+                analyzer
+                    .items
+                    .iter()
+                    .skip(params.p)
+                    .take(params.consecutive_n)
+                    .all(|data| {
+                        let adx_data = data.adxs.get(&params.period);
+                        adx_data.adx > params.threshold && adx_data.plus_di > adx_data.minus_di
+                    })
+            }
+        }
+        ADXFilterType::StrongDowntrend => {
+            // consecutive_n과 p를 고려
+            if analyzer.items.len() < params.p + params.consecutive_n {
+                false
+            } else {
+                analyzer
+                    .items
+                    .iter()
+                    .skip(params.p)
+                    .take(params.consecutive_n)
+                    .all(|data| {
+                        let adx_data = data.adxs.get(&params.period);
+                        adx_data.adx > params.threshold && adx_data.minus_di > adx_data.plus_di
+                    })
+            }
+        }
+        ADXFilterType::ADXRising => {
+            if analyzer.items.len() < params.p + 2 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                current_adx > prev_adx
+            }
+        }
+        ADXFilterType::ADXFalling => {
+            if analyzer.items.len() < params.p + 2 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                current_adx < prev_adx
+            }
+        }
+        ADXFilterType::DIGapExpanding => {
+            if analyzer.items.len() < params.p + 2 {
+                false
+            } else {
+                let current_adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                let prev_adx_data = analyzer.items[params.p + 1].adxs.get(&params.period);
+                let current_gap = (current_adx_data.plus_di - current_adx_data.minus_di).abs();
+                let prev_gap = (prev_adx_data.plus_di - prev_adx_data.minus_di).abs();
                 current_gap > prev_gap
             }
         }
-        // 9: +DI와 -DI의 간격이 좁아지는 중 (추세 불명확)
-        9 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::DIGapContracting => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
-                let current_gap = (pdi - mdi).abs();
-                let prev_gap = (prev_pdi - prev_mdi).abs();
+                let current_adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                let prev_adx_data = analyzer.items[params.p + 1].adxs.get(&params.period);
+                let current_gap = (current_adx_data.plus_di - current_adx_data.minus_di).abs();
+                let prev_gap = (prev_adx_data.plus_di - prev_adx_data.minus_di).abs();
                 current_gap < prev_gap
             }
         }
-        // 10: ADX가 극도로 높음 (50 이상)
-        10 => adx >= 50.0,
-        // 11: ADX가 극도로 낮음 (10 이하)
-        11 => adx <= 10.0,
-        // 12: ADX가 중간 수준 (20-30)
-        12 => (20.0..=30.0).contains(&adx),
-        // 13: +DI가 -DI를 상향 돌파
-        13 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::ExtremeHigh => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
-                prev_pdi <= prev_mdi && pdi > mdi
+                analyzer.items[params.p].get_adx(params.period) >= 50.0
             }
         }
-        // 14: -DI가 +DI를 상향 돌파
-        14 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::ExtremeLow => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (_, prev_pdi, prev_mdi) = calculate_adx_values(prev_candles, params.period);
-                prev_mdi <= prev_pdi && mdi > pdi
+                analyzer.items[params.p].get_adx(params.period) <= 10.0
             }
         }
-        // 15: ADX가 횡보 중 (변화율이 임계값 이하)
-        15 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::MiddleLevel => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let change_rate = (adx - prev_adx).abs() / prev_adx;
-                change_rate <= 0.05 // 5% 이하 변화
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                (20.0..=30.0).contains(&current_adx)
             }
         }
-        // 16: ADX가 급등 중 (변화율이 임계값 이상)
-        16 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::PDICrossAboveMDI => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let change_rate = (adx - prev_adx) / prev_adx;
-                change_rate >= 0.1 // 10% 이상 증가
+                let current_adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                let prev_adx_data = analyzer.items[params.p + 1].adxs.get(&params.period);
+                prev_adx_data.plus_di <= prev_adx_data.minus_di
+                    && current_adx_data.plus_di > current_adx_data.minus_di
             }
         }
-        // 17: ADX가 급락 중 (변화율이 임계값 이상)
-        17 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::MDICrossAbovePDI => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let change_rate = (prev_adx - adx) / prev_adx;
-                change_rate >= 0.1 // 10% 이상 감소
+                let current_adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                let prev_adx_data = analyzer.items[params.p + 1].adxs.get(&params.period);
+                prev_adx_data.minus_di <= prev_adx_data.plus_di
+                    && current_adx_data.minus_di > current_adx_data.plus_di
             }
         }
-        // 18: +DI와 -DI가 모두 높음 (강한 방향성)
-        18 => pdi > 25.0 && mdi > 25.0,
-        // 19: +DI와 -DI가 모두 낮음 (약한 방향성)
-        19 => pdi < 15.0 && mdi < 15.0,
-        // 20: ADX가 +DI보다 높음 (추세 강도 > 방향성)
-        20 => adx > pdi,
-        // 21: ADX가 -DI보다 높음 (추세 강도 > 방향성)
-        21 => adx > mdi,
-        // 22: +DI가 ADX보다 높음 (방향성 > 추세 강도)
-        22 => pdi > adx,
-        // 23: -DI가 ADX보다 높음 (방향성 > 추세 강도)
-        23 => mdi > adx,
-        // 24: ADX가 상승 추세에서 하락 전환
-        24 => {
-            if candles.len() < params.period * 2 + 3 {
+        ADXFilterType::Sideways => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let prev_prev_candles = &candles[..candles.len() - 2];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let (prev_prev_adx, _, _) = calculate_adx_values(prev_prev_candles, params.period);
-                prev_prev_adx < prev_adx && prev_adx > adx
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                if prev_adx == 0.0 {
+                    false
+                } else {
+                    let change_rate = (current_adx - prev_adx).abs() / prev_adx;
+                    change_rate <= 0.05
+                }
             }
         }
-        // 25: ADX가 하락 추세에서 상승 전환
-        25 => {
-            if candles.len() < params.period * 2 + 3 {
+        ADXFilterType::Surge => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let prev_prev_candles = &candles[..candles.len() - 2];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let (prev_prev_adx, _, _) = calculate_adx_values(prev_prev_candles, params.period);
-                prev_prev_adx > prev_adx && prev_adx < adx
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                if prev_adx == 0.0 {
+                    false
+                } else {
+                    let change_rate = (current_adx - prev_adx) / prev_adx;
+                    change_rate >= 0.1
+                }
             }
         }
-        // 26: +DI와 -DI가 교차 중 (방향성 불명확)
-        26 => {
-            let gap = (pdi - mdi).abs();
-            gap <= 2.0 // 2% 이하 차이
-        }
-        // 27: +DI가 극도로 높음 (40 이상)
-        27 => pdi >= 40.0,
-        // 28: -DI가 극도로 높음 (40 이상)
-        28 => mdi >= 40.0,
-        // 29: ADX가 안정적 (변화율이 매우 낮음)
-        29 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::Crash => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let change_rate = (adx - prev_adx).abs() / prev_adx;
-                change_rate <= 0.02 // 2% 이하 변화
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                if prev_adx == 0.0 {
+                    false
+                } else {
+                    let change_rate = (prev_adx - current_adx) / prev_adx;
+                    change_rate >= 0.1
+                }
             }
         }
-        // 30: ADX가 불안정 (변화율이 매우 높음)
-        30 => {
-            if candles.len() < params.period * 2 + 2 {
+        ADXFilterType::StrongDirectionality => {
+            if analyzer.items.len() <= params.p {
                 false
             } else {
-                let prev_candles = &candles[..candles.len() - 1];
-                let (prev_adx, _, _) = calculate_adx_values(prev_candles, params.period);
-                let change_rate = (adx - prev_adx).abs() / prev_adx;
-                change_rate >= 0.15 // 15% 이상 변화
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.plus_di > 25.0 && adx_data.minus_di > 25.0
             }
         }
-        _ => false,
+        ADXFilterType::WeakDirectionality => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.plus_di < 15.0 && adx_data.minus_di < 15.0
+            }
+        }
+        ADXFilterType::TrendStrengthHigherThanDirection => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.adx > adx_data.plus_di
+            }
+        }
+        ADXFilterType::ADXHigherThanMDI => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.adx > adx_data.minus_di
+            }
+        }
+        ADXFilterType::PDIHigherThanADX => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.plus_di > adx_data.adx
+            }
+        }
+        ADXFilterType::MDIHigherThanADX => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.minus_di > adx_data.adx
+            }
+        }
+        ADXFilterType::TrendReversalDown => {
+            if analyzer.items.len() < params.p + 3 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                let prev_prev_adx = analyzer.items[params.p + 2].get_adx(params.period);
+                prev_prev_adx < prev_adx && prev_adx > current_adx
+            }
+        }
+        ADXFilterType::TrendReversalUp => {
+            if analyzer.items.len() < params.p + 3 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                let prev_prev_adx = analyzer.items[params.p + 2].get_adx(params.period);
+                prev_prev_adx > prev_adx && prev_adx < current_adx
+            }
+        }
+        ADXFilterType::DICrossover => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                let gap = (adx_data.plus_di - adx_data.minus_di).abs();
+                gap <= 2.0
+            }
+        }
+        ADXFilterType::ExtremePDI => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.plus_di >= 40.0
+            }
+        }
+        ADXFilterType::ExtremeMDI => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                let adx_data = analyzer.items[params.p].adxs.get(&params.period);
+                adx_data.minus_di >= 40.0
+            }
+        }
+        ADXFilterType::Stable => {
+            if analyzer.items.len() < params.p + 2 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                if prev_adx == 0.0 {
+                    false
+                } else {
+                    let change_rate = (current_adx - prev_adx).abs() / prev_adx;
+                    change_rate <= 0.02
+                }
+            }
+        }
+        ADXFilterType::Unstable => {
+            if analyzer.items.len() < params.p + 2 {
+                false
+            } else {
+                let current_adx = analyzer.items[params.p].get_adx(params.period);
+                let prev_adx = analyzer.items[params.p + 1].get_adx(params.period);
+                if prev_adx == 0.0 {
+                    false
+                } else {
+                    let change_rate = (current_adx - prev_adx).abs() / prev_adx;
+                    change_rate >= 0.15
+                }
+            }
+        }
     };
 
     Ok(result)
-}
-
-// ADX 값들을 계산하는 헬퍼 함수
-fn calculate_adx_values<C: Candle>(candles: &[C], period: usize) -> (f64, f64, f64) {
-    let (dx, pdi, mdi) = calculate_directional_indicators(candles, period);
-    (dx, pdi, mdi)
-}
-
-// 방향 지표(+DI, -DI) 계산 함수
-fn calculate_directional_indicators<C: Candle>(candles: &[C], period: usize) -> (f64, f64, f64) {
-    if candles.len() < period * 2 {
-        return (f64::NAN, f64::NAN, f64::NAN);
-    }
-
-    // 상승 및 하락 이동 값 계산
-    let mut tr_values = Vec::with_capacity(candles.len() - 1);
-    let mut plus_dm = Vec::with_capacity(candles.len() - 1);
-    let mut minus_dm = Vec::with_capacity(candles.len() - 1);
-
-    for i in 1..candles.len() {
-        let high = candles[i].high_price();
-        let low = candles[i].low_price();
-        let prev_high = candles[i - 1].high_price();
-        let prev_low = candles[i - 1].low_price();
-        let prev_close = candles[i - 1].close_price();
-
-        // True Range 계산
-        let tr = (high - low)
-            .max((high - prev_close).abs())
-            .max((low - prev_close).abs());
-        tr_values.push(tr);
-
-        // Plus DM
-        let up_move = high - prev_high;
-        let down_move = prev_low - low;
-
-        if up_move > down_move && up_move > 0.0 {
-            plus_dm.push(up_move);
-        } else {
-            plus_dm.push(0.0);
-        }
-
-        // Minus DM
-        if down_move > up_move && down_move > 0.0 {
-            minus_dm.push(down_move);
-        } else {
-            minus_dm.push(0.0);
-        }
-    }
-
-    // 평균 TR, +DI, -DI 계산
-    if tr_values.len() < period {
-        return (f64::NAN, f64::NAN, f64::NAN);
-    }
-
-    let mut smoothed_tr = tr_values.iter().take(period).sum::<f64>();
-    let mut smoothed_plus_dm = plus_dm.iter().take(period).sum::<f64>();
-    let mut smoothed_minus_dm = minus_dm.iter().take(period).sum::<f64>();
-
-    for i in period..tr_values.len() {
-        smoothed_tr = smoothed_tr - (smoothed_tr / period as f64) + tr_values[i];
-        smoothed_plus_dm = smoothed_plus_dm - (smoothed_plus_dm / period as f64) + plus_dm[i];
-        smoothed_minus_dm = smoothed_minus_dm - (smoothed_minus_dm / period as f64) + minus_dm[i];
-    }
-
-    // +DI, -DI 계산
-    if smoothed_tr == 0.0 {
-        return (f64::NAN, f64::NAN, f64::NAN);
-    }
-
-    let plus_di = 100.0 * (smoothed_plus_dm / smoothed_tr);
-    let minus_di = 100.0 * (smoothed_minus_dm / smoothed_tr);
-
-    // DX 계산
-    let dx = if plus_di + minus_di == 0.0 {
-        0.0
-    } else {
-        let diff = (plus_di - minus_di).abs();
-        100.0 * (diff / (plus_di + minus_di))
-    };
-
-    (dx, plus_di, minus_di)
 }
 
 #[cfg(test)]
@@ -439,12 +492,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 10, // ADX가 극도로 높음
+            filter_type: 10.into(), // ADX가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_extreme_high = result.unwrap();
         println!("ADX 극도 높음 테스트 결과: {is_extreme_high}");
@@ -456,12 +509,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 11, // ADX가 극도로 낮음
+            filter_type: 11.into(), // ADX가 극도로 낮음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_extreme_low = result.unwrap();
         println!("ADX 극도 낮음 테스트 결과: {is_extreme_low}");
@@ -473,12 +526,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 12, // ADX가 중간 수준
+            filter_type: 12.into(), // ADX가 중간 수준
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_middle_level = result.unwrap();
         println!("ADX 중간 수준 테스트 결과: {is_middle_level}");
@@ -490,12 +543,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 13, // +DI가 -DI를 상향 돌파
+            filter_type: 13.into(), // +DI가 -DI를 상향 돌파
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_cross_above = result.unwrap();
         println!("+DI가 -DI를 상향 돌파 테스트 결과: {is_cross_above}");
@@ -507,12 +560,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 14, // -DI가 +DI를 상향 돌파
+            filter_type: 14.into(), // -DI가 +DI를 상향 돌파
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_cross_above = result.unwrap();
         println!("-DI가 +DI를 상향 돌파 테스트 결과: {is_cross_above}");
@@ -524,12 +577,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 15, // ADX가 횡보 중
+            filter_type: 15.into(), // ADX가 횡보 중
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_sideways = result.unwrap();
         println!("ADX 횡보 테스트 결과: {is_sideways}");
@@ -541,12 +594,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 16, // ADX가 급등 중
+            filter_type: 16.into(), // ADX가 급등 중
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_surge = result.unwrap();
         println!("ADX 급등 테스트 결과: {is_surge}");
@@ -558,12 +611,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 17, // ADX가 급락 중
+            filter_type: 17.into(), // ADX가 급락 중
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_crash = result.unwrap();
         println!("ADX 급락 테스트 결과: {is_crash}");
@@ -575,12 +628,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 18, // +DI와 -DI가 모두 높음
+            filter_type: 18.into(), // +DI와 -DI가 모두 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_strong_directionality = result.unwrap();
         println!("강한 방향성 테스트 결과: {is_strong_directionality}");
@@ -592,12 +645,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 19, // +DI와 -DI가 모두 낮음
+            filter_type: 19.into(), // +DI와 -DI가 모두 낮음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_weak_directionality = result.unwrap();
         println!("약한 방향성 테스트 결과: {is_weak_directionality}");
@@ -609,12 +662,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 20, // ADX가 +DI보다 높음
+            filter_type: 20.into(), // ADX가 +DI보다 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_trend_strength_higher = result.unwrap();
         println!("추세 강도 > 방향성 테스트 결과: {is_trend_strength_higher}");
@@ -626,12 +679,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 22, // +DI가 ADX보다 높음
+            filter_type: 22.into(), // +DI가 ADX보다 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_direction_higher = result.unwrap();
         println!("방향성 > 추세 강도 테스트 결과: {is_direction_higher}");
@@ -643,12 +696,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 24, // ADX가 상승 추세에서 하락 전환
+            filter_type: 24.into(), // ADX가 상승 추세에서 하락 전환
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_reversal_down = result.unwrap();
         println!("ADX 상승에서 하락 전환 테스트 결과: {is_reversal_down}");
@@ -660,12 +713,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 25, // ADX가 하락 추세에서 상승 전환
+            filter_type: 25.into(), // ADX가 하락 추세에서 상승 전환
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_reversal_up = result.unwrap();
         println!("ADX 하락에서 상승 전환 테스트 결과: {is_reversal_up}");
@@ -677,12 +730,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 26, // +DI와 -DI가 교차 중
+            filter_type: 26.into(), // +DI와 -DI가 교차 중
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_crossover = result.unwrap();
         println!("+DI와 -DI 교차 테스트 결과: {is_crossover}");
@@ -694,12 +747,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 27, // +DI가 극도로 높음
+            filter_type: 27.into(), // +DI가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_extreme_pdi = result.unwrap();
         println!("+DI 극도 높음 테스트 결과: {is_extreme_pdi}");
@@ -711,12 +764,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 28, // -DI가 극도로 높음
+            filter_type: 28.into(), // -DI가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_extreme_mdi = result.unwrap();
         println!("-DI 극도 높음 테스트 결과: {is_extreme_mdi}");
@@ -728,12 +781,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 29, // ADX가 안정적
+            filter_type: 29.into(), // ADX가 안정적
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_stable = result.unwrap();
         println!("ADX 안정적 테스트 결과: {is_stable}");
@@ -745,12 +798,12 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 30, // ADX가 불안정
+            filter_type: 30.into(), // ADX가 불안정
             consecutive_n: 1,
             p: 0,
         };
 
-        let result = filter_adx("TEST", params, &candles);
+        let result = filter_adx("TEST", &params, &candles);
         assert!(result.is_ok());
         let is_unstable = result.unwrap();
         println!("ADX 불안정 테스트 결과: {is_unstable}");

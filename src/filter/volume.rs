@@ -1,4 +1,4 @@
-use super::VolumeParams;
+use super::{VolumeFilterType, VolumeParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::volume_analyzer::VolumeAnalyzer;
 use anyhow::Result;
@@ -18,54 +18,8 @@ pub fn filter_volume<C: Candle + 'static>(
         params.filter_type,
         params.consecutive_n,
         params.p,
+        params.stable_min_threshold,
     )
-}
-
-/// Volume 필터 유형
-#[derive(Debug, Clone)]
-pub enum VolumeFilterType {
-    /// 0: 볼륨이 평균 이상
-    VolumeAboveAverage,
-    /// 1: 볼륨이 평균 이하
-    VolumeBelowAverage,
-    /// 2: 볼륨 급등
-    VolumeSurge,
-    /// 3: 볼륨 감소
-    VolumeDecline,
-    /// 4: 볼륨이 현저히 높음
-    VolumeSignificantlyAbove,
-    /// 5: 상승과 함께 볼륨 증가
-    BullishWithIncreasedVolume,
-    /// 6: 하락과 함께 볼륨 증가
-    BearishWithIncreasedVolume,
-    /// 7: 상승 추세에서 볼륨 증가
-    IncreasingVolumeInUptrend,
-    /// 8: 하락 추세에서 볼륨 감소
-    DecreasingVolumeInDowntrend,
-    /// 9: 볼륨이 급격히 감소
-    VolumeSharpDecline,
-    /// 10: 볼륨이 안정적
-    VolumeStable,
-    /// 11: 볼륨이 변동성이 큼
-    VolumeVolatile,
-    /// 12: 상승과 함께 볼륨 감소
-    BullishWithDecreasedVolume,
-    /// 13: 하락과 함께 볼륨 감소
-    BearishWithDecreasedVolume,
-    /// 14: 볼륨이 평균의 2배 이상
-    VolumeDoubleAverage,
-    /// 15: 볼륨이 평균의 절반 이하
-    VolumeHalfAverage,
-    /// 16: 볼륨이 연속 증가
-    VolumeConsecutiveIncrease,
-    /// 17: 볼륨이 연속 감소
-    VolumeConsecutiveDecrease,
-    /// 18: 볼륨이 횡보 중
-    VolumeSideways,
-    /// 19: 볼륨이 극도로 높음
-    VolumeExtremelyHigh,
-    /// 20: 볼륨이 극도로 낮음
-    VolumeExtremelyLow,
 }
 
 /// Volume 필터 구조체
@@ -78,47 +32,22 @@ impl VolumeFilter {
         candles: &[C],
         period: usize,
         threshold: f64,
-        filter_type: i32,
+        filter_type: VolumeFilterType,
         consecutive_n: usize,
         p: usize,
+        stable_min_threshold: f64,
     ) -> Result<bool> {
-        if candles.len() < period || candles.len() < consecutive_n {
+        // 파라미터 검증
+        utils::validate_period(period, "Volume")?;
+
+        // 경계 조건 체크
+        let required_length = period.max(consecutive_n);
+        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
             return Ok(false);
         }
 
-        let filter_type = match filter_type {
-            0 => VolumeFilterType::VolumeAboveAverage,
-            1 => VolumeFilterType::VolumeBelowAverage,
-            2 => VolumeFilterType::VolumeSurge,
-            3 => VolumeFilterType::VolumeDecline,
-            4 => VolumeFilterType::VolumeSignificantlyAbove,
-            5 => VolumeFilterType::BullishWithIncreasedVolume,
-            6 => VolumeFilterType::BearishWithIncreasedVolume,
-            7 => VolumeFilterType::IncreasingVolumeInUptrend,
-            8 => VolumeFilterType::DecreasingVolumeInDowntrend,
-            9 => VolumeFilterType::VolumeSharpDecline,
-            10 => VolumeFilterType::VolumeStable,
-            11 => VolumeFilterType::VolumeVolatile,
-            12 => VolumeFilterType::BullishWithDecreasedVolume,
-            13 => VolumeFilterType::BearishWithDecreasedVolume,
-            14 => VolumeFilterType::VolumeDoubleAverage,
-            15 => VolumeFilterType::VolumeHalfAverage,
-            16 => VolumeFilterType::VolumeConsecutiveIncrease,
-            17 => VolumeFilterType::VolumeConsecutiveDecrease,
-            18 => VolumeFilterType::VolumeSideways,
-            19 => VolumeFilterType::VolumeExtremelyHigh,
-            20 => VolumeFilterType::VolumeExtremelyLow,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Invalid Volume filter type: {}",
-                    filter_type
-                ));
-            }
-        };
-
         // Volume 분석기 생성
-        let candle_store =
-            crate::candle_store::CandleStore::new(candles.to_vec(), candles.len() * 2, false);
+        let candle_store = utils::create_candle_store(candles);
         let mut analyzer = VolumeAnalyzer::new(&[period], &candle_store);
 
         // 캔들 데이터 처리
@@ -126,80 +55,140 @@ impl VolumeFilter {
             analyzer.next(candle.clone());
         }
 
-        // 연속적인 조건 확인
-        let mut consecutive_count = 0;
-        for _ in 0..analyzer.items.len() {
-            let result = match filter_type {
-                VolumeFilterType::VolumeAboveAverage => {
-                    analyzer.is_volume_above_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeBelowAverage => {
-                    analyzer.is_volume_below_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeSurge => analyzer.is_volume_surge(period, threshold),
-                VolumeFilterType::VolumeDecline => analyzer.is_volume_decline(period, threshold),
-                VolumeFilterType::VolumeSignificantlyAbove => {
-                    analyzer.is_volume_significantly_above(consecutive_n, threshold, p)
-                }
-                VolumeFilterType::BullishWithIncreasedVolume => {
-                    analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
-                }
-                VolumeFilterType::BearishWithIncreasedVolume => {
-                    analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
-                }
-                VolumeFilterType::IncreasingVolumeInUptrend => {
-                    analyzer.is_increasing_volume_in_uptrend(period, consecutive_n)
-                }
-                VolumeFilterType::DecreasingVolumeInDowntrend => {
-                    analyzer.is_decreasing_volume_in_downtrend(period, consecutive_n)
-                }
-                VolumeFilterType::VolumeSharpDecline => {
-                    analyzer.is_volume_decline(period, threshold)
-                }
-                VolumeFilterType::VolumeStable => {
-                    analyzer.is_volume_above_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeVolatile => analyzer.is_volume_surge(period, threshold),
-                VolumeFilterType::BullishWithDecreasedVolume => {
-                    analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
-                }
-                VolumeFilterType::BearishWithDecreasedVolume => {
-                    analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
-                }
-                VolumeFilterType::VolumeDoubleAverage => {
-                    analyzer.is_volume_above_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeHalfAverage => {
-                    analyzer.is_volume_below_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeConsecutiveIncrease => {
-                    analyzer.is_volume_surge(period, threshold)
-                }
-                VolumeFilterType::VolumeConsecutiveDecrease => {
-                    analyzer.is_volume_decline(period, threshold)
-                }
-                VolumeFilterType::VolumeSideways => {
-                    analyzer.is_volume_above_average(consecutive_n, p)
-                }
-                VolumeFilterType::VolumeExtremelyHigh => {
-                    analyzer.is_volume_surge(period, threshold)
-                }
-                VolumeFilterType::VolumeExtremelyLow => {
-                    analyzer.is_volume_decline(period, threshold)
-                }
-            };
-
-            if result {
-                consecutive_count += 1;
-                if consecutive_count >= consecutive_n {
-                    return Ok(true);
-                }
-            } else {
-                consecutive_count = 0;
+        // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
+        let result = match filter_type {
+            VolumeFilterType::VolumeAboveAverage => {
+                analyzer.is_volume_above_average(consecutive_n, p)
             }
-        }
+            VolumeFilterType::VolumeBelowAverage => {
+                analyzer.is_volume_below_average(consecutive_n, p)
+            }
+            VolumeFilterType::VolumeSurge => analyzer.is_volume_surge(period, threshold),
+            VolumeFilterType::VolumeDecline => analyzer.is_volume_decline(period, threshold),
+            VolumeFilterType::VolumeSignificantlyAbove => {
+                analyzer.is_volume_significantly_above(consecutive_n, threshold, p)
+            }
+            VolumeFilterType::BullishWithIncreasedVolume => {
+                analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
+            }
+            VolumeFilterType::BearishWithIncreasedVolume => {
+                analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
+            }
+            VolumeFilterType::IncreasingVolumeInUptrend => {
+                analyzer.is_increasing_volume_in_uptrend(period, consecutive_n)
+            }
+            VolumeFilterType::DecreasingVolumeInDowntrend => {
+                analyzer.is_decreasing_volume_in_downtrend(period, consecutive_n)
+            }
+            VolumeFilterType::VolumeSharpDecline => analyzer.is_volume_decline(period, threshold),
+            VolumeFilterType::VolumeStable => {
+                // VolumeStable은 threshold와 stable_min_threshold 중 큰 값을 사용
+                let effective_threshold = threshold.max(stable_min_threshold);
+                analyzer.is_sideways(
+                    |data| data.get_volume_ratio(period),
+                    consecutive_n,
+                    p,
+                    effective_threshold,
+                )
+            }
+            VolumeFilterType::VolumeVolatile => analyzer.is_volume_surge(period, threshold),
+            VolumeFilterType::BullishWithDecreasedVolume => {
+                if analyzer.items.len() <= p {
+                    false
+                } else {
+                    let is_bullish = analyzer.items[p].candle.close_price()
+                        > analyzer.items[p].candle.open_price();
+                    let is_decreased = analyzer.is_volume_below_average(consecutive_n, p);
+                    is_bullish && is_decreased
+                }
+            }
+            VolumeFilterType::BearishWithDecreasedVolume => {
+                if analyzer.items.len() <= p {
+                    false
+                } else {
+                    let is_bearish = analyzer.items[p].candle.close_price()
+                        < analyzer.items[p].candle.open_price();
+                    let is_decreased = analyzer.is_volume_below_average(consecutive_n, p);
+                    is_bearish && is_decreased
+                }
+            }
+            VolumeFilterType::VolumeDoubleAverage => {
+                // volume_ratio >= 2.0 means current volume is at least 2x the average
+                // If threshold is provided, use threshold * 2.0, otherwise use 2.0
+                let double_threshold = if threshold > 0.0 {
+                    2.0 * threshold
+                } else {
+                    2.0
+                };
+                analyzer.is_all(
+                    |data| data.get_volume_ratio(period) >= double_threshold,
+                    consecutive_n,
+                    p,
+                )
+            }
+            VolumeFilterType::VolumeHalfAverage => {
+                // volume_ratio <= 0.5 means current volume is at most half of the average
+                // If threshold is provided, use threshold * 0.5, otherwise use 0.5
+                let half_threshold = if threshold > 0.0 {
+                    0.5 * threshold
+                } else {
+                    0.5
+                };
+                analyzer.is_all(
+                    |data| data.get_volume_ratio(period) <= half_threshold,
+                    consecutive_n,
+                    p,
+                )
+            }
+            VolumeFilterType::VolumeConsecutiveIncrease => {
+                if analyzer.items.len() < p + consecutive_n + 1 {
+                    false
+                } else {
+                    (0..consecutive_n).all(|i| {
+                        if let (Some(current), Some(next)) =
+                            (analyzer.items.get(p + i), analyzer.items.get(p + i + 1))
+                        {
+                            current.get_volume_ratio(period) < next.get_volume_ratio(period)
+                        } else {
+                            false
+                        }
+                    })
+                }
+            }
+            VolumeFilterType::VolumeConsecutiveDecrease => {
+                if analyzer.items.len() < p + consecutive_n + 1 {
+                    false
+                } else {
+                    (0..consecutive_n).all(|i| {
+                        if let (Some(current), Some(next)) =
+                            (analyzer.items.get(p + i), analyzer.items.get(p + i + 1))
+                        {
+                            current.get_volume_ratio(period) > next.get_volume_ratio(period)
+                        } else {
+                            false
+                        }
+                    })
+                }
+            }
+            VolumeFilterType::VolumeSideways => analyzer.is_sideways(
+                |data| data.get_volume_ratio(period),
+                consecutive_n,
+                p,
+                threshold,
+            ),
+            VolumeFilterType::VolumeExtremelyHigh => analyzer.is_all(
+                |data| data.get_volume_ratio(period) >= threshold,
+                consecutive_n,
+                p,
+            ),
+            VolumeFilterType::VolumeExtremelyLow => analyzer.is_all(
+                |data| data.get_volume_ratio(period) <= threshold,
+                consecutive_n,
+                p,
+            ),
+        };
 
-        Ok(false)
+        Ok(result)
     }
 }
 
@@ -254,56 +243,7 @@ mod tests {
             },
         ];
 
-        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 0, 1, 0);
+        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 0.into(), 1, 0, 0.1);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_volume_filter_invalid_type() {
-        let candles = vec![
-            TestCandle {
-                timestamp: 1,
-                open: 100.0,
-                high: 105.0,
-                low: 95.0,
-                close: 102.0,
-                volume: 1000.0,
-            },
-            TestCandle {
-                timestamp: 2,
-                open: 102.0,
-                high: 110.0,
-                low: 98.0,
-                close: 108.0,
-                volume: 1200.0,
-            },
-            TestCandle {
-                timestamp: 3,
-                open: 108.0,
-                high: 115.0,
-                low: 105.0,
-                close: 112.0,
-                volume: 1100.0,
-            },
-            TestCandle {
-                timestamp: 4,
-                open: 112.0,
-                high: 120.0,
-                low: 108.0,
-                close: 118.0,
-                volume: 1300.0,
-            },
-            TestCandle {
-                timestamp: 5,
-                open: 118.0,
-                high: 125.0,
-                low: 115.0,
-                close: 122.0,
-                volume: 1250.0,
-            },
-        ];
-
-        let result = VolumeFilter::check_filter("TEST", &candles, 3, 1.5, 99, 1, 0);
-        assert!(result.is_err());
     }
 }

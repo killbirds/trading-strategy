@@ -1,7 +1,6 @@
-use super::MovingAverageParams;
+use super::{MovingAverageFilterType, MovingAverageParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::ma_analyzer::MAAnalyzer;
-use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use anyhow::Result;
 use trading_chart::Candle;
@@ -18,27 +17,25 @@ pub fn filter_moving_average<C: Candle + 'static>(
     }
 
     log::debug!(
-        "이동평균선 필터 적용 - 기간 목록: {:?}, 타입: {}, 연속성: {}",
+        "이동평균선 필터 적용 - 기간 목록: {:?}, 타입: {:?}, 연속성: {}",
         params.periods,
         params.filter_type,
         params.consecutive_n
     );
 
+    // 파라미터 검증
+    for period in &params.periods {
+        utils::validate_period(*period, "MovingAverage")?;
+    }
+
     // 필터링 로직
-    let max_period = params.periods.iter().max().unwrap_or(&1);
-    if candles.len() < *max_period {
-        log::debug!(
-            "코인 {} 캔들 데이터 부족: {} < {}",
-            coin,
-            candles.len(),
-            max_period
-        );
+    let max_period = params.periods.iter().max().copied().unwrap_or(1);
+    if !utils::check_sufficient_candles(candles.len(), max_period, coin) {
         return Ok(false);
     }
 
     // 캔들 데이터로 CandleStore 생성
-    let candles_vec = candles.to_vec();
-    let candle_store = CandleStore::new(candles_vec, candles.len() * 2, false);
+    let candle_store = utils::create_candle_store(candles);
 
     // MAAnalyzer 생성 (SMA 타입 사용)
     let ma_type = MAType::SMA;
@@ -54,8 +51,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
     };
 
     let result = match params.filter_type {
-        // 0: 가격이 첫번째 MA 위에 있는 경우
-        0 => analyzer.is_all(
+        MovingAverageFilterType::PriceAboveFirstMA => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let first_ma = data.mas.get_by_key_index(first_index).get();
@@ -64,8 +60,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 1: 가격이 마지막 MA 위에 있는 경우
-        1 => analyzer.is_all(
+        MovingAverageFilterType::PriceAboveLastMA => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
@@ -74,10 +69,10 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 2: 정규 배열인 경우
-        2 => analyzer.is_ma_regular_arrangement(params.consecutive_n, params.p),
-        // 3: 첫번째 MA가 마지막 MA 위에 있는 경우
-        3 => analyzer.is_all(
+        MovingAverageFilterType::RegularArrangement => {
+            analyzer.is_ma_regular_arrangement(params.consecutive_n, params.p)
+        }
+        MovingAverageFilterType::FirstMAAboveLastMA => analyzer.is_all(
             |data| {
                 let first_ma = data.mas.get_by_key_index(first_index).get();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
@@ -86,8 +81,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 4: 첫번째 MA가 마지막 MA 아래에 있는 경우
-        4 => analyzer.is_all(
+        MovingAverageFilterType::FirstMABelowLastMA => analyzer.is_all(
             |data| {
                 let first_ma = data.mas.get_by_key_index(first_index).get();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
@@ -96,10 +90,10 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 5: 골든 크로스 발생 확인
-        5 => analyzer.is_ma_regular_arrangement_golden_cross(1, params.consecutive_n, params.p),
-        // 6: 가격이 첫번째와 마지막 MA 사이에 있는 경우
-        6 => analyzer.is_all(
+        MovingAverageFilterType::GoldenCross => {
+            analyzer.is_ma_regular_arrangement_golden_cross(1, params.consecutive_n, params.p)
+        }
+        MovingAverageFilterType::PriceBetweenMA => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let first_ma = data.mas.get_by_key_index(first_index).get();
@@ -109,36 +103,57 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 7: 이동평균선들이 수렴하는 중 (간격 좁아짐)
-        7 => {
-            if analyzer.items.len() < 2 || params.periods.len() < 2 {
+        MovingAverageFilterType::MAConvergence => {
+            if analyzer.items.len() < params.p + 2 || params.periods.len() < 2 {
                 false
             } else {
-                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                let current_gap = (analyzer.items[params.p]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let previous_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                let previous_gap = (analyzer.items[params.p + 1]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 1]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
                 current_gap < previous_gap
             }
         }
-        // 8: 이동평균선들이 발산하는 중 (간격 넓어짐)
-        8 => {
-            if analyzer.items.len() < 2 || params.periods.len() < 2 {
+        MovingAverageFilterType::MADivergence => {
+            if analyzer.items.len() < params.p + 2 || params.periods.len() < 2 {
                 false
             } else {
-                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                let current_gap = (analyzer.items[params.p]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let previous_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                let previous_gap = (analyzer.items[params.p + 1]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 1]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
                 current_gap > previous_gap
             }
         }
-        // 9: 가격이 모든 이동평균선 위에 있음 (강한 상승 추세)
-        9 => analyzer.is_all(
+        MovingAverageFilterType::AllMAAbove => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 for i in 0..params.periods.len() {
@@ -152,8 +167,7 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 10: 가격이 모든 이동평균선 아래에 있음 (강한 하락 추세)
-        10 => analyzer.is_all(
+        MovingAverageFilterType::AllMABelow => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 for i in 0..params.periods.len() {
@@ -167,36 +181,39 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 11: 역배열 (내림차순) - 단기 MA가 장기 MA 아래에 있음
-        11 => analyzer.is_ma_reverse_arrangement(params.consecutive_n, params.p),
-        // 12: 데드 크로스 발생 확인 (역배열이 n개 연속, 이전 m개는 아님)
-        12 => analyzer.is_ma_reverse_arrangement_dead_cross(1, params.consecutive_n, params.p),
-        // 13: 이동평균선들이 횡보 중 (변화율이 임계값 이하)
-        13 => {
+        MovingAverageFilterType::ReverseArrangement => {
+            analyzer.is_ma_reverse_arrangement(params.consecutive_n, params.p)
+        }
+        MovingAverageFilterType::DeadCross => {
+            analyzer.is_ma_reverse_arrangement_dead_cross(1, params.consecutive_n, params.p)
+        }
+        MovingAverageFilterType::MASideways => {
             if params.periods.is_empty() {
                 false
             } else {
-                analyzer.is_ma_sideways(0, params.consecutive_n, params.p, 0.02) // 2% 임계값
+                analyzer.is_ma_sideways(
+                    0,
+                    params.consecutive_n,
+                    params.p,
+                    params.sideways_threshold,
+                )
             }
         }
-        // 14: 이동평균선들이 강한 상승 추세 (수익률이 양수)
-        14 => {
+        MovingAverageFilterType::StrongUptrend => {
             if params.periods.is_empty() {
                 false
             } else {
                 analyzer.is_ma_greater_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
             }
         }
-        // 15: 이동평균선들이 강한 하락 추세 (수익률이 음수)
-        15 => {
+        MovingAverageFilterType::StrongDowntrend => {
             if params.periods.is_empty() {
                 false
             } else {
                 analyzer.is_ma_less_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
             }
         }
-        // 16: 가격이 이동평균선들과 교차 중 (가격이 MA들 사이를 오가며 횡보)
-        16 => analyzer.is_all(
+        MovingAverageFilterType::PriceCrossingMA => analyzer.is_all(
             |data| {
                 let price = data.candle.close_price();
                 let mut above_count = 0;
@@ -217,90 +234,132 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 17: 이동평균선들이 수렴 후 발산 시작 (골든 크로스 전조)
-        17 => {
-            if analyzer.items.len() < 3 || params.periods.len() < 2 {
+        MovingAverageFilterType::ConvergenceDivergence => {
+            if analyzer.items.len() < params.p + 3 || params.periods.len() < 2 {
                 false
             } else {
-                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                let current_gap = (analyzer.items[params.p]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let prev_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                let prev_gap = (analyzer.items[params.p + 1]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 1]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let prev_prev_gap = (analyzer.items[2].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[2].mas.get_by_key_index(last_index).get())
+                let prev_prev_gap = (analyzer.items[params.p + 2]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 2]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
 
                 // 이전에 수렴했다가 현재 발산하기 시작
                 prev_gap < prev_prev_gap && current_gap > prev_gap
             }
         }
-        // 18: 이동평균선들이 발산 후 수렴 시작 (데드 크로스 전조)
-        18 => {
-            if analyzer.items.len() < 3 || params.periods.len() < 2 {
+        MovingAverageFilterType::DivergenceConvergence => {
+            if analyzer.items.len() < params.p + 3 || params.periods.len() < 2 {
                 false
             } else {
-                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
+                let current_gap = (analyzer.items[params.p]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let prev_gap = (analyzer.items[1].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[1].mas.get_by_key_index(last_index).get())
+                let prev_gap = (analyzer.items[params.p + 1]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 1]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
-                let prev_prev_gap = (analyzer.items[2].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[2].mas.get_by_key_index(last_index).get())
+                let prev_prev_gap = (analyzer.items[params.p + 2]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p + 2]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
                 .abs();
 
                 // 이전에 발산했다가 현재 수렴하기 시작
                 prev_gap > prev_prev_gap && current_gap < prev_gap
             }
         }
-        // 19: 이동평균선들이 평행 이동 중 (모든 MA가 같은 방향으로 움직임)
-        19 => analyzer.is_all(
-            |data| {
-                if analyzer.items.len() < 2 {
-                    return false;
-                }
-
-                let current = data;
-                let previous = &analyzer.items[1];
-
-                let mut all_rising = true;
-                let mut all_falling = true;
-
-                for i in 0..params.periods.len() {
-                    let current_ma = current.mas.get_by_key_index(i).get();
-                    let previous_ma = previous.mas.get_by_key_index(i).get();
-
-                    if current_ma <= previous_ma {
-                        all_rising = false;
-                    }
-                    if current_ma >= previous_ma {
-                        all_falling = false;
-                    }
-                }
-
-                all_rising || all_falling
-            },
-            params.consecutive_n,
-            params.p,
-        ),
-        // 20: 이동평균선들이 교차점 근처 (MA들 간의 간격이 매우 좁음)
-        20 => {
-            if params.periods.len() < 2 {
+        MovingAverageFilterType::ParallelMovement => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
-                let current_gap = (analyzer.items[0].mas.get_by_key_index(first_index).get()
-                    - analyzer.items[0].mas.get_by_key_index(last_index).get())
-                .abs();
-                let avg_price = analyzer.items[0].candle.close_price();
-                let gap_ratio = current_gap / avg_price;
+                let mut all_parallel = true;
+                for i in 0..params.consecutive_n {
+                    let current = &analyzer.items[params.p + i];
+                    let previous = &analyzer.items[params.p + i + 1];
 
-                // 간격이 평균 가격의 0.5% 이하일 때 교차점 근처로 판단
-                gap_ratio <= 0.005
+                    let mut all_rising = true;
+                    let mut all_falling = true;
+
+                    for j in 0..params.periods.len() {
+                        let current_ma = current.mas.get_by_key_index(j).get();
+                        let previous_ma = previous.mas.get_by_key_index(j).get();
+
+                        if current_ma <= previous_ma {
+                            all_rising = false;
+                        }
+                        if current_ma >= previous_ma {
+                            all_falling = false;
+                        }
+                    }
+
+                    if !(all_rising || all_falling) {
+                        all_parallel = false;
+                        break;
+                    }
+                }
+                all_parallel
             }
         }
-        _ => false,
+        MovingAverageFilterType::NearCrossover => {
+            if analyzer.items.len() <= params.p || params.periods.len() < 2 {
+                false
+            } else {
+                let current_gap = (analyzer.items[params.p]
+                    .mas
+                    .get_by_key_index(first_index)
+                    .get()
+                    - analyzer.items[params.p]
+                        .mas
+                        .get_by_key_index(last_index)
+                        .get())
+                .abs();
+                let avg_price = analyzer.items[params.p].candle.close_price();
+                if avg_price == 0.0 {
+                    false
+                } else {
+                    let gap_ratio = current_gap / avg_price;
+                    gap_ratio <= params.crossover_threshold
+                }
+            }
+        }
     };
 
     Ok(result)
@@ -425,9 +484,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -440,9 +500,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 1,
+            filter_type: 1.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -455,9 +516,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 2,
+            filter_type: 2.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -470,9 +532,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 3,
+            filter_type: 3.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -485,9 +548,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 4,
+            filter_type: 4.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -500,9 +564,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 5,
+            filter_type: 5.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -515,9 +580,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 6,
+            filter_type: 6.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -530,9 +596,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 99, // 유효하지 않은 필터 타입
+            filter_type: 99.into(), // 유효하지 않은 필터 타입
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -547,9 +614,10 @@ mod tests {
         // 이 테스트는 단순히 캔들 데이터와 이동평균 필터가 제대로 작동하는지 확인
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 4,   // 첫번째 MA가 마지막 MA 아래에 있는 경우
-            consecutive_n: 1, // 1개 조건만 확인
+            filter_type: 4.into(), // 첫번째 MA가 마지막 MA 아래에 있는 경우
+            consecutive_n: 1,      // 1개 조건만 확인
             p: 0,
+            ..Default::default()
         };
 
         let result = filter_moving_average("TEST/USDT", &params, &candles);
@@ -563,9 +631,10 @@ mod tests {
         let candles = vec![TestCandle::new(100.0, 105.0, 98.0, 103.0, 1000.0)]; // 캔들 데이터 부족
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -577,9 +646,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 10, 20],
-            filter_type: 2,
+            filter_type: 2.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -592,9 +662,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![],
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -606,9 +677,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -621,9 +693,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 11,
+            filter_type: 11.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -636,9 +709,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 12,
+            filter_type: 12.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -651,9 +725,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 13,
+            filter_type: 13.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -666,9 +741,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 14,
+            filter_type: 14.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -681,9 +757,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 15,
+            filter_type: 15.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -696,9 +773,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 16,
+            filter_type: 16.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -711,9 +789,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 17,
+            filter_type: 17.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -726,9 +805,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 18,
+            filter_type: 18.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -741,9 +821,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 19,
+            filter_type: 19.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -756,9 +837,10 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 20,
+            filter_type: 20.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_moving_average("TEST/USDT", &params, &candles);
         assert!(result.is_ok());

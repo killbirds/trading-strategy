@@ -1,4 +1,4 @@
-use super::SupportResistanceParams;
+use super::{SupportResistanceFilterType, SupportResistanceParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::support_resistance_analyzer::SupportResistanceAnalyzer;
 use anyhow::Result;
@@ -23,31 +23,6 @@ pub fn filter_support_resistance<C: Candle + 'static>(
     )
 }
 
-/// SupportResistance 필터 유형
-#[derive(Debug, Clone)]
-pub enum SupportResistanceFilterType {
-    /// 0: 지지선 하향 돌파
-    SupportBreakdown,
-    /// 1: 저항선 상향 돌파
-    ResistanceBreakout,
-    /// 2: 지지선 반등
-    SupportBounce,
-    /// 3: 저항선 거부
-    ResistanceRejection,
-    /// 4: 강한 지지선 근처
-    NearStrongSupport,
-    /// 5: 강한 저항선 근처
-    NearStrongResistance,
-    /// 6: 지지선 위에 있음
-    AboveSupport,
-    /// 7: 저항선 아래에 있음
-    BelowResistance,
-    /// 8: 지지선 근처
-    NearSupport,
-    /// 9: 저항선 근처
-    NearResistance,
-}
-
 /// SupportResistance 필터 구조체
 pub struct SupportResistanceFilter;
 
@@ -60,36 +35,26 @@ impl SupportResistanceFilter {
         touch_threshold: f64,
         min_touch_count: usize,
         threshold: f64,
-        filter_type: i32,
+        filter_type: SupportResistanceFilterType,
         consecutive_n: usize,
         p: usize,
     ) -> Result<bool> {
-        if candles.len() < lookback_period || candles.len() < consecutive_n {
+        // 파라미터 검증
+        utils::validate_period(lookback_period, "SupportResistance lookback_period")?;
+        if min_touch_count == 0 {
+            return Err(anyhow::anyhow!(
+                "SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다"
+            ));
+        }
+
+        // 경계 조건 체크
+        let required_length = lookback_period.max(consecutive_n);
+        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
             return Ok(false);
         }
 
-        let filter_type = match filter_type {
-            0 => SupportResistanceFilterType::SupportBreakdown,
-            1 => SupportResistanceFilterType::ResistanceBreakout,
-            2 => SupportResistanceFilterType::SupportBounce,
-            3 => SupportResistanceFilterType::ResistanceRejection,
-            4 => SupportResistanceFilterType::NearStrongSupport,
-            5 => SupportResistanceFilterType::NearStrongResistance,
-            6 => SupportResistanceFilterType::AboveSupport,
-            7 => SupportResistanceFilterType::BelowResistance,
-            8 => SupportResistanceFilterType::NearSupport,
-            9 => SupportResistanceFilterType::NearResistance,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Invalid SupportResistance filter type: {}",
-                    filter_type
-                ));
-            }
-        };
-
         // SupportResistance 분석기 생성
-        let candle_store =
-            crate::candle_store::CandleStore::new(candles.to_vec(), candles.len() * 2, false);
+        let candle_store = utils::create_candle_store(candles);
         let mut analyzer = SupportResistanceAnalyzer::new(
             &candle_store,
             lookback_period,
@@ -102,53 +67,41 @@ impl SupportResistanceFilter {
             analyzer.next(candle.clone());
         }
 
-        // 연속적인 조건 확인
-        let mut consecutive_count = 0;
-        for _ in 0..analyzer.items.len() {
-            let result = match filter_type {
-                SupportResistanceFilterType::SupportBreakdown => {
-                    analyzer.is_support_breakdown_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::ResistanceBreakout => {
-                    analyzer.is_resistance_breakout_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::SupportBounce => {
-                    analyzer.is_support_bounce_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::ResistanceRejection => {
-                    analyzer.is_resistance_rejection_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::NearStrongSupport => {
-                    analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, p)
-                }
-                SupportResistanceFilterType::NearStrongResistance => {
-                    analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, p)
-                }
-                SupportResistanceFilterType::AboveSupport => {
-                    analyzer.is_above_support_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::BelowResistance => {
-                    analyzer.is_below_resistance_signal(consecutive_n, 1, p)
-                }
-                SupportResistanceFilterType::NearSupport => {
-                    analyzer.is_near_support_signal(consecutive_n, 1, threshold, p)
-                }
-                SupportResistanceFilterType::NearResistance => {
-                    analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, p)
-                }
-            };
-
-            if result {
-                consecutive_count += 1;
-                if consecutive_count >= consecutive_n {
-                    return Ok(true);
-                }
-            } else {
-                consecutive_count = 0;
+        // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
+        let result = match filter_type {
+            SupportResistanceFilterType::SupportBreakdown => {
+                analyzer.is_support_breakdown_signal(consecutive_n, 1, p)
             }
-        }
+            SupportResistanceFilterType::ResistanceBreakout => {
+                analyzer.is_resistance_breakout_signal(consecutive_n, 1, p)
+            }
+            SupportResistanceFilterType::SupportBounce => {
+                analyzer.is_support_bounce_signal(consecutive_n, 1, p)
+            }
+            SupportResistanceFilterType::ResistanceRejection => {
+                analyzer.is_resistance_rejection_signal(consecutive_n, 1, p)
+            }
+            SupportResistanceFilterType::NearStrongSupport => {
+                analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, p)
+            }
+            SupportResistanceFilterType::NearStrongResistance => {
+                analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, p)
+            }
+            SupportResistanceFilterType::AboveSupport => {
+                analyzer.is_above_support_signal(consecutive_n, 1, p)
+            }
+            SupportResistanceFilterType::BelowResistance => {
+                analyzer.is_below_resistance_signal(consecutive_n, 1, p)
+            }
+            SupportResistanceFilterType::NearSupport => {
+                analyzer.is_near_support_signal(consecutive_n, 1, threshold, p)
+            }
+            SupportResistanceFilterType::NearResistance => {
+                analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, p)
+            }
+        };
 
-        Ok(false)
+        Ok(result)
     }
 }
 
@@ -203,58 +156,17 @@ mod tests {
             },
         ];
 
-        let result =
-            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 0, 1, 0);
+        let result = SupportResistanceFilter::check_filter(
+            "TEST",
+            &candles,
+            3,
+            0.01,
+            2,
+            0.05,
+            0.into(),
+            1,
+            0,
+        );
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_support_resistance_filter_invalid_type() {
-        let candles = vec![
-            TestCandle {
-                timestamp: 1,
-                open: 100.0,
-                high: 105.0,
-                low: 95.0,
-                close: 102.0,
-                volume: 1000.0,
-            },
-            TestCandle {
-                timestamp: 2,
-                open: 102.0,
-                high: 110.0,
-                low: 98.0,
-                close: 108.0,
-                volume: 1200.0,
-            },
-            TestCandle {
-                timestamp: 3,
-                open: 108.0,
-                high: 115.0,
-                low: 105.0,
-                close: 112.0,
-                volume: 1100.0,
-            },
-            TestCandle {
-                timestamp: 4,
-                open: 112.0,
-                high: 120.0,
-                low: 108.0,
-                close: 118.0,
-                volume: 1300.0,
-            },
-            TestCandle {
-                timestamp: 5,
-                open: 118.0,
-                high: 125.0,
-                low: 115.0,
-                close: 122.0,
-                volume: 1250.0,
-            },
-        ];
-
-        let result =
-            SupportResistanceFilter::check_filter("TEST", &candles, 3, 0.01, 2, 0.05, 99, 1, 0);
-        assert!(result.is_err());
     }
 }

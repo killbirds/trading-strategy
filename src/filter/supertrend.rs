@@ -1,5 +1,4 @@
-use super::SuperTrendParams;
-use crate::analyzer::base::AnalyzerOps;
+use super::{SuperTrendFilterType, SuperTrendParams, utils};
 use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
 use anyhow::Result;
 use trading_chart::Candle;
@@ -21,29 +20,6 @@ pub fn filter_supertrend<C: Candle + 'static>(
     )
 }
 
-/// SuperTrend 필터 유형
-#[derive(Debug, Clone)]
-pub enum SuperTrendFilterType {
-    /// 0: 모든 설정에서 상승 추세
-    AllUptrend,
-    /// 1: 모든 설정에서 하락 추세
-    AllDowntrend,
-    /// 2: 가격이 슈퍼트렌드 위에 있음
-    PriceAboveSupertrend,
-    /// 3: 가격이 슈퍼트렌드 아래에 있음
-    PriceBelowSupertrend,
-    /// 4: 가격이 슈퍼트렌드를 상향 돌파
-    PriceCrossingAbove,
-    /// 5: 가격이 슈퍼트렌드를 하향 돌파
-    PriceCrossingBelow,
-    /// 6: 추세 변경
-    TrendChanged,
-    /// 7: 특정 설정에서 상승 추세
-    Uptrend,
-    /// 8: 특정 설정에서 하락 추세
-    Downtrend,
-}
-
 /// SuperTrend 필터 구조체
 pub struct SuperTrendFilter;
 
@@ -54,35 +30,21 @@ impl SuperTrendFilter {
         candles: &[C],
         period: usize,
         multiplier: f64,
-        filter_type: i32,
+        filter_type: SuperTrendFilterType,
         consecutive_n: usize,
         p: usize,
     ) -> Result<bool> {
-        if candles.len() < period || candles.len() < consecutive_n {
+        // 파라미터 검증
+        utils::validate_period(period, "SuperTrend")?;
+
+        // 경계 조건 체크
+        let required_length = period.max(consecutive_n);
+        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
             return Ok(false);
         }
 
-        let filter_type = match filter_type {
-            0 => SuperTrendFilterType::AllUptrend,
-            1 => SuperTrendFilterType::AllDowntrend,
-            2 => SuperTrendFilterType::PriceAboveSupertrend,
-            3 => SuperTrendFilterType::PriceBelowSupertrend,
-            4 => SuperTrendFilterType::PriceCrossingAbove,
-            5 => SuperTrendFilterType::PriceCrossingBelow,
-            6 => SuperTrendFilterType::TrendChanged,
-            7 => SuperTrendFilterType::Uptrend,
-            8 => SuperTrendFilterType::Downtrend,
-            _ => {
-                return Err(anyhow::anyhow!(
-                    "Invalid SuperTrend filter type: {}",
-                    filter_type
-                ));
-            }
-        };
-
         // SuperTrend 분석기 생성
-        let candle_store =
-            crate::candle_store::CandleStore::new(candles.to_vec(), candles.len() * 2, false);
+        let candle_store = utils::create_candle_store(candles);
         let mut analyzer = SuperTrendAnalyzer::new(&[(period, multiplier)], &candle_store);
 
         // 캔들 데이터 처리
@@ -90,46 +52,41 @@ impl SuperTrendFilter {
             analyzer.next(candle.clone());
         }
 
-        // 연속적인 조건 확인
-        let mut consecutive_count = 0;
-        for _ in 0..analyzer.items.len() {
-            let result = match filter_type {
-                SuperTrendFilterType::AllUptrend => analyzer.is_all_uptrend(),
-                SuperTrendFilterType::AllDowntrend => analyzer.is_all_downtrend(),
-                SuperTrendFilterType::PriceAboveSupertrend => {
-                    analyzer.is_price_above_supertrend(&period, &multiplier)
-                }
-                SuperTrendFilterType::PriceBelowSupertrend => {
-                    analyzer.is_price_below_supertrend(&period, &multiplier)
-                }
-                SuperTrendFilterType::PriceCrossingAbove => {
-                    analyzer.is_price_crossing_above_supertrend(&period, &multiplier)
-                }
-                SuperTrendFilterType::PriceCrossingBelow => {
-                    analyzer.is_price_crossing_below_supertrend(&period, &multiplier)
-                }
-                SuperTrendFilterType::TrendChanged => {
-                    analyzer.is_trend_changed(&period, &multiplier, consecutive_n)
-                }
-                SuperTrendFilterType::Uptrend => {
-                    analyzer.is_uptrend(consecutive_n, period, multiplier, p)
-                }
-                SuperTrendFilterType::Downtrend => {
-                    analyzer.is_downtrend(consecutive_n, period, multiplier, p)
-                }
-            };
+        use crate::analyzer::base::AnalyzerOps;
 
-            if result {
-                consecutive_count += 1;
-                if consecutive_count >= consecutive_n {
-                    return Ok(true);
-                }
-            } else {
-                consecutive_count = 0;
+        // analyzer 메서드들이 이미 consecutive_n을 처리하거나, 직접 호출
+        let result = match filter_type {
+            SuperTrendFilterType::AllUptrend => analyzer.is_all_uptrend_signal(consecutive_n, 1, p),
+            SuperTrendFilterType::AllDowntrend => {
+                analyzer.is_all_downtrend_signal(consecutive_n, 1, p)
             }
-        }
+            SuperTrendFilterType::PriceAboveSupertrend => {
+                analyzer.is_price_above_supertrend_continuous(consecutive_n, period, multiplier, p)
+            }
+            SuperTrendFilterType::PriceBelowSupertrend => {
+                analyzer.is_price_below_supertrend_continuous(consecutive_n, period, multiplier, p)
+            }
+            SuperTrendFilterType::PriceCrossingAbove => analyzer
+                .is_price_crossing_above_supertrend_signal(consecutive_n, 1, period, multiplier, p),
+            SuperTrendFilterType::PriceCrossingBelow => analyzer
+                .is_price_crossing_below_supertrend_signal(consecutive_n, 1, period, multiplier, p),
+            SuperTrendFilterType::TrendChanged => analyzer.is_trend_changed_signal(
+                consecutive_n,
+                1,
+                period,
+                multiplier,
+                consecutive_n,
+                p,
+            ),
+            SuperTrendFilterType::Uptrend => {
+                analyzer.is_uptrend(consecutive_n, period, multiplier, p)
+            }
+            SuperTrendFilterType::Downtrend => {
+                analyzer.is_downtrend(consecutive_n, period, multiplier, p)
+            }
+        };
 
-        Ok(false)
+        Ok(result)
     }
 }
 
@@ -184,56 +141,7 @@ mod tests {
             },
         ];
 
-        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 0, 1, 0);
+        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 0.into(), 1, 0);
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_supertrend_filter_invalid_type() {
-        let candles = vec![
-            TestCandle {
-                timestamp: 1,
-                open: 100.0,
-                high: 105.0,
-                low: 95.0,
-                close: 102.0,
-                volume: 1000.0,
-            },
-            TestCandle {
-                timestamp: 2,
-                open: 102.0,
-                high: 110.0,
-                low: 98.0,
-                close: 108.0,
-                volume: 1200.0,
-            },
-            TestCandle {
-                timestamp: 3,
-                open: 108.0,
-                high: 115.0,
-                low: 105.0,
-                close: 112.0,
-                volume: 1100.0,
-            },
-            TestCandle {
-                timestamp: 4,
-                open: 112.0,
-                high: 120.0,
-                low: 108.0,
-                close: 118.0,
-                volume: 1300.0,
-            },
-            TestCandle {
-                timestamp: 5,
-                open: 118.0,
-                high: 125.0,
-                low: 115.0,
-                close: 122.0,
-                volume: 1250.0,
-            },
-        ];
-
-        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 99, 1, 0);
-        assert!(result.is_err());
     }
 }

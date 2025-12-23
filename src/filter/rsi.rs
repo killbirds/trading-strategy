@@ -1,7 +1,6 @@
-use super::RSIParams;
+use super::{RSIFilterType, RSIParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::rsi_analyzer::RSIAnalyzer;
-use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use anyhow::Result;
 use trading_chart::Candle;
@@ -13,7 +12,7 @@ pub fn filter_rsi<C: Candle + 'static>(
     candles: &[C],
 ) -> Result<bool> {
     log::debug!(
-        "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 타입: {}, 연속성: {}",
+        "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 타입: {:?}, 연속성: {}",
         params.period,
         params.oversold,
         params.overbought,
@@ -21,21 +20,19 @@ pub fn filter_rsi<C: Candle + 'static>(
         params.consecutive_n
     );
 
-    if candles.len() < params.period + params.consecutive_n {
-        log::debug!(
-            "코인 {} 캔들 데이터 부족: {} < {}",
-            coin,
-            candles.len(),
-            params.period + params.consecutive_n
-        );
+    // 파라미터 검증
+    utils::validate_period(params.period, "RSI")?;
+
+    // 경계 조건 체크
+    let required_length = params.period + params.consecutive_n;
+    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
         return Ok(false);
     }
 
     // 캔들 데이터로 CandleStore 생성
-    let candles_vec = candles.to_vec();
-    let candle_store = CandleStore::new(candles_vec, candles.len() * 2, false);
+    let candle_store = utils::create_candle_store(candles);
 
-    // RSIAnalyzer 생성 - MA는 사용하지 않으므로 빈 배열 전달
+    // RSIAnalyzer 생성
     let ma_type = MAType::SMA;
     let ma_periods: Vec<usize> = vec![params.period];
     let analyzer = RSIAnalyzer::new(params.period, &ma_type, &ma_periods, &candle_store);
@@ -49,8 +46,7 @@ pub fn filter_rsi<C: Candle + 'static>(
     let trend_descending = is_trend_descending(candles);
 
     let result = match params.filter_type {
-        // 0: 과매수 (RSI > 70)
-        0 => analyzer.is_all(
+        RSIFilterType::Overbought => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 rsi > params.overbought
@@ -58,21 +54,15 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 1: 과매도 (RSI < 30)
-        1 => {
-            // 하락 추세이면 과매도 가능성 높음
-            analyzer.is_all(
-                |data| {
-                    let rsi = data.rsi.value();
-                    rsi < params.oversold
-                },
-                params.consecutive_n,
-                params.p,
-            )
-        }
-        // 2: 과매수 또는 과매도 아닌 정상 범위
-        2 => {
-            // 연속적인 하락 추세이면 과매도 상태로 정상 범위 아님
+        RSIFilterType::Oversold => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                rsi < params.oversold
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        RSIFilterType::NormalRange => {
             if trend_descending {
                 false
             } else {
@@ -86,59 +76,53 @@ pub fn filter_rsi<C: Candle + 'static>(
                 )
             }
         }
-        // 3: RSI가 임계값을 상향 돌파
-        3 => {
-            // 하락 추세에선 상향 돌파 없음
-            if trend_descending || analyzer.items.len() < 2 {
+        RSIFilterType::CrossAboveThreshold => {
+            if trend_descending || analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[analyzer.items.len() - 1].rsi.value();
-                let previous_rsi = analyzer.items[analyzer.items.len() - 2].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 let threshold = (params.oversold + params.overbought) / 2.0;
                 current_rsi > threshold && previous_rsi <= threshold
             }
         }
-        // 4: RSI가 임계값을 하향 돌파
-        4 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossBelowThreshold => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_idx = analyzer.items.len() - 1;
-                let previous_idx = analyzer.items.len() - 2;
-                let current_rsi = analyzer.items[current_idx].rsi.value();
-                let previous_rsi = analyzer.items[previous_idx].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 let threshold = (params.oversold + params.overbought) / 2.0;
                 current_rsi < threshold && previous_rsi >= threshold
             }
         }
-        // 5: RSI가 50을 상향 돌파 (상승 추세 시작)
-        5 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossAbove50 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi > 50.0 && previous_rsi <= 50.0
             }
         }
-        // 6: RSI가 50을 하향 돌파 (하락 추세 시작)
-        6 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossBelow50 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi < 50.0 && previous_rsi >= 50.0
             }
         }
-        // 7: RSI 상승 추세 (연속적으로 증가)
-        7 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        RSIFilterType::RisingTrend => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut ascending = true;
                 for i in 0..params.consecutive_n {
-                    if analyzer.items[i].rsi.value() <= analyzer.items[i + 1].rsi.value() {
+                    if analyzer.items[params.p + i].rsi.value()
+                        <= analyzer.items[params.p + i + 1].rsi.value()
+                    {
                         ascending = false;
                         break;
                     }
@@ -146,14 +130,15 @@ pub fn filter_rsi<C: Candle + 'static>(
                 ascending
             }
         }
-        // 8: RSI 하락 추세 (연속적으로 감소)
-        8 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        RSIFilterType::FallingTrend => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut descending = true;
                 for i in 0..params.consecutive_n {
-                    if analyzer.items[i].rsi.value() >= analyzer.items[i + 1].rsi.value() {
+                    if analyzer.items[params.p + i].rsi.value()
+                        >= analyzer.items[params.p + i + 1].rsi.value()
+                    {
                         descending = false;
                         break;
                     }
@@ -161,59 +146,54 @@ pub fn filter_rsi<C: Candle + 'static>(
                 descending
             }
         }
-        // 9: RSI가 40을 상향 돌파 (약세에서 중립으로 전환)
-        9 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossAbove40 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi > 40.0 && previous_rsi <= 40.0
             }
         }
-        // 10: RSI가 60을 하향 돌파 (강세에서 중립으로 전환)
-        10 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossBelow60 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi < 60.0 && previous_rsi >= 60.0
             }
         }
-        // 11: RSI가 20을 상향 돌파 (극도 과매도에서 반등)
-        11 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossAbove20 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi > 20.0 && previous_rsi <= 20.0
             }
         }
-        // 12: RSI가 80을 하향 돌파 (극도 과매수에서 하락)
-        12 => {
-            if analyzer.items.len() < 2 {
+        RSIFilterType::CrossBelow80 => {
+            if analyzer.items.len() < params.p + 2 {
                 false
             } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 current_rsi < 80.0 && previous_rsi >= 80.0
             }
         }
-        // 13: RSI가 횡보 중 (변화율이 임계값 이하)
-        13 => analyzer.is_rsi_sideways(params.consecutive_n, params.p, 0.02),
-        // 14: RSI가 강한 상승 모멘텀 (연속 상승)
-        14 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        RSIFilterType::Sideways => {
+            analyzer.is_rsi_sideways(params.consecutive_n, params.p, params.sideways_threshold)
+        }
+        RSIFilterType::StrongRisingMomentum => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut strong_momentum = true;
                 for i in 0..params.consecutive_n {
-                    let current = analyzer.items[i].rsi.value();
-                    let previous = analyzer.items[i + 1].rsi.value();
-                    // RSI가 3 이상 상승해야 강한 모멘텀으로 판단
-                    if current <= previous + 3.0 {
+                    let current = analyzer.items[params.p + i].rsi.value();
+                    let previous = analyzer.items[params.p + i + 1].rsi.value();
+                    if current <= previous + params.momentum_threshold {
                         strong_momentum = false;
                         break;
                     }
@@ -221,17 +201,15 @@ pub fn filter_rsi<C: Candle + 'static>(
                 strong_momentum
             }
         }
-        // 15: RSI가 강한 하락 모멘텀 (연속 하락)
-        15 => {
-            if analyzer.items.len() < params.consecutive_n + 1 {
+        RSIFilterType::StrongFallingMomentum => {
+            if analyzer.items.len() < params.p + params.consecutive_n + 1 {
                 false
             } else {
                 let mut strong_momentum = true;
                 for i in 0..params.consecutive_n {
-                    let current = analyzer.items[i].rsi.value();
-                    let previous = analyzer.items[i + 1].rsi.value();
-                    // RSI가 3 이상 하락해야 강한 모멘텀으로 판단
-                    if current >= previous - 3.0 {
+                    let current = analyzer.items[params.p + i].rsi.value();
+                    let previous = analyzer.items[params.p + i + 1].rsi.value();
+                    if current >= previous - params.momentum_threshold {
                         strong_momentum = false;
                         break;
                     }
@@ -239,8 +217,7 @@ pub fn filter_rsi<C: Candle + 'static>(
                 strong_momentum
             }
         }
-        // 16: RSI가 50 근처에서 횡보 (중립 상태)
-        16 => analyzer.is_all(
+        RSIFilterType::NeutralRange => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 (45.0..=55.0).contains(&rsi)
@@ -248,134 +225,81 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 17: RSI가 과매수 구간에서 하락 시작
-        17 => {
-            if analyzer.items.len() < 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
-                // 이전에 과매수였고 현재 하락
-                previous_rsi >= params.overbought && current_rsi < previous_rsi
-            }
-        }
-        // 18: RSI가 과매도 구간에서 상승 시작
-        18 => {
-            if analyzer.items.len() < 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[1].rsi.value();
-                // 이전에 과매도였고 현재 상승
-                previous_rsi <= params.oversold && current_rsi > previous_rsi
-            }
-        }
-        // 19: RSI가 이중 바닥 패턴 (W 패턴)
-        19 => {
-            if analyzer.items.len() < 5 {
+        RSIFilterType::Above40 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                rsi > 40.0
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        RSIFilterType::Below60 => analyzer.is_all(
+            |data| {
+                let rsi = data.rsi.value();
+                rsi < 60.0
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        RSIFilterType::Above50 => {
+            if analyzer.items.len() < params.p + 5 {
                 false
             } else {
                 let rsi_values: Vec<f64> = analyzer
                     .items
                     .iter()
+                    .skip(params.p)
                     .take(5)
                     .map(|data| data.rsi.value())
                     .collect();
-
-                // 첫 번째 바닥, 반등, 두 번째 바닥, 상승 패턴 확인
-                rsi_values[4] <= params.oversold && // 첫 번째 바닥
-                rsi_values[3] > rsi_values[4] && // 반등
-                rsi_values[2] <= params.oversold && // 두 번째 바닥
-                rsi_values[1] > rsi_values[2] && // 상승
-                rsi_values[0] > rsi_values[1] // 계속 상승
+                rsi_values[4] <= params.oversold
+                    && rsi_values[3] > rsi_values[4]
+                    && rsi_values[2] <= params.oversold
+                    && rsi_values[1] > rsi_values[2]
+                    && rsi_values[0] > rsi_values[1]
             }
         }
-        // 20: RSI가 이중 천정 패턴 (M 패턴)
-        20 => {
-            if analyzer.items.len() < 5 {
+        RSIFilterType::Below50 => {
+            if analyzer.items.len() < params.p + 5 {
                 false
             } else {
                 let rsi_values: Vec<f64> = analyzer
                     .items
                     .iter()
+                    .skip(params.p)
                     .take(5)
                     .map(|data| data.rsi.value())
                     .collect();
-
-                // 첫 번째 천정, 하락, 두 번째 천정, 하락 패턴 확인
-                rsi_values[4] >= params.overbought && // 첫 번째 천정
-                rsi_values[3] < rsi_values[4] && // 하락
-                rsi_values[2] >= params.overbought && // 두 번째 천정
-                rsi_values[1] < rsi_values[2] && // 하락
-                rsi_values[0] < rsi_values[1] // 계속 하락
+                rsi_values[4] >= params.overbought
+                    && rsi_values[3] < rsi_values[4]
+                    && rsi_values[2] >= params.overbought
+                    && rsi_values[1] < rsi_values[2]
+                    && rsi_values[0] < rsi_values[1]
             }
         }
-        // 21: RSI가 다이버전스 패턴 (가격 상승, RSI 하락)
-        21 => {
-            if analyzer.items.len() < 3 {
+        RSIFilterType::Divergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[0].candle.close_price();
-                let previous_price = analyzer.items[2].candle.close_price();
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[2].rsi.value();
-
-                // 가격은 상승했지만 RSI는 하락 (음의 다이버전스)
+                let current_price = analyzer.items[params.p].candle.close_price();
+                let previous_price = analyzer.items[params.p + 2].candle.close_price();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 2].rsi.value();
                 current_price > previous_price && current_rsi < previous_rsi
             }
         }
-        // 22: RSI가 컨버전스 패턴 (가격 하락, RSI 상승)
-        22 => {
-            if analyzer.items.len() < 3 {
+        RSIFilterType::Convergence => {
+            if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[0].candle.close_price();
-                let previous_price = analyzer.items[2].candle.close_price();
-                let current_rsi = analyzer.items[0].rsi.value();
-                let previous_rsi = analyzer.items[2].rsi.value();
-
-                // 가격은 하락했지만 RSI는 상승 (양의 다이버전스)
+                let current_price = analyzer.items[params.p].candle.close_price();
+                let previous_price = analyzer.items[params.p + 2].candle.close_price();
+                let current_rsi = analyzer.items[params.p].rsi.value();
+                let previous_rsi = analyzer.items[params.p + 2].rsi.value();
                 current_price < previous_price && current_rsi > previous_rsi
             }
         }
-        // 23: RSI가 과매수 구간에서 반전 신호
-        23 => {
-            if analyzer.items.len() < 3 {
-                false
-            } else {
-                let rsi_values: Vec<f64> = analyzer
-                    .items
-                    .iter()
-                    .take(3)
-                    .map(|data| data.rsi.value())
-                    .collect();
-
-                // 과매수 구간에서 하락 후 반등 실패
-                rsi_values[2] >= params.overbought && // 과매수
-                rsi_values[1] < rsi_values[2] && // 하락
-                rsi_values[0] < rsi_values[1] // 계속 하락
-            }
-        }
-        // 24: RSI가 과매도 구간에서 반전 신호
-        24 => {
-            if analyzer.items.len() < 3 {
-                false
-            } else {
-                let rsi_values: Vec<f64> = analyzer
-                    .items
-                    .iter()
-                    .take(3)
-                    .map(|data| data.rsi.value())
-                    .collect();
-
-                // 과매도 구간에서 상승 후 하락 실패
-                rsi_values[2] <= params.oversold && // 과매도
-                rsi_values[1] > rsi_values[2] && // 상승
-                rsi_values[0] > rsi_values[1] // 계속 상승
-            }
-        }
-        // 25: RSI가 30-70 구간에서 안정적
-        25 => analyzer.is_all(
+        RSIFilterType::Stable => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 (30.0..=70.0).contains(&rsi)
@@ -383,26 +307,7 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 26: RSI가 극단적 과매수 (90 이상)
-        26 => analyzer.is_all(
-            |data| {
-                let rsi = data.rsi.value();
-                rsi >= 90.0
-            },
-            params.consecutive_n,
-            params.p,
-        ),
-        // 27: RSI가 극단적 과매도 (10 이하)
-        27 => analyzer.is_all(
-            |data| {
-                let rsi = data.rsi.value();
-                rsi <= 10.0
-            },
-            params.consecutive_n,
-            params.p,
-        ),
-        // 28: RSI가 50을 중심으로 진동 (중립적 추세)
-        28 => analyzer.is_all(
+        RSIFilterType::NeutralTrend => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 (40.0..=60.0).contains(&rsi)
@@ -410,8 +315,7 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 29: RSI가 강세 구간 (60-80)
-        29 => analyzer.is_all(
+        RSIFilterType::Bullish => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 (60.0..=80.0).contains(&rsi)
@@ -419,8 +323,7 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        // 30: RSI가 약세 구간 (20-40)
-        30 => analyzer.is_all(
+        RSIFilterType::Bearish => analyzer.is_all(
             |data| {
                 let rsi = data.rsi.value();
                 (20.0..=40.0).contains(&rsi)
@@ -428,7 +331,6 @@ pub fn filter_rsi<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        _ => false,
     };
 
     Ok(result)
@@ -582,9 +484,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -610,9 +513,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 1,
+            filter_type: 1.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -628,9 +532,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 2,
+            filter_type: 2.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -645,9 +550,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 3,
+            filter_type: 3.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -682,9 +588,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 4,
+            filter_type: 4.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -700,9 +607,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 5, // 유효하지 않은 필터 타입
+            filter_type: 5.into(), // 유효하지 않은 필터 타입
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -727,9 +635,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 1,   // RSI가 과매도 임계값 아래
-            consecutive_n: 3, // 3연속 조건
+            filter_type: 1.into(), // RSI가 과매도 임계값 아래
+            consecutive_n: 3,      // 3연속 조건
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -745,9 +654,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 0,
+            filter_type: 0.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -761,9 +671,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 9,
+            filter_type: 9.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -779,9 +690,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 10,
+            filter_type: 10.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -797,9 +709,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 13,
+            filter_type: 13.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -815,9 +728,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 16,
+            filter_type: 16.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -833,9 +747,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 21,
+            filter_type: 21.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -851,9 +766,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 22,
+            filter_type: 22.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -869,9 +785,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 25,
+            filter_type: 25.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -887,9 +804,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 28,
+            filter_type: 28.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -905,9 +823,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 29,
+            filter_type: 29.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
@@ -923,9 +842,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 30,
+            filter_type: 30.into(),
             consecutive_n: 1,
             p: 0,
+            ..Default::default()
         };
         let result = filter_rsi("TEST/USDT", &params, &candles);
         assert!(result.is_ok());
