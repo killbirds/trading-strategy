@@ -96,6 +96,11 @@ impl VWAP {
 /// VWAP 빌더
 ///
 /// VWAP 기술적 지표를 계산하고 업데이트합니다.
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period개의 (typical_price, volume) 쌍만 유지 (period=0일 때 최대 500개)
+/// - 시간 복잡도: O(1) 업데이트 (누적 합계 사용), O(n) 초기 빌드 (n = 데이터 개수)
+/// - 최적화: 누적 합계(cumulative_pv, cumulative_volume)를 사용하여 효율적인 업데이트 지원
 #[derive(Debug)]
 pub struct VWAPBuilder<C: Candle> {
     /// VWAP 매개변수
@@ -485,9 +490,19 @@ mod tests {
         // 둘 다 유효한 값이어야 함 (next와 build는 내부 상태 차이로 약간 다를 수 있음)
         assert!(vwap1.value > 0.0);
         assert!(vwap2.value > 0.0);
-        // 값이 비슷한 범위 내에 있어야 함 (10% 이내)
-        let diff_percent = ((vwap1.value - vwap2.value).abs() / vwap2.value.max(1.0)) * 100.0;
-        assert!(diff_percent < 10.0);
+        // 값이 비슷한 범위 내에 있어야 함 (5% 이내로 더 엄격하게 검증)
+        let diff_percent = if vwap2.value > 0.0 {
+            ((vwap1.value - vwap2.value).abs() / vwap2.value) * 100.0
+        } else {
+            0.0
+        };
+        assert!(
+            diff_percent < 5.0,
+            "VWAP values should be consistent. Incremental: {}, Build: {}, Diff: {}%",
+            vwap1.value,
+            vwap2.value,
+            diff_percent
+        );
     }
 
     #[test]

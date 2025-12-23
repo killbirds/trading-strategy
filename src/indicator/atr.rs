@@ -42,6 +42,11 @@ impl ATR {
 /// ATR 계산을 위한 빌더
 ///
 /// ATR 지표를 계산하고 업데이트하는 빌더
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period + 1개의 데이터만 유지하여 O(period) 메모리 사용
+/// - 시간 복잡도: O(1) 업데이트 (next), O(n) 초기 빌드 (n = 데이터 개수)
+/// - 대용량 데이터: period * 2개 이상의 데이터는 자동으로 제거되어 메모리 효율적
 #[derive(Debug)]
 pub struct ATRBuilder<C: Candle> {
     /// ATR 계산 기간
@@ -530,6 +535,41 @@ mod tests {
             atr.value() <= 10.0,
             "ATR should be less than or equal to max TR. Got: {}",
             atr.value()
+        );
+    }
+
+    #[test]
+    fn test_atr_incremental_vs_build_consistency() {
+        // next를 여러 번 호출한 결과와 build를 한 번 호출한 결과의 일관성 검증
+        let mut builder1 = ATRBuilder::<TestCandle>::new(14);
+        let mut builder2 = ATRBuilder::<TestCandle>::new(14);
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let atr1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let atr2 = builder2.build(&candles);
+
+        // 마지막 값이 비슷해야 함 (Wilder's smoothing으로 인해 약간의 차이는 있을 수 있음)
+        // 하지만 둘 다 유효한 범위 내에 있어야 함
+        assert!(atr1.value() >= 0.0);
+        assert!(atr2.value() >= 0.0);
+        // 값의 차이가 너무 크지 않아야 함 (10% 이내)
+        let diff_percent = if atr2.value() > 0.0 {
+            ((atr1.value() - atr2.value()).abs() / atr2.value()) * 100.0
+        } else {
+            0.0
+        };
+        assert!(
+            diff_percent < 10.0,
+            "ATR values should be consistent. Incremental: {}, Build: {}, Diff: {}%",
+            atr1.value(),
+            atr2.value(),
+            diff_percent
         );
     }
 }

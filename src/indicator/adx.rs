@@ -211,6 +211,12 @@ impl AverageDirectionalMovementIndex {
     }
 }
 
+/// ADX 계산을 위한 빌더
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period + 2개의 고가/저가/종가 데이터와 period + 1개의 DX 값 유지
+/// - 시간 복잡도: O(1) 업데이트 (Wilder's smoothing), O(n*period) 초기 빌드
+/// - 최적화: Wilder's smoothing을 사용하여 효율적인 증분 계산 지원
 #[derive(Debug)]
 pub struct ADXBuilder<C: Candle> {
     period: usize,

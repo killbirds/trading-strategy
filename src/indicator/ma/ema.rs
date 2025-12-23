@@ -9,6 +9,11 @@ use trading_chart::Candle;
 /// 지수이동평균(EMA) 계산 빌더
 ///
 /// 지수이동평균은 최근 데이터에 더 높은 가중치를 부여하는 이동평균입니다.
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period * 2개의 가격 데이터만 유지하여 O(period) 메모리 사용
+/// - 시간 복잡도: O(1) 업데이트 (증분 계산), O(n) 초기 빌드 (n = 데이터 개수)
+/// - 최적화: 이전 EMA 값을 캐싱하여 효율적인 증분 계산 지원
 #[derive(Debug)]
 pub struct EMABuilder<C: Candle> {
     /// EMA 계산 기간
@@ -578,6 +583,41 @@ mod tests {
             "EMA calculation mismatch. Expected: {}, Got: {}",
             expected,
             ema.get()
+        );
+    }
+
+    #[test]
+    fn test_ema_incremental_vs_build_consistency() {
+        // next를 여러 번 호출한 결과와 build를 한 번 호출한 결과의 일관성 검증
+        let mut builder1 = EMABuilder::<TestCandle>::new(14);
+        let mut builder2 = EMABuilder::<TestCandle>::new(14);
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let ema1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let ema2 = builder2.build(&candles);
+
+        // 값들이 유효한 범위 내에 있어야 함
+        assert!(ema1.get() > 0.0);
+        assert!(ema2.get() > 0.0);
+
+        // EMA 값의 차이가 너무 크지 않아야 함 (1% 이내)
+        let diff_percent = if ema2.get() > 0.0 {
+            ((ema1.get() - ema2.get()).abs() / ema2.get()) * 100.0
+        } else {
+            0.0
+        };
+        assert!(
+            diff_percent < 1.0,
+            "EMA values should be consistent. Incremental: {}, Build: {}, Diff: {}%",
+            ema1.get(),
+            ema2.get(),
+            diff_percent
         );
     }
 }

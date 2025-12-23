@@ -7,6 +7,11 @@ use trading_chart::Candle;
 /// 상대강도지수(RSI) 기술적 지표 빌더
 ///
 /// RSI 지표를 계산하고 업데이트하는 빌더
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period + 1개의 종가 데이터만 유지하여 O(period) 메모리 사용
+/// - 시간 복잡도: O(1) 업데이트 (Wilder's smoothing), O(n) 초기 빌드 (n = 데이터 개수)
+/// - 최적화: Wilder's smoothing을 사용하여 효율적인 증분 계산 지원
 #[derive(Debug)]
 pub struct RSIBuilder<C: Candle> {
     /// RSI 계산 기간

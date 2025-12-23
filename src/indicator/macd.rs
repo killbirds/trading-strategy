@@ -9,6 +9,11 @@ use trading_chart::Candle;
 ///
 /// MACD는 두 개의 이동평균선(빠른 EMA와 느린 EMA)의 차이를 계산하고,
 /// 이 값에 대한 시그널 라인(MACD의 EMA)을 제공하는 기술적 지표입니다.
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: slow_period * 2개의 가격 데이터와 signal_period * 2개의 MACD 히스토리 유지
+/// - 시간 복잡도: O(1) 업데이트 (next), O(n) 초기 빌드 (n = 데이터 개수)
+/// - 증분 계산: 이전 EMA 값을 캐싱하여 효율적인 업데이트 지원
 #[derive(Debug)]
 pub struct MACDBuilder<C: Candle> {
     /// 빠른 EMA 기간 (일반적으로 12)
@@ -812,6 +817,53 @@ mod tests {
             !macd.histogram.is_nan() && !macd.histogram.is_infinite(),
             "Histogram should be finite. Got: {}",
             macd.histogram
+        );
+    }
+
+    #[test]
+    fn test_macd_incremental_vs_build_consistency() {
+        // next를 여러 번 호출한 결과와 build를 한 번 호출한 결과의 일관성 검증
+        let mut builder1 = MACDBuilder::<TestCandle>::new(12, 26, 9);
+        let mut builder2 = MACDBuilder::<TestCandle>::new(12, 26, 9);
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let macd1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let macd2 = builder2.build(&candles);
+
+        // 값들이 유효한 범위 내에 있어야 함
+        assert!(!macd1.macd_line.is_nan() && !macd1.macd_line.is_infinite());
+        assert!(!macd2.macd_line.is_nan() && !macd2.macd_line.is_infinite());
+
+        // MACD 라인의 차이가 너무 크지 않아야 함 (EMA 계산 방식 차이로 약간의 차이는 허용)
+        let macd_diff = (macd1.macd_line - macd2.macd_line).abs();
+        assert!(
+            macd_diff < 100.0,
+            "MACD line values should be consistent. Incremental: {}, Build: {}, Diff: {}",
+            macd1.macd_line,
+            macd2.macd_line,
+            macd_diff
+        );
+
+        // 히스토그램 계산이 일관되어야 함
+        let hist1_expected = macd1.macd_line - macd1.signal_line;
+        let hist2_expected = macd2.macd_line - macd2.signal_line;
+        assert!(
+            (macd1.histogram - hist1_expected).abs() < 0.01,
+            "Histogram should equal MACD - Signal. Got: {}, Expected: {}",
+            macd1.histogram,
+            hist1_expected
+        );
+        assert!(
+            (macd2.histogram - hist2_expected).abs() < 0.01,
+            "Histogram should equal MACD - Signal. Got: {}, Expected: {}",
+            macd2.histogram,
+            hist2_expected
         );
     }
 }

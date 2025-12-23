@@ -119,6 +119,11 @@ impl BollingerBandsIndicator {
 ///
 /// 볼린저 밴드는 가격의 변동성을 측정하는 기술적 지표로,
 /// 이동평균선과 그 주변의 표준편차 기반 밴드로 구성됩니다.
+///
+/// # 성능 고려사항
+/// - 메모리 사용량: period개의 가격 데이터만 유지하여 O(period) 메모리 사용
+/// - 시간 복잡도: O(period) 업데이트 (표준편차 계산), O(n*period) 초기 빌드
+/// - 최적화: period개 이상의 데이터는 자동으로 제거되어 메모리 효율적
 #[derive(Debug)]
 pub struct BollingerBandsBuilder<C: Candle> {
     /// 내부 볼린저 밴드 계산 객체
@@ -724,6 +729,54 @@ mod tests {
             "Lower band calculation mismatch. Expected: {}, Got: {}",
             expected_lower,
             bband.lower
+        );
+    }
+
+    #[test]
+    fn test_bband_incremental_vs_build_consistency() {
+        // next를 여러 번 호출한 결과와 build를 한 번 호출한 결과의 일관성 검증
+        // period=3으로 충분한 데이터로 테스트
+        let mut builder1 = BollingerBandsBuilder::<TestCandle>::new(3, 2.0);
+        let mut builder2 = BollingerBandsBuilder::<TestCandle>::new(3, 2.0);
+        let candles = create_test_candles();
+
+        // builder1: next를 여러 번 호출
+        for candle in &candles {
+            builder1.next(candle);
+        }
+        let bband1 = builder1.next(&candles[candles.len() - 1]);
+
+        // builder2: build를 한 번 호출
+        let bband2 = builder2.build(&candles);
+
+        // 값들이 유효한 범위 내에 있어야 함
+        assert!(bband1.middle > 0.0);
+        assert!(bband2.middle > 0.0);
+
+        // 데이터가 충분한 경우에만 밴드 관계 검증
+        // 데이터가 부족하면 upper, middle, lower가 모두 같을 수 있음
+        if bband1.upper != bband1.middle {
+            assert!(bband1.upper > bband1.middle);
+            assert!(bband1.lower < bband1.middle);
+        }
+        if bband2.upper != bband2.middle {
+            assert!(bband2.upper > bband2.middle);
+            assert!(bband2.lower < bband2.middle);
+        }
+
+        // 중간 밴드의 차이가 너무 크지 않아야 함 (10% 이내)
+        // 볼린저 밴드는 내부 상태(표준편차 계산)에 따라 약간 다른 결과를 낼 수 있음
+        let middle_diff_percent = if bband2.middle > 0.0 {
+            ((bband1.middle - bband2.middle).abs() / bband2.middle) * 100.0
+        } else {
+            0.0
+        };
+        assert!(
+            middle_diff_percent < 10.0,
+            "Middle band values should be consistent. Incremental: {}, Build: {}, Diff: {}%",
+            bband1.middle,
+            bband2.middle,
+            middle_diff_percent
         );
     }
 }

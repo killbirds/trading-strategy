@@ -163,11 +163,22 @@ where
 
         let weight_sum: f64 = (1..=len).sum::<usize>() as f64;
         let mut wma = 0.0;
+        let mut actual_weight_sum = 0.0;
 
         // 최신 데이터에 높은 가중치 부여 (slice의 마지막 요소가 가장 높은 가중치)
         for (i, &value) in slice.iter().enumerate() {
             let weight = (i + 1) as f64 / weight_sum;
+            actual_weight_sum += weight;
             wma += value * weight;
+        }
+
+        // 가중치 합 검증 (부동소수점 오차 허용)
+        const EPSILON: f64 = 1e-10;
+        if (actual_weight_sum - 1.0).abs() > EPSILON {
+            // 가중치 합이 1이 아니면 정규화
+            if actual_weight_sum > EPSILON {
+                wma /= actual_weight_sum;
+            }
         }
 
         wma
