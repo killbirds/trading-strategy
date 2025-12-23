@@ -383,13 +383,15 @@ mod tests {
 
     impl TestCandle {
         fn new(open: f64, high: f64, low: f64, close: f64, volume: f64) -> Self {
+            static COUNTER: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+            let timestamp = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Self {
                 open,
                 high,
                 low,
                 close,
                 volume,
-                datetime: Utc.timestamp_opt(0, 0).unwrap(),
+                datetime: Utc.timestamp_opt(timestamp, 0).unwrap(),
             }
         }
     }
