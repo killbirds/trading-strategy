@@ -391,7 +391,10 @@ impl<C: Candle + Clone + 'static> MarketStructureAnalyzer<C> {
             return StructureChange::None;
         }
 
-        let previous_structure = &self.items[0].market_structure;
+        let previous_structure = match self.items.first() {
+            Some(item) => &item.market_structure,
+            None => return StructureChange::None,
+        };
 
         match (previous_structure, current_structure) {
             (MarketStructure::Uptrend, MarketStructure::Downtrend) => {
@@ -613,8 +616,14 @@ impl<C: Candle + Clone + 'static> MarketStructureAnalyzer<C> {
             return 0.0;
         }
 
-        let current_price = candles[0].close_price();
-        let past_price = candles[candles.len() - 1].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
+        let past_price = match candles.last() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
 
         if past_price == 0.0 {
             return 0.0;

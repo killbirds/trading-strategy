@@ -442,11 +442,15 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
             return 0.0;
         }
 
+        let first_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
         let last_price = candles.last().map(|c| c.close_price()).unwrap_or(0.0);
         if last_price == 0.0 {
             return 0.0;
         }
-        let total_return = (candles[0].close_price() - last_price) / last_price;
+        let total_return = (first_price - last_price) / last_price;
         let volatility = self.calculate_volatility(candles);
 
         if volatility == 0.0 {
@@ -460,7 +464,10 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     fn calculate_optimal_position_size(&self, candles: &[C]) -> f64 {
         let atr = self.calculate_atr(candles);
         let volatility = self.calculate_volatility(candles);
-        let current_price = candles[0].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
 
         if current_price == 0.0 || atr == 0.0 {
             return 0.0;

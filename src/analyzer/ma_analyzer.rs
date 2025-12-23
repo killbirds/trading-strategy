@@ -139,8 +139,14 @@ impl<C: Candle + 'static> MAAnalyzer<C> {
             return false;
         }
 
-        let current = &self.items[0];
-        let previous = &self.items[1];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => item,
+            None => return false,
+        };
 
         let current_short = current.mas.get_by_key_index(short_index).get();
         let current_long = current.mas.get_by_key_index(long_index).get();

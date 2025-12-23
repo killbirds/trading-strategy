@@ -137,13 +137,20 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
             let adx_range = max_adx - min_adx;
 
             // 높은 값에서 안정적으로 유지되거나 (변동폭이 작음) 또는 증가하는 경우
-            adx_stable_high =
-                min_adx >= 80.0 && (adx_range < 5.0 || adx_values[0] >= adx_values[n]);
+            if let (Some(first), Some(last)) = (adx_values.first(), adx_values.get(n)) {
+                adx_stable_high = min_adx >= 80.0 && (adx_range < 5.0 || first >= last);
+            }
         } else {
             // 일반적인 경우: ADX가 증가하는지 확인
             for i in 1..=n {
                 // 현재 값이 이전 값보다 작고, 이전 값이 100이 아닌 경우 증가 추세가 아님
-                if adx_values[i] < adx_values[i - 1] && adx_values[i - 1] < 100.0 {
+                if let (Some(current), Some(previous)) = (adx_values.get(i), adx_values.get(i - 1))
+                {
+                    if *current < *previous && *previous < 100.0 {
+                        adx_increasing = false;
+                        break;
+                    }
+                } else {
                     adx_increasing = false;
                     break;
                 }
@@ -153,7 +160,12 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         // +DI와 -DI의 상대적 강도 확인
         let mut di_strength = true;
         for i in 0..=n {
-            if pdi_values[i] <= ndi_values[i] {
+            if let (Some(pdi), Some(ndi)) = (pdi_values.get(i), ndi_values.get(i)) {
+                if pdi <= ndi {
+                    di_strength = false;
+                    break;
+                }
+            } else {
                 di_strength = false;
                 break;
             }
@@ -184,13 +196,18 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         // 연속된 감소 횟수 확인
         let mut decreasing_count = 0;
         for i in 0..n {
-            if adx_values[i] > adx_values[i + 1] {
+            if let (Some(current), Some(next)) = (adx_values.get(i), adx_values.get(i + 1))
+                && current > next
+            {
                 decreasing_count += 1;
             }
         }
 
         // 첫 번째와 마지막 값의 차이로 전체적인 감소 추세 확인
-        let total_change = adx_values[n] - adx_values[0];
+        let total_change = match (adx_values.get(n), adx_values.first()) {
+            (Some(last), Some(first)) => last - first,
+            _ => return false,
+        };
 
         // n개 중 최소 50% 이상이 감소하고, 전체적으로도 감소했다면 추세 약화로 판단
         decreasing_count >= (n as f64 * 0.5).ceil() as usize && total_change > 0.0
@@ -226,10 +243,16 @@ impl<C: Candle + 'static> ADXAnalyzer<C> {
         let previous_avg = previous_adx.iter().sum::<f64>() / m as f64;
 
         // 최근 ADX 값의 변화율 계산
-        let recent_change = (recent_adx[0] - recent_adx[n - 1]) / recent_adx[n - 1] * 100.0;
+        let recent_change = match (recent_adx.first(), recent_adx.get(n - 1)) {
+            (Some(first), Some(last)) if *last != 0.0 => (first - last) / last * 100.0,
+            _ => return false,
+        };
 
         // 이전 ADX 값의 변화율 계산
-        let previous_change = (previous_adx[0] - previous_adx[m - 1]) / previous_adx[m - 1] * 100.0;
+        let previous_change = match (previous_adx.first(), previous_adx.get(m - 1)) {
+            (Some(first), Some(last)) if *last != 0.0 => (first - last) / last * 100.0,
+            _ => return false,
+        };
 
         // ADX 최소값 확인 (20 이상)
         let recent_min_adx = recent_adx.iter().fold(f64::INFINITY, |a, &b| a.min(b));

@@ -338,18 +338,15 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
 
     /// 지지선 브레이크다운 확인
     pub fn is_support_breakdown(&self) -> bool {
-        if self.items.len() < 2 {
-            return false;
-        }
-
-        let current = &self.items[0];
-        let previous = &self.items[1];
-
-        if let (Some(current_support), Some(previous_support)) =
-            (&current.nearest_support, &previous.nearest_support)
-        {
-            previous.candle.close_price() >= previous_support.price
-                && current.candle.close_price() < current_support.price
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            if let (Some(current_support), Some(previous_support)) =
+                (&current.nearest_support, &previous.nearest_support)
+            {
+                previous.candle.close_price() >= previous_support.price
+                    && current.candle.close_price() < current_support.price
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -357,18 +354,15 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
 
     /// 저항선 브레이크아웃 확인
     pub fn is_resistance_breakout(&self) -> bool {
-        if self.items.len() < 2 {
-            return false;
-        }
-
-        let current = &self.items[0];
-        let previous = &self.items[1];
-
-        if let (Some(current_resistance), Some(previous_resistance)) =
-            (&current.nearest_resistance, &previous.nearest_resistance)
-        {
-            previous.candle.close_price() <= previous_resistance.price
-                && current.candle.close_price() > current_resistance.price
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            if let (Some(current_resistance), Some(previous_resistance)) =
+                (&current.nearest_resistance, &previous.nearest_resistance)
+            {
+                previous.candle.close_price() <= previous_resistance.price
+                    && current.candle.close_price() > current_resistance.price
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -380,7 +374,10 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             return false;
         }
 
-        let current = &self.items[0];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         if let Some(support) = &current.nearest_support {
             // 최근 n개 캔들 중 지지선 근처에서 반등했는지 확인
             let recent_low = self.items[..n]
@@ -403,7 +400,10 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
             return false;
         }
 
-        let current = &self.items[0];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         if let Some(resistance) = &current.nearest_resistance {
             // 최근 n개 캔들 중 저항선 근처에서 거부되었는지 확인
             let recent_high = self.items[..n]

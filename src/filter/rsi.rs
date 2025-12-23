@@ -89,9 +89,7 @@ pub fn filter_rsi<C: Candle + 'static>(
         // 3: RSI가 임계값을 상향 돌파
         3 => {
             // 하락 추세에선 상향 돌파 없음
-            if trend_descending {
-                false
-            } else if analyzer.items.len() < 2 {
+            if trend_descending || analyzer.items.len() < 2 {
                 false
             } else {
                 let current_rsi = analyzer.items[analyzer.items.len() - 1].rsi.value();

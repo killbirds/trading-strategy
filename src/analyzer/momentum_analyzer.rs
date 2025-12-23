@@ -405,7 +405,10 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             .iter()
             .map(|c| c.low_price())
             .fold(f64::MAX, f64::min);
-        let current_close = candles[0].close_price();
+        let current_close = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 50.0,
+        };
 
         if highest_high == lowest_low {
             return 50.0;
@@ -438,7 +441,10 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             .iter()
             .map(|c| c.low_price())
             .fold(f64::MAX, f64::min);
-        let current_close = candles[0].close_price();
+        let current_close = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 50.0,
+        };
 
         if highest_high == lowest_low {
             return -50.0;
@@ -453,8 +459,14 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             return 0.0;
         }
 
-        let current_price = candles[0].close_price();
-        let past_price = candles[self.roc_period - 1].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
+        let past_price = match candles.get(self.roc_period - 1) {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
 
         if past_price == 0.0 {
             return 0.0;
@@ -476,7 +488,10 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             .collect();
 
         let sma = typical_prices.iter().sum::<f64>() / typical_prices.len() as f64;
-        let current_typical = typical_prices[0];
+        let current_typical = match typical_prices.first() {
+            Some(&tp) => tp,
+            None => return 0.0,
+        };
 
         let mad = typical_prices
             .iter()
@@ -497,8 +512,14 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             return 0.0;
         }
 
-        let current_price = candles[0].close_price();
-        let past_price = candles[self.momentum_period - 1].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
+        let past_price = match candles.get(self.momentum_period - 1) {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
 
         current_price - past_price
     }
@@ -745,9 +766,9 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
             let next_rsi = indicators_history[i + 1].rsi;
 
             // 극값 확인 (간소화된 버전)
-            if rsi > prev_rsi && rsi > next_rsi && rsi > 70.0 {
-                extremes.push((i, rsi));
-            } else if rsi < prev_rsi && rsi < next_rsi && rsi < 30.0 {
+            if (rsi > prev_rsi && rsi > next_rsi && rsi > 70.0)
+                || (rsi < prev_rsi && rsi < next_rsi && rsi < 30.0)
+            {
                 extremes.push((i, rsi));
             }
         }

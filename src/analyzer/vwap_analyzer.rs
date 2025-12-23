@@ -149,50 +149,54 @@ impl<C: Candle + 'static> VWAPAnalyzer<C> {
 
     /// VWAP 붕괴 확인 (가격이 VWAP 아래로 이동)
     pub fn is_vwap_breakdown(&self, param: &VWAPParams) -> bool {
-        if self.items.len() < 2 {
-            return false;
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            let current_below = current.is_price_below_vwap(param);
+            let previous_below = previous.is_price_below_vwap(param);
+            current_below && !previous_below
+        } else {
+            false
         }
-
-        let current_below = self.items[0].is_price_below_vwap(param);
-        let previous_below = self.items[1].is_price_below_vwap(param);
-
-        current_below && !previous_below
     }
 
     /// VWAP 리바운드 확인 (가격이 VWAP에 닿고 반등)
     pub fn is_vwap_rebound(&self, param: &VWAPParams, threshold: f64) -> bool {
-        if self.items.len() < 3 {
-            return false;
+        if let (Some(current), Some(previous), Some(more_previous)) =
+            (self.items.first(), self.items.get(1), self.items.get(2))
+        {
+            let current_percent = current.price_to_vwap_percent(param);
+            let previous_percent = previous.price_to_vwap_percent(param);
+            let more_previous_percent = more_previous.price_to_vwap_percent(param);
+
+            // 상승 반등: VWAP 아래에서 VWAP에 가까워졌다가 다시 상승
+            let up_rebound = current_percent > previous_percent
+                && previous_percent.abs() < threshold
+                && more_previous_percent < previous_percent;
+
+            // 하락 반등: VWAP 위에서 VWAP에 가까워졌다가 다시 하락
+            let down_rebound = current_percent < previous_percent
+                && previous_percent.abs() < threshold
+                && more_previous_percent > previous_percent;
+
+            up_rebound || down_rebound
+        } else {
+            false
         }
-
-        // 현재 VWAP에서 멀어지고 있는지
-        let current_percent = self.items[0].price_to_vwap_percent(param);
-        let previous_percent = self.items[1].price_to_vwap_percent(param);
-        let more_previous_percent = self.items[2].price_to_vwap_percent(param);
-
-        // 상승 반등: VWAP 아래에서 VWAP에 가까워졌다가 다시 상승
-        let up_rebound = current_percent > previous_percent
-            && previous_percent.abs() < threshold
-            && more_previous_percent < previous_percent;
-
-        // 하락 반등: VWAP 위에서 VWAP에 가까워졌다가 다시 하락
-        let down_rebound = current_percent < previous_percent
-            && previous_percent.abs() < threshold
-            && more_previous_percent > previous_percent;
-
-        up_rebound || down_rebound
     }
 
     /// 가격과 VWAP의 거리가 점점 벌어지는지 확인 (VWAP에서 점점 멀어짐)
     pub fn is_diverging_from_vwap(&self, param: &VWAPParams, n: usize) -> bool {
-        if self.items.len() < n + 1 {
+        if self.items.len() < n + 1 || n < 2 {
             return false;
         }
 
         for i in 0..n - 1 {
-            let current_percent = self.items[i].price_to_vwap_percent(param).abs();
-            let next_percent = self.items[i + 1].price_to_vwap_percent(param).abs();
-            if current_percent <= next_percent {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_percent = current.price_to_vwap_percent(param).abs();
+                let next_percent = next.price_to_vwap_percent(param).abs();
+                if current_percent <= next_percent {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
@@ -202,14 +206,18 @@ impl<C: Candle + 'static> VWAPAnalyzer<C> {
 
     /// 가격과 VWAP의 거리가 점점 좁아지는지 확인 (VWAP로 회귀)
     pub fn is_converging_to_vwap(&self, param: &VWAPParams, n: usize) -> bool {
-        if self.items.len() < n + 1 {
+        if self.items.len() < n + 1 || n < 2 {
             return false;
         }
 
         for i in 0..n - 1 {
-            let current_percent = self.items[i].price_to_vwap_percent(param).abs();
-            let next_percent = self.items[i + 1].price_to_vwap_percent(param).abs();
-            if current_percent >= next_percent {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_percent = current.price_to_vwap_percent(param).abs();
+                let next_percent = next.price_to_vwap_percent(param).abs();
+                if current_percent >= next_percent {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }

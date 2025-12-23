@@ -200,7 +200,10 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         }
 
         // 현재 캔들의 고가가 상단을 돌파하고 종가가 상단 위에 있는지 확인
-        let current_data = &self.items[0];
+        let current_data = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         let high_breaks_upper = current_data.candle.high_price() > current_data.bband.upper();
         let close_above_upper = current_data.candle.close_price() > current_data.bband.upper();
 
@@ -264,8 +267,14 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
             return 0.0;
         }
 
-        let current_width = self.items[0].bband.upper() - self.items[0].bband.lower();
-        let previous_width = self.items[1].bband.upper() - self.items[1].bband.lower();
+        let current_width = match self.items.first() {
+            Some(item) => item.bband.upper() - item.bband.lower(),
+            None => return 0.0,
+        };
+        let previous_width = match self.items.get(1) {
+            Some(item) => item.bband.upper() - item.bband.lower(),
+            None => return 0.0,
+        };
 
         if previous_width == 0.0 {
             return 0.0;
@@ -398,8 +407,7 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         let current_not_squeeze = !self.is_band_width_squeeze(1, threshold, 0);
 
         // 이전에는 스퀴즈 상태였는지 확인
-        let previous_was_squeeze = if self.items.len() >= 2 {
-            let previous_data = &self.items[1];
+        let previous_was_squeeze = if let Some(previous_data) = self.items.get(1) {
             let band_width = previous_data.bband.upper() - previous_data.bband.lower();
             let middle = previous_data.bband.middle();
             if middle == 0.0 {
@@ -480,9 +488,13 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
                     return false;
                 }
                 // 현재 밴드폭이 이전보다 큰지 확인
-                let current_width = self.items[0].bband.upper() - self.items[0].bband.lower();
-                let previous_width = self.items[1].bband.upper() - self.items[1].bband.lower();
-                current_width > previous_width
+                if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+                    let current_width = current.bband.upper() - current.bband.lower();
+                    let previous_width = previous.bband.upper() - previous.bband.lower();
+                    current_width > previous_width
+                } else {
+                    false
+                }
             },
             n,
             m,
@@ -521,10 +533,10 @@ impl<C: Candle + 'static> BBandAnalyzer<C> {
         self.is_break_through_by_satisfying(
             |_| {
                 // 스퀴즈 브레이크아웃 로직 (기존 is_squeeze_breakout_with_close_above_upper와 유사)
-                if self.items.is_empty() {
-                    return false;
-                }
-                let current_data = &self.items[0];
+                let current_data = match self.items.first() {
+                    Some(item) => item,
+                    None => return false,
+                };
                 let high_breaks_upper =
                     current_data.candle.high_price() > current_data.bband.upper();
                 let close_above_upper =

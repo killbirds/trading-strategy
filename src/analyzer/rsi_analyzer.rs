@@ -117,7 +117,10 @@ impl<C: Candle + 'static> RSIAnalyzer<C> {
         }
 
         // 현재 캔들에서 단기선이 장기선보다 위에 있는지 확인
-        let current = &self.items[0];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         let current_short = current.mas.get_by_key_index(short_index).get();
         let current_long = current.mas.get_by_key_index(long_index).get();
         let is_current_short_above_long = current_short > current_long;

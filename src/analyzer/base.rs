@@ -19,9 +19,12 @@ pub trait AnalyzerDataOps<C: Candle>: GetCandle<C> {
     /// * `get_value` - 기준 가격 가져오는 함수
     ///
     /// # Returns
-    /// * `f64` - 수익률 (현재가격 - 기준가격)/기준가격
+    /// * `f64` - 수익률 (현재가격 - 기준가격)/기준가격 (기준가격이 0이면 0.0 반환)
     fn get_rate_of_return(&self, get_value: impl Fn(&Self) -> f64) -> f64 {
         let value = get_value(self);
+        if value == 0.0 {
+            return 0.0;
+        }
         (self.candle().close_price() - value) / value
     }
 
@@ -160,14 +163,21 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get_value` - 값 추출 함수
     ///
     /// # Returns
-    /// * `f64` - 추출된 값
-    ///
-    /// # Panics
-    /// * 인덱스가 범위를 벗어나면 패닉 발생
+    /// * `f64` - 추출된 값 (인덱스가 범위를 벗어나면 0.0 반환)
     fn get_value(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
-        self.get(index)
-            .map(get_value)
-            .unwrap_or_else(|| panic!("Index {} out of bounds", index))
+        self.get(index).map(get_value).unwrap_or(0.0)
+    }
+
+    /// 특정 인덱스의 데이터에서 값 추출 (안전한 버전)
+    ///
+    /// # Arguments
+    /// * `index` - 데이터 인덱스
+    /// * `get_value` - 값 추출 함수
+    ///
+    /// # Returns
+    /// * `Option<f64>` - 추출된 값 (인덱스가 범위를 벗어나면 None)
+    fn try_get_value(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> Option<f64> {
+        self.get(index).map(get_value)
     }
 
     /// 특정 인덱스 데이터의 수익률 계산
@@ -177,20 +187,30 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `get_value` - 기준 가격 추출 함수
     ///
     /// # Returns
-    /// * `f64` - 계산된 수익률
-    ///
-    /// # Panics
-    /// * 인덱스가 범위를 벗어나면 패닉 발생
+    /// * `f64` - 계산된 수익률 (인덱스가 범위를 벗어나면 0.0 반환)
     fn get_rate_of_return(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
         self.datum()
             .get(index)
             .map(|data| data.get_rate_of_return(&get_value))
-            .unwrap_or_else(|| {
-                panic!(
-                    "Index {} out of bounds for rate of return calculation",
-                    index
-                )
-            })
+            .unwrap_or(0.0)
+    }
+
+    /// 특정 인덱스 데이터의 수익률 계산 (안전한 버전)
+    ///
+    /// # Arguments
+    /// * `index` - 데이터 인덱스
+    /// * `get_value` - 기준 가격 추출 함수
+    ///
+    /// # Returns
+    /// * `Option<f64>` - 계산된 수익률 (인덱스가 범위를 벗어나면 None)
+    fn try_get_rate_of_return(
+        &self,
+        index: usize,
+        get_value: impl Fn(&Data) -> f64,
+    ) -> Option<f64> {
+        self.datum()
+            .get(index)
+            .map(|data| data.get_rate_of_return(&get_value))
     }
 
     /// n개의 연속된 데이터가 특정 조건을 모두 만족하는지 확인

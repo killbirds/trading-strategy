@@ -354,10 +354,7 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
         }
 
         // 2캔들 패턴
-        if candles.len() >= 2 {
-            let prev = &candles[1];
-            let curr = &candles[0];
-
+        if let (Some(prev), Some(curr)) = (candles.get(1), candles.first()) {
             // 엔걸핑 패턴
             if self.is_engulfing_pattern(prev, curr) {
                 if curr.close_price() > curr.open_price() {
@@ -396,11 +393,9 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
         }
 
         // 3캔들 패턴
-        if candles.len() >= 3 {
-            let third = &candles[2];
-            let second = &candles[1];
-            let first = &candles[0];
-
+        if let (Some(third), Some(second), Some(first)) =
+            (candles.get(2), candles.get(1), candles.first())
+        {
             // 모닝 스타
             if self.is_morning_star_pattern(third, second, first) {
                 return MultiCandlePattern::MorningStar;
@@ -712,7 +707,10 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
             return 0.0;
         }
 
-        let current = &candles[0];
+        let current = match candles.first() {
+            Some(c) => c,
+            None => return 0.0,
+        };
         let body_size = (current.close_price() - current.open_price()).abs();
         let total_range = current.high_price() - current.low_price();
 
@@ -721,8 +719,8 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
         }
 
         let body_ratio = body_size / total_range;
-        let volume_factor = if candles.len() > 1 {
-            let prev_volume = candles[1].volume();
+        let volume_factor = if let Some(prev) = candles.get(1) {
+            let prev_volume = prev.volume();
             if prev_volume > 0.0 {
                 (current.volume() / prev_volume).min(2.0)
             } else {
@@ -741,8 +739,14 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
             return false;
         }
 
-        let current_volume = candles[0].volume();
-        let prev_volume = candles[1].volume();
+        let current_volume = match candles.first() {
+            Some(c) => c.volume(),
+            None => return false,
+        };
+        let prev_volume = match candles.get(1) {
+            Some(c) => c.volume(),
+            None => return false,
+        };
 
         current_volume > prev_volume * 1.2
     }
@@ -754,11 +758,23 @@ impl<C: Candle + Clone + 'static> CandlePatternAnalyzer<C> {
         }
 
         let recent_closes: Vec<f64> = candles.iter().take(5).map(|c| c.close_price()).collect();
-        let first_close = recent_closes[4];
-        let last_close = recent_closes[0];
+        if recent_closes.len() < 5 {
+            return false;
+        }
+        let first_close = match recent_closes.get(4) {
+            Some(&close) => close,
+            None => return false,
+        };
+        let last_close = match recent_closes.first() {
+            Some(&close) => close,
+            None => return false,
+        };
 
         let trend_direction = last_close - first_close;
-        let current_direction = candles[0].close_price() - candles[0].open_price();
+        let current_direction = match candles.first() {
+            Some(c) => c.close_price() - c.open_price(),
+            None => return false,
+        };
 
         trend_direction * current_direction > 0.0
     }

@@ -6,6 +6,7 @@ use crate::indicator::orderbook::{
     SupportResistanceLevel, find_significant_levels,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 /// Configuration for orderbook analyzer
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,6 +23,12 @@ pub struct OrderBookAnalyzerConfig {
     pub min_volume_percentile: f64,
     /// Aggression level for suggested prices (0.0 - 1.0)
     pub default_aggression: f64,
+    /// Trend detection threshold for imbalance change
+    pub trend_threshold: f64,
+    /// Strong signal threshold (0.0 - 1.0)
+    pub strong_signal_threshold: f64,
+    /// Moderate signal threshold (0.0 - 1.0)
+    pub moderate_signal_threshold: f64,
 }
 
 impl Default for OrderBookAnalyzerConfig {
@@ -33,6 +40,9 @@ impl Default for OrderBookAnalyzerConfig {
             history_size: 100,
             min_volume_percentile: 75.0,
             default_aggression: 0.3,
+            trend_threshold: 0.05,
+            strong_signal_threshold: 0.4,
+            moderate_signal_threshold: 0.15,
         }
     }
 }
@@ -127,7 +137,7 @@ pub struct OrderBookTimeSeriesAnalyzer {
     /// Internal analyzer
     analyzer: OrderBookAnalyzer,
     /// Historical data points
-    history: Vec<OrderBookDataPoint>,
+    history: VecDeque<OrderBookDataPoint>,
 }
 
 impl OrderBookTimeSeriesAnalyzer {
@@ -138,6 +148,7 @@ impl OrderBookTimeSeriesAnalyzer {
 
     /// Create new analyzer with custom configuration
     pub fn with_config(config: OrderBookAnalyzerConfig) -> Self {
+        let history_size = config.history_size;
         let analyzer = OrderBookAnalyzer::new(
             config.depth_percent,
             config.reference_order_size,
@@ -147,7 +158,7 @@ impl OrderBookTimeSeriesAnalyzer {
         Self {
             config,
             analyzer,
-            history: Vec::new(),
+            history: VecDeque::with_capacity(history_size),
         }
     }
 
@@ -179,10 +190,10 @@ impl OrderBookTimeSeriesAnalyzer {
             significant_levels: significant_levels.clone(),
         };
 
-        // Add to history
-        self.history.insert(0, data_point);
+        // Add to history (most recent at front)
+        self.history.push_front(data_point);
         if self.history.len() > self.config.history_size {
-            self.history.pop();
+            self.history.pop_back();
         }
 
         // Calculate trend and signal
@@ -221,6 +232,12 @@ impl OrderBookTimeSeriesAnalyzer {
 
         // Calculate average imbalance for recent vs older data
         let recent_count = (self.history.len() / 3).max(1);
+
+        // Ensure we have enough data for comparison
+        if self.history.len() < recent_count * 2 {
+            return OrderBookTrend::Neutral;
+        }
+
         let recent_avg: f64 = self
             .history
             .iter()
@@ -229,17 +246,21 @@ impl OrderBookTimeSeriesAnalyzer {
             .sum::<f64>()
             / recent_count as f64;
 
-        let older_avg: f64 = self
-            .history
-            .iter()
-            .skip(recent_count)
-            .take(recent_count)
-            .map(|dp| dp.analysis.imbalance_ratio)
-            .sum::<f64>()
-            / recent_count as f64;
+        let older_count = self.history.len().min(recent_count * 2) - recent_count;
+        let older_avg: f64 = if older_count > 0 {
+            self.history
+                .iter()
+                .skip(recent_count)
+                .take(older_count)
+                .map(|dp| dp.analysis.imbalance_ratio)
+                .sum::<f64>()
+                / older_count as f64
+        } else {
+            recent_avg
+        };
 
         let change = recent_avg - older_avg;
-        let threshold = 0.05;
+        let threshold = self.config.trend_threshold;
 
         if recent_avg > 0.0 && change > threshold {
             OrderBookTrend::BuyPressureIncreasing
@@ -285,13 +306,16 @@ impl OrderBookTimeSeriesAnalyzer {
         };
 
         // Determine signal
-        let signal = if score > 0.4 {
+        let strong_threshold = self.config.strong_signal_threshold;
+        let moderate_threshold = self.config.moderate_signal_threshold;
+
+        let signal = if score > strong_threshold {
             OrderBookSignal::StrongBuy
-        } else if score > 0.15 {
+        } else if score > moderate_threshold {
             OrderBookSignal::Buy
-        } else if score < -0.4 {
+        } else if score < -strong_threshold {
             OrderBookSignal::StrongSell
-        } else if score < -0.15 {
+        } else if score < -moderate_threshold {
             OrderBookSignal::Sell
         } else {
             OrderBookSignal::Neutral

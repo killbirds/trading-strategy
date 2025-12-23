@@ -358,11 +358,10 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
 
     /// 캔들 패턴 식별
     fn identify_candle_pattern(&self, candles: &[C]) -> CandlePattern {
-        if candles.is_empty() {
-            return CandlePattern::Normal;
-        }
-
-        let current = &candles[0];
+        let current = match candles.first() {
+            Some(c) => c,
+            None => return CandlePattern::Normal,
+        };
         let body_size = (current.close_price() - current.open_price()).abs();
         let total_size = current.high_price() - current.low_price();
         let upper_shadow = current.high_price() - current.close_price().max(current.open_price());
@@ -400,8 +399,7 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
         }
 
         // 엔걸핑 패턴 확인
-        if candles.len() >= 2 {
-            let previous = &candles[1];
+        if let Some(previous) = candles.get(1) {
             let current_bullish = current.close_price() > current.open_price();
             let previous_bullish = previous.close_price() > previous.open_price();
 
@@ -551,7 +549,10 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
 
         let total_volume: f64 = candles.iter().map(|c| c.volume()).sum();
         if total_volume == 0.0 {
-            return candles[0].close_price();
+            return match candles.first() {
+                Some(c) => c.close_price(),
+                None => 0.0,
+            };
         }
 
         let vwap: f64 = candles
@@ -571,8 +572,17 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
             return 0.0;
         }
 
-        let current_price = candles[0].close_price();
-        let past_price = candles[self.momentum_period - 1].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
+        let past_price = match candles.get(self.momentum_period - 1) {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
+        if past_price == 0.0 {
+            return 0.0;
+        }
         (current_price - past_price) / past_price
     }
 
@@ -649,7 +659,12 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
         let recent_momentum: Vec<f64> = self.items.iter().take(3).map(|d| d.momentum).collect();
         let is_decreasing_momentum = recent_momentum.windows(2).all(|w| w[0].abs() < w[1].abs());
 
-        is_decreasing_momentum && self.items[0].is_indecision_pattern()
+        is_decreasing_momentum
+            && self
+                .items
+                .first()
+                .map(|item| item.is_indecision_pattern())
+                .unwrap_or(false)
     }
 
     /// 볼륨 확인 신호

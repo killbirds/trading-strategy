@@ -295,7 +295,10 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
 
         let short_ma = self.calculate_sma(&candles[..10]);
         let long_ma = self.calculate_sma(&candles[..20]);
-        let current_price = candles[0].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return (0.0, 0.0),
+        };
 
         let trend_strength = ((short_ma - long_ma) / long_ma).abs();
         let _price_position = (current_price - long_ma) / long_ma;
@@ -351,7 +354,10 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
 
         let volatility = self.calculate_volatility(&candles[..20]);
         let atr = self.calculate_atr(&candles[..14]);
-        let current_range = candles[0].high_price() - candles[0].low_price();
+        let current_range = match candles.first() {
+            Some(c) => c.high_price() - c.low_price(),
+            None => return (0.0, 0.0),
+        };
 
         let volatility_factor = if volatility > 0.0 {
             (current_range / atr).min(2.0)
@@ -375,14 +381,20 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
         }
 
         let avg_volume = candles[1..10].iter().map(|c| c.volume()).sum::<f64>() / 9.0;
-        let current_volume = candles[0].volume();
+        let current_volume = match candles.first() {
+            Some(c) => c.volume(),
+            None => return (0.0, 0.0),
+        };
         let volume_ratio = if avg_volume > 0.0 {
             current_volume / avg_volume
         } else {
             1.0
         };
 
-        let is_bullish = candles[0].close_price() > candles[0].open_price();
+        let is_bullish = match candles.first() {
+            Some(c) => c.close_price() > c.open_price(),
+            None => return (0.0, 0.0),
+        };
         let volume_strength = (volume_ratio - 1.0).clamp(0.0, 1.0);
 
         let buy_signal = if is_bullish && volume_ratio > 1.2 {
@@ -407,7 +419,10 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
             return (0.0, 0.0);
         }
 
-        let current_price = candles[0].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return (0.0, 0.0),
+        };
         let recent_highs: Vec<f64> = candles[..20].iter().map(|c| c.high_price()).collect();
         let recent_lows: Vec<f64> = candles[..20].iter().map(|c| c.low_price()).collect();
 
@@ -645,7 +660,10 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
             return 0.0;
         }
 
-        let current_price = candles[0].close_price();
+        let current_price = match candles.first() {
+            Some(c) => c.close_price(),
+            None => return 0.0,
+        };
         let past_price = candles[candles.len() - 1].close_price();
 
         (current_price - past_price) / past_price

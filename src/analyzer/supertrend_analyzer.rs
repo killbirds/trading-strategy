@@ -104,8 +104,12 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
             return false;
         }
 
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         for (period, multiplier) in &self.periods {
-            if !self.items[0].is_uptrend(period, multiplier) {
+            if !current.is_uptrend(period, multiplier) {
                 return false;
             }
         }
@@ -119,8 +123,12 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
             return false;
         }
 
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return false,
+        };
         for (period, multiplier) in &self.periods {
-            if !self.items[0].is_downtrend(period, multiplier) {
+            if !current.is_downtrend(period, multiplier) {
                 return false;
             }
         }
@@ -134,66 +142,70 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
             return false;
         }
 
-        let current_direction = self.items[0].get_supertrend(period, multiplier).direction;
-        let previous_direction = self.items[n].get_supertrend(period, multiplier).direction;
+        let current_direction = match self.items.first() {
+            Some(item) => item.get_supertrend(period, multiplier).direction,
+            None => return false,
+        };
+        let previous_direction = match self.items.get(n) {
+            Some(item) => item.get_supertrend(period, multiplier).direction,
+            None => return false,
+        };
 
         current_direction != previous_direction && current_direction != 0 && previous_direction != 0
     }
 
     /// 가격이 슈퍼트렌드 위에 있는지 확인 (가격 > 슈퍼트렌드)
     pub fn is_price_above_supertrend(&self, period: &usize, multiplier: &f64) -> bool {
-        if self.items.is_empty() {
-            return false;
+        if let Some(current) = self.items.first() {
+            let candle = &current.candle;
+            let st = current.get_supertrend(period, multiplier);
+            candle.close_price() > st.value
+        } else {
+            false
         }
-
-        let candle = &self.items[0].candle;
-        let st = self.items[0].get_supertrend(period, multiplier);
-
-        candle.close_price() > st.value
     }
 
     /// 가격이 슈퍼트렌드 아래에 있는지 확인 (가격 < 슈퍼트렌드)
     pub fn is_price_below_supertrend(&self, period: &usize, multiplier: &f64) -> bool {
-        if self.items.is_empty() {
-            return false;
+        if let Some(current) = self.items.first() {
+            let candle = &current.candle;
+            let st = current.get_supertrend(period, multiplier);
+            candle.close_price() < st.value
+        } else {
+            false
         }
-
-        let candle = &self.items[0].candle;
-        let st = self.items[0].get_supertrend(period, multiplier);
-
-        candle.close_price() < st.value
     }
 
     /// 가격이 슈퍼트렌드를 상향 돌파했는지 확인 (전: 가격<슈퍼트렌드, 현재: 가격>슈퍼트렌드)
     pub fn is_price_crossing_above_supertrend(&self, period: &usize, multiplier: &f64) -> bool {
-        if self.items.len() < 2 {
-            return false;
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            let current_candle = &current.candle;
+            let previous_candle = &previous.candle;
+
+            let current_st = current.get_supertrend(period, multiplier);
+            let previous_st = previous.get_supertrend(period, multiplier);
+
+            previous_candle.close_price() < previous_st.value
+                && current_candle.close_price() > current_st.value
+        } else {
+            false
         }
-
-        let current_candle = &self.items[0].candle;
-        let previous_candle = &self.items[1].candle;
-
-        let current_st = self.items[0].get_supertrend(period, multiplier);
-        let previous_st = self.items[1].get_supertrend(period, multiplier);
-
-        previous_candle.close_price() < previous_st.value
-            && current_candle.close_price() > current_st.value
     }
 
     /// 가격이 슈퍼트렌드를 하향 돌파했는지 확인 (전: 가격>슈퍼트렌드, 현재: 가격<슈퍼트렌드)
     pub fn is_price_crossing_below_supertrend(&self, period: &usize, multiplier: &f64) -> bool {
-        if self.items.len() < 2 {
-            return false;
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            let current_candle = &current.candle;
+            let previous_candle = &previous.candle;
+
+            let current_st = current.get_supertrend(period, multiplier);
+            let previous_st = previous.get_supertrend(period, multiplier);
+
+            previous_candle.close_price() > previous_st.value
+                && current_candle.close_price() < current_st.value
+        } else {
+            false
         }
-
-        let current_candle = &self.items[0].candle;
-        let previous_candle = &self.items[1].candle;
-
-        let current_st = self.items[0].get_supertrend(period, multiplier);
-        let previous_st = self.items[1].get_supertrend(period, multiplier);
-
-        previous_candle.close_price() > previous_st.value
-            && current_candle.close_price() < current_st.value
     }
 
     /// 가격이 슈퍼트렌드 위 신호 확인 (n개 연속 가격 > 슈퍼트렌드, 이전 m개는 아님)
@@ -268,11 +280,14 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
                     return false;
                 }
 
-                for (period, multiplier) in &self.periods {
-                    let data = &self.items[0];
-                    if !data.is_uptrend(period, multiplier) {
-                        return false;
+                if let Some(data) = self.items.first() {
+                    for (period, multiplier) in &self.periods {
+                        if !data.is_uptrend(period, multiplier) {
+                            return false;
+                        }
                     }
+                } else {
+                    return false;
                 }
                 true
             },
@@ -290,11 +305,14 @@ impl<C: Candle> SuperTrendAnalyzer<C> {
                     return false;
                 }
 
-                for (period, multiplier) in &self.periods {
-                    let data = &self.items[0];
-                    if !data.is_downtrend(period, multiplier) {
-                        return false;
+                if let Some(data) = self.items.first() {
+                    for (period, multiplier) in &self.periods {
+                        if !data.is_downtrend(period, multiplier) {
+                            return false;
+                        }
                     }
+                } else {
+                    return false;
                 }
                 true
             },

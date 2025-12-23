@@ -153,6 +153,16 @@ impl<C: Candle + 'static> ThreeRSIAnalyzer<C> {
 
     /// n개의 연속 데이터에서 특정 RSI가 횡보 상태인지 확인
     pub fn is_rsi_sideways(&self, rsi_index: usize, n: usize, p: usize, threshold: f64) -> bool {
+        // Check if we have enough data and valid RSI index
+        if self.items.is_empty() {
+            return false;
+        }
+
+        // Validate RSI index range
+        if rsi_index >= self.items[0].rsis.len() {
+            return false;
+        }
+
         self.is_sideways(
             |data: &ThreeRSIAnalyzerData<C>| data.rsis.get_by_key_index(rsi_index).value,
             n,

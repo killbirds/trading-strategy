@@ -110,8 +110,10 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
 
         // 최신 캔들(items[0])에서 MACD가 시그널보다 위에 있고,
         // 그 이전 캔들들 중 하나라도 MACD가 시그널보다 아래에 있는지 확인
-        let current_macd_above_signal =
-            self.items[0].macd.macd_line > self.items[0].macd.signal_line;
+        let current_macd_above_signal = match self.items.first() {
+            Some(item) => item.macd.macd_line > item.macd.signal_line,
+            None => return false,
+        };
 
         // 최근 일부 캔들 중에 하나라도 MACD가 시그널보다 아래에 있는지 확인 (crossover 확인)
         let mut found_prev_below = false;
@@ -142,8 +144,10 @@ impl<C: Candle + 'static> MACDAnalyzer<C> {
 
         // 최신 캔들(items[0])에서 MACD가 시그널보다 아래에 있고,
         // 그 이전 캔들들 중 하나라도 MACD가 시그널보다 위에 있는지 확인
-        let current_macd_below_signal =
-            self.items[0].macd.macd_line < self.items[0].macd.signal_line;
+        let current_macd_below_signal = match self.items.first() {
+            Some(item) => item.macd.macd_line < item.macd.signal_line,
+            None => return false,
+        };
 
         // 최근 일부 캔들 중에 하나라도 MACD가 시그널보다 위에 있는지 확인 (crossover 확인)
         let mut found_prev_above = false;

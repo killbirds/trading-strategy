@@ -70,33 +70,32 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
 
     /// 특정 기간과 배수로 ATR 상단값 계산
     pub fn calculate_upper_band(&self, candle: &C, period: usize, multiplier: f64) -> f64 {
-        if self.items.is_empty() {
-            return 0.0;
-        }
-
-        let atr = self.items[0].get_atr(period);
+        let atr = self
+            .items
+            .first()
+            .map(|item| item.get_atr(period))
+            .unwrap_or(0.0);
         let price = (candle.high_price() + candle.low_price()) / 2.0;
         price + (atr * multiplier)
     }
 
     /// 특정 기간과 배수로 ATR 하단값 계산
     pub fn calculate_lower_band(&self, candle: &C, period: usize, multiplier: f64) -> f64 {
-        if self.items.is_empty() {
-            return 0.0;
-        }
-
-        let atr = self.items[0].get_atr(period);
+        let atr = self
+            .items
+            .first()
+            .map(|item| item.get_atr(period))
+            .unwrap_or(0.0);
         let price = (candle.high_price() + candle.low_price()) / 2.0;
         price - (atr * multiplier)
     }
 
     /// 현재 ATR이 특정 임계값을 초과하는지 확인
     pub fn is_above_threshold(&self, period: usize, threshold: f64) -> bool {
-        if self.items.is_empty() {
-            return false;
-        }
-
-        self.items[0].get_atr(period) > threshold
+        self.items
+            .first()
+            .map(|item| item.get_atr(period) > threshold)
+            .unwrap_or(false)
     }
 
     /// 현재 ATR이 이전 n개 캔들의 평균 ATR보다 높은지 확인 (변동성 확대)
@@ -105,7 +104,11 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
             return false;
         }
 
-        let current_atr = self.items[0].get_atr(period);
+        let current_atr = self
+            .items
+            .first()
+            .map(|item| item.get_atr(period))
+            .unwrap_or(0.0);
         let avg_atr: f64 = self.items[1..=n]
             .iter()
             .map(|item| item.get_atr(period))
@@ -121,7 +124,11 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
             return false;
         }
 
-        let current_atr = self.items[0].get_atr(period);
+        let current_atr = self
+            .items
+            .first()
+            .map(|item| item.get_atr(period))
+            .unwrap_or(0.0);
         let avg_atr: f64 = self.items[1..=n]
             .iter()
             .map(|item| item.get_atr(period))
@@ -219,19 +226,30 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
         period: usize,
         p: usize,
     ) -> bool {
-        self.is_break_through_by_satisfying(
-            |_| {
-                if self.items.len() < 2 {
-                    return false;
+        if self.items.len() < n + m + p + 1 {
+            return false;
+        }
+
+        let recent_increasing = self.is_volatility_increasing(n, period);
+        if !recent_increasing {
+            return false;
+        }
+
+        if m > 0 && p + n < self.items.len() {
+            let previous_start = p + n;
+            let previous_end = (previous_start + m).min(self.items.len());
+            for i in previous_start..previous_end.saturating_sub(1) {
+                if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                    let current_atr = current.get_atr(period);
+                    let next_atr = next.get_atr(period);
+                    if current_atr > next_atr {
+                        return false;
+                    }
                 }
-                let current_atr = self.items[0].get_atr(period);
-                let previous_atr = self.items[1].get_atr(period);
-                current_atr > previous_atr
-            },
-            n,
-            m,
-            p,
-        )
+            }
+        }
+
+        true
     }
 
     /// 변동성 감소 신호 확인 (n개 연속 변동성 감소, 이전 m개는 아님)
@@ -242,19 +260,30 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
         period: usize,
         p: usize,
     ) -> bool {
-        self.is_break_through_by_satisfying(
-            |_| {
-                if self.items.len() < 2 {
-                    return false;
+        if self.items.len() < n + m + p + 1 {
+            return false;
+        }
+
+        let recent_decreasing = self.is_volatility_decreasing(n, period);
+        if !recent_decreasing {
+            return false;
+        }
+
+        if m > 0 && p + n < self.items.len() {
+            let previous_start = p + n;
+            let previous_end = (previous_start + m).min(self.items.len());
+            for i in previous_start..previous_end.saturating_sub(1) {
+                if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                    let current_atr = current.get_atr(period);
+                    let next_atr = next.get_atr(period);
+                    if current_atr < next_atr {
+                        return false;
+                    }
                 }
-                let current_atr = self.items[0].get_atr(period);
-                let previous_atr = self.items[1].get_atr(period);
-                current_atr < previous_atr
-            },
-            n,
-            m,
-            p,
-        )
+            }
+        }
+
+        true
     }
 
     /// n개의 연속 데이터에서 고변동성인지 확인
@@ -303,13 +332,17 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
 
     /// n개의 연속 데이터에서 변동성이 증가하는지 확인
     pub fn is_volatility_increasing(&self, n: usize, period: usize) -> bool {
-        if n > self.items.len() {
+        if n > self.items.len() || n < 2 {
             return false;
         }
         for i in 0..n - 1 {
-            let current_atr = self.items[i].get_atr(period);
-            let next_atr = self.items[i + 1].get_atr(period);
-            if current_atr <= next_atr {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_atr = current.get_atr(period);
+                let next_atr = next.get_atr(period);
+                if current_atr <= next_atr {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
@@ -318,13 +351,17 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
 
     /// n개의 연속 데이터에서 변동성이 감소하는지 확인
     pub fn is_volatility_decreasing(&self, n: usize, period: usize) -> bool {
-        if n > self.items.len() {
+        if n > self.items.len() || n < 2 {
             return false;
         }
         for i in 0..n - 1 {
-            let current_atr = self.items[i].get_atr(period);
-            let next_atr = self.items[i + 1].get_atr(period);
-            if current_atr >= next_atr {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_atr = current.get_atr(period);
+                let next_atr = next.get_atr(period);
+                if current_atr >= next_atr {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }

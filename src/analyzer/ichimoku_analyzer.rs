@@ -157,8 +157,14 @@ impl<C: Candle + 'static> IchimokuAnalyzer<C> {
             return false;
         }
 
-        let current = self.items[0].is_tenkan_above_kijun(param);
-        let previous = self.items[1].is_tenkan_above_kijun(param);
+        let current = match self.items.first() {
+            Some(item) => item.is_tenkan_above_kijun(param),
+            None => return false,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => item.is_tenkan_above_kijun(param),
+            None => return false,
+        };
 
         current && !previous
     }
@@ -169,8 +175,14 @@ impl<C: Candle + 'static> IchimokuAnalyzer<C> {
             return false;
         }
 
-        let current = self.items[0].is_tenkan_below_kijun(param);
-        let previous = self.items[1].is_tenkan_below_kijun(param);
+        let current = match self.items.first() {
+            Some(item) => item.is_tenkan_below_kijun(param),
+            None => return false,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => item.is_tenkan_below_kijun(param),
+            None => return false,
+        };
 
         current && !previous
     }
@@ -181,8 +193,14 @@ impl<C: Candle + 'static> IchimokuAnalyzer<C> {
             return false;
         }
 
-        let current = self.items[0].is_price_above_cloud(param);
-        let previous = !self.items[1].is_price_above_cloud(param);
+        let current = match self.items.first() {
+            Some(item) => item.is_price_above_cloud(param),
+            None => return false,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => !item.is_price_above_cloud(param),
+            None => return false,
+        };
 
         current && previous
     }
@@ -193,8 +211,14 @@ impl<C: Candle + 'static> IchimokuAnalyzer<C> {
             return false;
         }
 
-        let current = self.items[0].is_price_below_cloud(param);
-        let previous = !self.items[1].is_price_below_cloud(param);
+        let current = match self.items.first() {
+            Some(item) => item.is_price_below_cloud(param),
+            None => return false,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => !item.is_price_below_cloud(param),
+            None => return false,
+        };
 
         current && previous
     }

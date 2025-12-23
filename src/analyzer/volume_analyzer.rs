@@ -4,6 +4,10 @@ use crate::indicator::volume::{Volumes, VolumesBuilder, VolumesBuilderFactory};
 use std::fmt::Display;
 use trading_chart::Candle;
 
+// Volume analysis constants
+const VOLUME_SURGE_MULTIPLIER: f64 = 1.5;
+const VOLUME_DECLINE_MULTIPLIER: f64 = 0.5;
+
 /// 볼륨 전략 데이터
 #[derive(Debug)]
 pub struct VolumeAnalyzerData<C: Candle> {
@@ -135,14 +139,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
-            |_| {
-                if self.items.is_empty() {
-                    return false;
-                }
-
-                let current_ratio = self.items[0].get_volume_ratio(period);
-                current_ratio > threshold
-            },
+            |data| data.get_volume_ratio(period) > threshold,
             n,
             m,
             p,
@@ -159,14 +156,7 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         p: usize,
     ) -> bool {
         self.is_break_through_by_satisfying(
-            |_| {
-                if self.items.is_empty() {
-                    return false;
-                }
-
-                let current_ratio = self.items[0].get_volume_ratio(period);
-                current_ratio < threshold
-            },
+            |data| data.get_volume_ratio(period) < threshold,
             n,
             m,
             p,
@@ -247,35 +237,16 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         trend_period: usize,
         p: usize,
     ) -> bool {
-        self.is_break_through_by_satisfying(
-            |_| {
-                // 연속적인 양봉에서 점진적으로 볼륨이 증가하는지 확인
-                if self.items.len() < trend_period {
-                    return false;
-                }
+        if self.items.len() < trend_period {
+            return false;
+        }
 
-                // 모두 양봉인지 확인
-                for i in 0..trend_period {
-                    if self.items[i].candle.close_price() <= self.items[i].candle.open_price() {
-                        return false;
-                    }
-                }
+        let is_increasing = self.is_increasing_volume_in_uptrend(period, trend_period);
+        if !is_increasing {
+            return false;
+        }
 
-                // 볼륨이 점진적으로 증가하는지 확인
-                for i in 0..trend_period - 1 {
-                    let current_ratio = self.items[i].get_volume_ratio(period);
-                    let next_ratio = self.items[i + 1].get_volume_ratio(period);
-                    if current_ratio <= next_ratio {
-                        return false;
-                    }
-                }
-
-                true
-            },
-            n,
-            m,
-            p,
-        )
+        self.is_break_through_by_satisfying(|_| true, n, m, p)
     }
 
     /// 하락 추세에서 볼륨 감소 신호 확인 (n개 연속 하락 추세 볼륨 감소, 이전 m개는 아님)
@@ -287,79 +258,66 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
         trend_period: usize,
         p: usize,
     ) -> bool {
-        self.is_break_through_by_satisfying(
-            |_| {
-                // 연속적인 음봉에서 점진적으로 볼륨이 감소하는지 확인
-                if self.items.len() < trend_period {
-                    return false;
-                }
+        if self.items.len() < trend_period {
+            return false;
+        }
 
-                // 모두 음봉인지 확인
-                for i in 0..trend_period {
-                    if self.items[i].candle.close_price() >= self.items[i].candle.open_price() {
-                        return false;
-                    }
-                }
+        let is_decreasing = self.is_decreasing_volume_in_downtrend(period, trend_period);
+        if !is_decreasing {
+            return false;
+        }
 
-                // 볼륨이 점진적으로 감소하는지 확인
-                for i in 0..trend_period - 1 {
-                    let current_ratio = self.items[i].get_volume_ratio(period);
-                    let next_ratio = self.items[i + 1].get_volume_ratio(period);
-                    if current_ratio >= next_ratio {
-                        return false;
-                    }
-                }
-
-                true
-            },
-            n,
-            m,
-            p,
-        )
+        self.is_break_through_by_satisfying(|_| true, n, m, p)
     }
 
     /// 볼륨 급증 여부 확인 (이전 대비 갑자기 높은 볼륨)
     pub fn is_volume_surge(&self, period: usize, threshold: f64) -> bool {
-        if self.items.len() < 2 {
-            return false;
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            let current_ratio = current.get_volume_ratio(period);
+            let previous_ratio = previous.get_volume_ratio(period);
+            current_ratio > threshold && current_ratio > previous_ratio * VOLUME_SURGE_MULTIPLIER
+        } else {
+            false
         }
-
-        let current_ratio = self.items[0].get_volume_ratio(period);
-        let previous_ratio = self.items[1].get_volume_ratio(period);
-
-        current_ratio > threshold && current_ratio > previous_ratio * 1.5
     }
 
     /// 볼륨 급감 여부 확인 (이전 대비 갑자기 낮은 볼륨)
     pub fn is_volume_decline(&self, period: usize, threshold: f64) -> bool {
-        if self.items.len() < 2 {
-            return false;
+        if let (Some(current), Some(previous)) = (self.items.first(), self.items.get(1)) {
+            let current_ratio = current.get_volume_ratio(period);
+            let previous_ratio = previous.get_volume_ratio(period);
+            current_ratio < threshold && current_ratio < previous_ratio * VOLUME_DECLINE_MULTIPLIER
+        } else {
+            false
         }
-
-        let current_ratio = self.items[0].get_volume_ratio(period);
-        let previous_ratio = self.items[1].get_volume_ratio(period);
-
-        current_ratio < threshold && current_ratio < previous_ratio * 0.5
     }
 
     /// 연속적인 양봉에서 점진적으로 볼륨이 증가하는지 확인
     pub fn is_increasing_volume_in_uptrend(&self, period: usize, n: usize) -> bool {
-        if self.items.len() < n {
+        if self.items.len() < n || n < 2 {
             return false;
         }
 
         // 모두 양봉인지 확인
         for i in 0..n {
-            if self.items[i].candle.close_price() <= self.items[i].candle.open_price() {
+            if let Some(item) = self.items.get(i) {
+                if item.candle.close_price() <= item.candle.open_price() {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
 
         // 볼륨이 점진적으로 증가하는지 확인
         for i in 0..n - 1 {
-            let current_ratio = self.items[i].get_volume_ratio(period);
-            let next_ratio = self.items[i + 1].get_volume_ratio(period);
-            if current_ratio <= next_ratio {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_ratio = current.get_volume_ratio(period);
+                let next_ratio = next.get_volume_ratio(period);
+                if current_ratio <= next_ratio {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
@@ -369,22 +327,30 @@ impl<C: Candle + 'static> VolumeAnalyzer<C> {
 
     /// 연속적인 음봉에서 점진적으로 볼륨이 감소하는지 확인
     pub fn is_decreasing_volume_in_downtrend(&self, period: usize, n: usize) -> bool {
-        if self.items.len() < n {
+        if self.items.len() < n || n < 2 {
             return false;
         }
 
         // 모두 음봉인지 확인
         for i in 0..n {
-            if self.items[i].candle.close_price() >= self.items[i].candle.open_price() {
+            if let Some(item) = self.items.get(i) {
+                if item.candle.close_price() >= item.candle.open_price() {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }
 
         // 볼륨이 점진적으로 감소하는지 확인
         for i in 0..n - 1 {
-            let current_ratio = self.items[i].get_volume_ratio(period);
-            let next_ratio = self.items[i + 1].get_volume_ratio(period);
-            if current_ratio >= next_ratio {
+            if let (Some(current), Some(next)) = (self.items.get(i), self.items.get(i + 1)) {
+                let current_ratio = current.get_volume_ratio(period);
+                let next_ratio = next.get_volume_ratio(period);
+                if current_ratio >= next_ratio {
+                    return false;
+                }
+            } else {
                 return false;
             }
         }

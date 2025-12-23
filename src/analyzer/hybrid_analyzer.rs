@@ -7,6 +7,24 @@ use crate::indicator::rsi::{RSI, RSIBuilder};
 use std::fmt::Display;
 use trading_chart::Candle;
 
+// RSI threshold constants
+const RSI_OVERSOLD_THRESHOLD: f64 = 30.0;
+const RSI_OVERBOUGHT_THRESHOLD: f64 = 70.0;
+const RSI_NEUTRAL_LOWER: f64 = 30.0;
+const RSI_NEUTRAL_UPPER: f64 = 70.0;
+
+// Signal strength constants
+const SIGNAL_STRENGTH_WEAK: f64 = 0.5;
+const SIGNAL_STRENGTH_MODERATE: f64 = 0.6;
+const SIGNAL_STRENGTH_STRONG: f64 = 0.7;
+const SIGNAL_STRENGTH_HALF: f64 = 0.5;
+
+// Volume factor adjustment threshold
+const VOLUME_FACTOR_ADJUSTMENT_THRESHOLD: f64 = 1.5;
+
+// Score range constants
+const SCORE_RANGE_MIN: f64 = 0.5;
+
 /// 하이브리드 분석기 데이터
 #[derive(Debug)]
 pub struct HybridAnalyzerData<C: Candle> {
@@ -155,9 +173,18 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let current = &self.items[0];
-        let previous = &self.items[1];
-        let before_previous = &self.items[2];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return 0.0,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => item,
+            None => return 0.0,
+        };
+        let before_previous = match self.items.get(2) {
+            Some(item) => item,
+            None => return 0.0,
+        };
 
         // 가중치 정의
         const MA_WEIGHT: f64 = 0.25; // 이동평균 기준 신호 가중치
@@ -171,7 +198,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         // 1. 이동평균선 기반 신호 (가격이 이동평균선 위에 있는지, 상승추세인지)
         if current.candle.close_price() > current.ma.get() {
             // 가격이 이동평균 위에 있음 (상승추세 가능성)
-            signal_strength += MA_WEIGHT * 0.6;
+            signal_strength += MA_WEIGHT * SIGNAL_STRENGTH_MODERATE;
 
             // 이동평균선 자체가 상승 중인지 확인
             if current.ma.get() > previous.ma.get() {
@@ -203,7 +230,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
 
             // 히스토그램이 증가 중인지 확인 (모멘텀 가속)
             if current.macd.histogram > previous.macd.histogram {
-                signal_strength += MACD_HIST_WEIGHT * 0.5;
+                signal_strength += MACD_HIST_WEIGHT * SIGNAL_STRENGTH_HALF;
             }
         }
 
@@ -215,7 +242,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             signal_strength += RSI_WEIGHT * (1.0 - rsi / rsi_lower);
         } else if rsi < 45.0 && rsi > previous.rsi.value() {
             // RSI가 낮은 상태에서 반등 중 (적절한 매수 신호)
-            signal_strength += RSI_WEIGHT * 0.5 * (45.0 - rsi) / 15.0;
+            signal_strength += RSI_WEIGHT * SIGNAL_STRENGTH_HALF * (45.0 - rsi) / 15.0;
         }
 
         // 최종 신호 강도 (0.0~1.0 범위로 클램핑)
@@ -235,9 +262,18 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let current = &self.items[0];
-        let previous = &self.items[1];
-        let before_previous = &self.items[2];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return 0.0,
+        };
+        let previous = match self.items.get(1) {
+            Some(item) => item,
+            None => return 0.0,
+        };
+        let before_previous = match self.items.get(2) {
+            Some(item) => item,
+            None => return 0.0,
+        };
 
         // 가중치 정의
         const MA_WEIGHT: f64 = 0.2; // 이동평균 기준 신호 가중치
@@ -252,7 +288,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         // 1. 이동평균선 기반 신호 (가격이 이동평균선 아래에 있는지, 하락추세인지)
         if current.candle.close_price() < current.ma.get() {
             // 가격이 이동평균 아래에 있음 (하락추세 가능성)
-            signal_strength += MA_WEIGHT * 0.6;
+            signal_strength += MA_WEIGHT * SIGNAL_STRENGTH_MODERATE;
 
             // 이동평균선 자체가 하락 중인지 확인
             if current.ma.get() < previous.ma.get() {
@@ -285,7 +321,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
 
             // 히스토그램이 감소 중인지 확인 (모멘텀 가속)
             if current.macd.histogram < previous.macd.histogram {
-                signal_strength += MACD_HIST_WEIGHT * 0.5;
+                signal_strength += MACD_HIST_WEIGHT * SIGNAL_STRENGTH_HALF;
             }
         }
 
@@ -297,7 +333,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             signal_strength += RSI_WEIGHT * ((rsi - rsi_upper) / (100.0 - rsi_upper));
         } else if rsi > 55.0 && rsi < previous.rsi.value() {
             // RSI가 높은 상태에서 하락 중 (적절한 매도 신호)
-            signal_strength += RSI_WEIGHT * 0.5 * (rsi - 55.0) / 15.0;
+            signal_strength += RSI_WEIGHT * SIGNAL_STRENGTH_HALF * (rsi - 55.0) / 15.0;
         }
 
         // 5. 수익률 기반 신호
@@ -306,7 +342,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             signal_strength += PROFIT_WEIGHT;
         } else if profit_percentage > 3.0 {
             // 적정 수익 실현 (중간 매도 신호)
-            signal_strength += PROFIT_WEIGHT * 0.7;
+            signal_strength += PROFIT_WEIGHT * SIGNAL_STRENGTH_STRONG;
         } else if profit_percentage < -5.0 {
             // 큰 손실 발생 (손절 매도 신호)
             signal_strength += PROFIT_WEIGHT * 0.8;
@@ -341,7 +377,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         let market_condition_factor = self.calculate_market_condition_factor();
         let momentum_factor = self.calculate_momentum_factor();
         let volatility_factor = self.calculate_volatility_adjustment_factor(volatility);
-        let volume_factor_adj = if volume_factor > 1.5 {
+        let volume_factor_adj = if volume_factor > VOLUME_FACTOR_ADJUSTMENT_THRESHOLD {
             1.2
         } else if volume_factor < 0.8 {
             0.8
@@ -388,7 +424,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         let market_condition_factor = 2.0 - self.calculate_market_condition_factor(); // 역방향 적용
         let momentum_factor = 2.0 - self.calculate_momentum_factor(); // 역방향 적용
         let volatility_factor = self.calculate_volatility_adjustment_factor(volatility);
-        let volume_factor_adj = if volume_factor > 1.5 {
+        let volume_factor_adj = if volume_factor > VOLUME_FACTOR_ADJUSTMENT_THRESHOLD {
             1.2
         } else if volume_factor < 0.8 {
             0.8
@@ -426,8 +462,8 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         // 종합 시장 상황 점수
         let market_score = (price_trend + ma_trend + stability) / 3.0;
 
-        // 0.5 ~ 1.5 범위로 조정
-        0.5 + market_score
+        // SCORE_RANGE_MIN ~ SCORE_RANGE_MAX 범위로 조정
+        SCORE_RANGE_MIN + market_score
     }
 
     /// 가격 트렌드 강도 계산
@@ -457,16 +493,25 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let current_ma = items[0].ma.get();
-        let previous_ma = items[1].ma.get();
-        let before_ma = items[2].ma.get();
+        let current_ma = match items.first() {
+            Some(item) => item.ma.get(),
+            None => return 0.0,
+        };
+        let previous_ma = match items.get(1) {
+            Some(item) => item.ma.get(),
+            None => return 0.0,
+        };
+        let before_ma = match items.get(2) {
+            Some(item) => item.ma.get(),
+            None => return 0.0,
+        };
 
-        if current_ma > previous_ma && previous_ma > before_ma {
-            1.0 // 강한 상승 트렌드
-        } else if current_ma < previous_ma && previous_ma < before_ma {
-            1.0 // 강한 하락 트렌드 (절댓값)
+        if (current_ma > previous_ma && previous_ma > before_ma)
+            || (current_ma < previous_ma && previous_ma < before_ma)
+        {
+            1.0 // 강한 상승/하락 트렌드
         } else if current_ma > previous_ma || previous_ma > before_ma {
-            0.5 // 약한 상승 트렌드
+            SIGNAL_STRENGTH_WEAK // 약한 상승 트렌드
         } else {
             0.0 // 횡보
         }
@@ -522,8 +567,8 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
         // 종합 모멘텀 점수
         let momentum_score = (price_momentum + macd_momentum + rsi_momentum) / 3.0;
 
-        // 0.5 ~ 1.5 범위로 조정
-        0.5 + momentum_score
+        // SCORE_RANGE_MIN ~ SCORE_RANGE_MAX 범위로 조정
+        SCORE_RANGE_MIN + momentum_score
     }
 
     /// 가격 모멘텀 계산
@@ -532,10 +577,25 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let recent_change = (items[0].candle.close_price() - items[1].candle.close_price())
-            / items[1].candle.close_price();
-        let previous_change = (items[1].candle.close_price() - items[2].candle.close_price())
-            / items[2].candle.close_price();
+        let current_price = match items.first() {
+            Some(item) => item.candle.close_price(),
+            None => return 0.0,
+        };
+        let previous_price = match items.get(1) {
+            Some(item) => item.candle.close_price(),
+            None => return 0.0,
+        };
+        let before_price = match items.get(2) {
+            Some(item) => item.candle.close_price(),
+            None => return 0.0,
+        };
+
+        if previous_price == 0.0 || before_price == 0.0 {
+            return 0.0;
+        }
+
+        let recent_change = (current_price - previous_price) / previous_price;
+        let previous_change = (previous_price - before_price) / before_price;
 
         if recent_change > previous_change {
             (recent_change - previous_change).abs().min(1.0)
@@ -550,14 +610,23 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let current_hist = items[0].macd.histogram;
-        let previous_hist = items[1].macd.histogram;
-        let before_hist = items[2].macd.histogram;
+        let current_hist = match items.first() {
+            Some(item) => item.macd.histogram,
+            None => return 0.0,
+        };
+        let previous_hist = match items.get(1) {
+            Some(item) => item.macd.histogram,
+            None => return 0.0,
+        };
+        let before_hist = match items.get(2) {
+            Some(item) => item.macd.histogram,
+            None => return 0.0,
+        };
 
         if current_hist > previous_hist && previous_hist > before_hist {
             1.0 // 강한 모멘텀
         } else if current_hist > previous_hist {
-            0.5 // 약한 모멘텀
+            SIGNAL_STRENGTH_WEAK // 약한 모멘텀
         } else {
             0.0 // 모멘텀 없음
         }
@@ -569,10 +638,19 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             return 0.0;
         }
 
-        let current_rsi = items[0].rsi.value();
-        let previous_rsi = items[1].rsi.value();
+        let current_rsi = match items.first() {
+            Some(item) => item.rsi.value(),
+            None => return 0.0,
+        };
+        let previous_rsi = match items.get(1) {
+            Some(item) => item.rsi.value(),
+            None => return 0.0,
+        };
 
-        if current_rsi > previous_rsi && current_rsi < 70.0 && current_rsi > 30.0 {
+        if current_rsi > previous_rsi
+            && current_rsi < RSI_NEUTRAL_UPPER
+            && current_rsi > RSI_NEUTRAL_LOWER
+        {
             ((current_rsi - previous_rsi) / 10.0).min(1.0)
         } else {
             0.0
@@ -583,7 +661,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
     fn calculate_volatility_adjustment_factor(&self, volatility: f64) -> f64 {
         // 높은 변동성일 때는 신호 강도를 낮추고, 낮은 변동성일 때는 높임
         if volatility > 0.05 {
-            0.7 // 높은 변동성
+            SIGNAL_STRENGTH_STRONG // 높은 변동성
         } else if volatility > 0.03 {
             0.85 // 중간 변동성
         } else if volatility > 0.01 {
@@ -595,11 +673,10 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
 
     /// 지표 합의 요인 계산
     fn calculate_indicators_consensus_factor(&self) -> f64 {
-        if self.items.is_empty() {
-            return 1.0;
-        }
-
-        let current = &self.items[0];
+        let current = match self.items.first() {
+            Some(item) => item,
+            None => return 1.0,
+        };
         let mut consensus_score = 0.0;
         let mut total_indicators = 0.0;
 
@@ -617,13 +694,17 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
 
         // RSI 신호 (중립 영역에서 상승)
         let rsi = current.rsi.value();
-        if rsi > 30.0 && rsi < 70.0 && self.items.len() > 1 && rsi > self.items[1].rsi.value() {
+        if let Some(previous) = self.items.get(1)
+            && rsi > RSI_NEUTRAL_LOWER
+            && rsi < RSI_NEUTRAL_UPPER
+            && rsi > previous.rsi.value()
+        {
             consensus_score += 1.0;
         }
         total_indicators += 1.0;
 
-        // 합의 점수 (0.5 ~ 1.5 범위)
-        0.5 + (consensus_score / total_indicators)
+        // 합의 점수 (SCORE_RANGE_MIN ~ SCORE_RANGE_MAX 범위)
+        SCORE_RANGE_MIN + (consensus_score / total_indicators)
     }
 
     /// 시장 상황 평가
@@ -644,7 +725,7 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
             "좋은 시장 상황".to_string()
         } else if overall_score > 0.9 {
             "보통 시장 상황".to_string()
-        } else if overall_score > 0.7 {
+        } else if overall_score > SIGNAL_STRENGTH_STRONG {
             "주의 필요한 시장 상황".to_string()
         } else {
             "위험한 시장 상황".to_string()
@@ -875,9 +956,9 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
                 };
 
                 let rsi_signal = if signal_type == "buy" {
-                    data.rsi.value() < 30.0 // 과매도에서 반등 신호
+                    data.rsi.value() < RSI_OVERSOLD_THRESHOLD // 과매도에서 반등 신호
                 } else {
-                    data.rsi.value() > 70.0 // 과매수에서 하락 신호
+                    data.rsi.value() > RSI_OVERBOUGHT_THRESHOLD // 과매수에서 하락 신호
                 };
 
                 let signal_count = [ma_signal, macd_signal, rsi_signal]
