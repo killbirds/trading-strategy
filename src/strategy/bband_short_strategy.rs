@@ -1,6 +1,7 @@
 use super::Strategy;
 use super::StrategyType;
 use super::bband_common::{BBandAnalyzer, BBandStrategyConfigBase};
+use super::config_utils;
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
@@ -21,6 +22,27 @@ pub struct BBandShortStrategyConfig {
     pub period: usize,
     /// 표준편차 배수
     pub multiplier: f64,
+    /// 밴드 폭 감소 확인 기간 (스퀴즈 감지용, 기본값: 5)
+    #[serde(default = "default_narrowing_period")]
+    pub narrowing_period: usize,
+    /// 좁은 상태 유지 기간 (스퀴즈 감지용, 기본값: 5)
+    #[serde(default = "default_squeeze_period")]
+    pub squeeze_period: usize,
+    /// 스퀴즈 조건을 위한 최소 밴드 폭 (비율, 기본값: 0.02)
+    #[serde(default = "default_squeeze_threshold")]
+    pub squeeze_threshold: f64,
+}
+
+fn default_narrowing_period() -> usize {
+    5
+}
+
+fn default_squeeze_period() -> usize {
+    5
+}
+
+fn default_squeeze_threshold() -> f64 {
+    0.02
 }
 
 impl Default for BBandShortStrategyConfig {
@@ -30,6 +52,9 @@ impl Default for BBandShortStrategyConfig {
             count: 3,
             period: 20,
             multiplier: 2.0,
+            narrowing_period: 5,
+            squeeze_period: 5,
+            squeeze_threshold: 0.02,
         }
     }
 }
@@ -40,9 +65,9 @@ impl ConfigValidation for BBandShortStrategyConfig {
             count: self.count,
             period: self.period,
             multiplier: self.multiplier,
-            narrowing_period: 5,     // 기본값
-            squeeze_period: 5,       // 기본값
-            squeeze_threshold: 0.02, // 기본값
+            narrowing_period: self.narrowing_period,
+            squeeze_period: self.squeeze_period,
+            squeeze_threshold: self.squeeze_threshold,
         };
         base.validate()
     }
@@ -60,7 +85,7 @@ impl BBandShortStrategyConfig {
     /// * `Result<BBandShortStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<BBandShortStrategyConfig, String> {
         let config = BBandStrategyConfigBase::from_json::<BBandShortStrategyConfig>(json)?;
-        config.validate()?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -68,13 +93,27 @@ impl BBandShortStrategyConfig {
     fn from_hash_map(config: &HashMap<String, String>) -> Result<BBandShortStrategyConfig, String> {
         let base_config = BBandStrategyConfigBase::from_hash_map(config)?;
 
+        // 공통 유틸리티를 사용하여 선택적 설정 파싱
+        let narrowing_period =
+            config_utils::parse_usize(config, "narrowing_period", Some(1), false)?.unwrap_or(5);
+
+        let squeeze_period =
+            config_utils::parse_usize(config, "squeeze_period", Some(1), false)?.unwrap_or(5);
+
+        let squeeze_threshold =
+            config_utils::parse_f64(config, "squeeze_threshold", Some((0.0, f64::MAX)), false)?
+                .unwrap_or(0.02);
+
         let result = BBandShortStrategyConfig {
             count: base_config.count,
             period: base_config.period,
             multiplier: base_config.multiplier,
+            narrowing_period,
+            squeeze_period,
+            squeeze_threshold,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }
@@ -90,8 +129,14 @@ impl<C: Candle> Display for BBandShortStrategy<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "[볼린저밴드숏전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}}}, 컨텍스트: {}",
-            self.config.period, self.config.multiplier, self.config.count, self.ctx
+            "[볼린저밴드숏전략] 설정: {{기간: {}, 승수: {}, 확인캔들수: {}, 스퀴즈: {}/{}/{:.3}}}, 컨텍스트: {}",
+            self.config.period,
+            self.config.multiplier,
+            self.config.count,
+            self.config.narrowing_period,
+            self.config.squeeze_period,
+            self.config.squeeze_threshold,
+            self.ctx
         )
     }
 }
@@ -149,19 +194,34 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
-        // 가격이 상단 밴드를 상향 돌파했을 때 숏 진입 신호
-        let is_buy = self
+        // 숏 진입: 스퀴즈 후 상단 밴드 돌파 시 숏 진입 신호
+        // 스퀴즈 패턴 확인 (밴드 폭이 좁아지다가 좁은 상태 유지)
+        let squeeze_pattern = self.ctx.is_narrowing_then_squeeze_pattern(
+            self.config.narrowing_period,
+            self.config.squeeze_period,
+            self.config.squeeze_threshold,
+        );
+
+        // 상단 밴드 돌파 확인
+        let breaks_upper = self
             .ctx
             .is_break_through_upper_band_from_below(self.config.count, 0);
 
-        // 밴드 폭이 충분히 넓은지 확인
-        is_buy && self.ctx.is_band_width_sufficient(0)
+        // 밴드 폭이 충분히 넓은지 확인 (스퀴즈 후 확대 시작)
+        let band_width_sufficient = self.ctx.is_band_width_sufficient(0);
+
+        squeeze_pattern && breaks_upper && band_width_sufficient
     }
 
     fn should_exit(&self, _candle: &C) -> bool {
-        // 가격이 하단 밴드를 하향 돌파했을 때 숏 청산 신호
-        self.ctx
-            .is_break_through_lower_band_from_below(self.config.count, 0)
+        // 숏 청산: 하단 밴드 하향 돌파 또는 중간 밴드 아래로 하락
+        let breaks_lower = self
+            .ctx
+            .is_break_through_lower_band_from_below(self.config.count, 0);
+
+        let below_middle = self.ctx.is_below_middle_band(1, 0);
+
+        breaks_lower || below_middle
     }
 
     fn position(&self) -> PositionType {

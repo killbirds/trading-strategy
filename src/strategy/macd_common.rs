@@ -1,4 +1,5 @@
 use super::Strategy;
+use super::config_utils;
 use crate::{ConfigError, ConfigResult, ConfigValidation};
 use serde::Deserialize;
 use serde::Serialize;
@@ -65,7 +66,7 @@ impl MACDStrategyConfigBase {
     ///
     /// # Returns
     /// * `Result<T, String>` - 로드된 설정 또는 오류
-    pub fn from_json<T>(json: &str, _is_long_strategy: bool) -> Result<T, String>
+    pub fn from_json<T>(json: &str) -> Result<T, String>
     where
         T: for<'de> Deserialize<'de>,
     {
@@ -80,97 +81,43 @@ impl MACDStrategyConfigBase {
         config: &HashMap<String, String>,
         is_long_strategy: bool,
     ) -> Result<MACDStrategyConfigBase, String> {
-        // 빠른 EMA 기간 설정
-        let fast_period = match config.get("fast_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "빠른 EMA 기간 파싱 오류".to_string())?;
+        // 공통 유틸리티를 사용하여 설정 파싱
+        let fast_period = config_utils::parse_usize(config, "fast_period", Some(2), true)?
+            .ok_or("fast_period 설정이 필요합니다")?;
 
-                if period < 2 {
-                    return Err("빠른 EMA 기간은 2 이상이어야 합니다".to_string());
-                }
+        let slow_period = config_utils::parse_usize(config, "slow_period", Some(1), true)?
+            .ok_or("slow_period 설정이 필요합니다")?;
 
-                period
-            }
-            None => return Err("fast_period 설정이 필요합니다".to_string()),
-        };
+        if slow_period <= fast_period {
+            return Err(format!(
+                "느린 EMA 기간({slow_period})은 빠른 EMA 기간({fast_period})보다 커야 합니다"
+            ));
+        }
 
-        // 느린 EMA 기간 설정
-        let slow_period = match config.get("slow_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "느린 EMA 기간 파싱 오류".to_string())?;
-
-                if period <= fast_period {
-                    return Err(format!(
-                        "느린 EMA 기간({period})은 빠른 EMA 기간({fast_period})보다 커야 합니다"
-                    ));
-                }
-
-                period
-            }
-            None => return Err("slow_period 설정이 필요합니다".to_string()),
-        };
-
-        // 시그널 EMA 기간 설정
-        let signal_period = match config.get("signal_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "시그널 EMA 기간 파싱 오류".to_string())?;
-
-                if period < 1 {
-                    return Err("시그널 EMA 기간은 1 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("signal_period 설정이 필요합니다".to_string()),
-        };
+        let signal_period = config_utils::parse_usize(config, "signal_period", Some(1), true)?
+            .ok_or("signal_period 설정이 필요합니다")?;
 
         // 히스토그램 임계값 설정
-        let histogram_threshold = match config.get("histogram_threshold") {
-            Some(threshold_str) => {
-                let threshold = threshold_str
-                    .parse::<f64>()
-                    .map_err(|_| "히스토그램 임계값 파싱 오류".to_string())?;
+        let histogram_threshold =
+            config_utils::parse_f64(config, "histogram_threshold", None, true)?
+                .ok_or("histogram_threshold 설정이 필요합니다")?;
 
-                // 롱 전략인 경우 임계값 검증
-                if is_long_strategy && threshold < 0.0 {
-                    return Err(format!(
-                        "롱 전략의 히스토그램 임계값({threshold})은 0 이상이어야 합니다"
-                    ));
-                }
+        // 롱 전략인 경우 임계값 검증
+        if is_long_strategy && histogram_threshold < 0.0 {
+            return Err(format!(
+                "롱 전략의 히스토그램 임계값({histogram_threshold})은 0 이상이어야 합니다"
+            ));
+        }
 
-                // 숏 전략인 경우 임계값 검증
-                if !is_long_strategy && threshold > 0.0 {
-                    return Err(format!(
-                        "숏 전략의 히스토그램 임계값({threshold})은 0보다 작아야 합니다"
-                    ));
-                }
+        // 숏 전략인 경우 임계값 검증
+        if !is_long_strategy && histogram_threshold > 0.0 {
+            return Err(format!(
+                "숏 전략의 히스토그램 임계값({histogram_threshold})은 0보다 작아야 합니다"
+            ));
+        }
 
-                threshold
-            }
-            None => return Err("histogram_threshold 설정이 필요합니다".to_string()),
-        };
-
-        // 신호 확인 기간 설정
-        let confirm_period = match config.get("confirm_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "신호 확인 기간 파싱 오류".to_string())?;
-
-                if period < 1 {
-                    return Err("신호 확인 기간은 1 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("confirm_period 설정이 필요합니다".to_string()),
-        };
+        let confirm_period = config_utils::parse_usize(config, "confirm_period", Some(1), true)?
+            .ok_or("confirm_period 설정이 필요합니다")?;
 
         let result = MACDStrategyConfigBase {
             fast_period,
@@ -180,7 +127,7 @@ impl MACDStrategyConfigBase {
             confirm_period,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }

@@ -1,4 +1,5 @@
 use super::Strategy;
+use super::config_utils;
 use crate::indicator::ma::MAType;
 use serde::Deserialize;
 use serde_json;
@@ -7,6 +8,56 @@ use trading_chart::Candle;
 
 // analyzer에서 HybridAnalyzer 관련 구조체 가져오기
 pub use crate::analyzer::hybrid_analyzer::{HybridAnalyzer, HybridAnalyzerData};
+
+/// 성능 최적화를 위한 신호 캐시 구조체
+#[derive(Debug, Default)]
+pub struct SignalCache {
+    /// 매수 신호 강도 캐시
+    pub buy_signal_strength: Option<f64>,
+    /// 매도 신호 강도 캐시
+    pub sell_signal_strength: Option<f64>,
+    /// 마지막 캔들 인덱스 (캐시 무효화에 사용)
+    pub last_candle_index: usize,
+}
+
+impl SignalCache {
+    /// 캐시를 리셋하고 새로운 데이터에 대한 준비
+    pub fn reset(&mut self, current_items_len: usize) {
+        self.buy_signal_strength = None;
+        self.sell_signal_strength = None;
+        self.last_candle_index = current_items_len;
+    }
+
+    /// 매수 신호 강도 캐시 확인 및 반환
+    pub fn get_buy_signal_strength(&self, current_items_len: usize) -> Option<f64> {
+        if self.last_candle_index == current_items_len {
+            self.buy_signal_strength
+        } else {
+            None
+        }
+    }
+
+    /// 매도 신호 강도 캐시 확인 및 반환
+    pub fn get_sell_signal_strength(&self, current_items_len: usize) -> Option<f64> {
+        if self.last_candle_index == current_items_len {
+            self.sell_signal_strength
+        } else {
+            None
+        }
+    }
+
+    /// 매수 신호 강도 캐시 저장
+    pub fn set_buy_signal_strength(&mut self, strength: f64, current_items_len: usize) {
+        self.buy_signal_strength = Some(strength);
+        self.last_candle_index = current_items_len;
+    }
+
+    /// 매도 신호 강도 캐시 저장
+    pub fn set_sell_signal_strength(&mut self, strength: f64, current_items_len: usize) {
+        self.sell_signal_strength = Some(strength);
+        self.last_candle_index = current_items_len;
+    }
+}
 
 /// 하이브리드 전략 공통 설정
 #[derive(Debug, Deserialize)]
@@ -118,75 +169,25 @@ impl HybridStrategyConfigBase {
     pub fn from_hash_map(
         config: &HashMap<String, String>,
     ) -> Result<HybridStrategyConfigBase, String> {
-        // 카운트 설정
-        let count = match config.get("count") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "카운트 파싱 오류".to_string())?;
-
-                if value == 0 {
-                    return Err("카운트는 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("count 설정이 필요합니다".to_string()),
-        };
+        // 공통 유틸리티를 사용하여 설정 파싱
+        let count = config_utils::parse_usize(config, "count", Some(1), true)?
+            .ok_or("count 설정이 필요합니다")?;
 
         // 이동평균 관련 설정
-        let ma_type = match config.get("ma_type").map(|s| s.as_str()) {
-            Some("sma") => MAType::SMA,
-            Some("ema") => MAType::EMA,
-            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {unknown}")),
-            None => return Err("ma_type 설정이 필요합니다".to_string()),
-        };
+        let ma_type = config_utils::parse_ma_type(config, Some("ma_type"), true)?
+            .ok_or("ma_type 설정이 필요합니다")?;
 
-        let ma_period = match config.get("ma_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "이동평균 기간 파싱 오류".to_string())?;
-
-                if value == 0 {
-                    return Err("이동평균 기간은 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("ma_period 설정이 필요합니다".to_string()),
-        };
+        let ma_period = config_utils::parse_usize(config, "ma_period", Some(1), true)?
+            .ok_or("ma_period 설정이 필요합니다")?;
 
         // MACD 관련 설정
-        let macd_fast_period = match config.get("macd_fast_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "MACD 빠른 기간 파싱 오류".to_string())?;
+        let macd_fast_period =
+            config_utils::parse_usize(config, "macd_fast_period", Some(1), true)?
+                .ok_or("macd_fast_period 설정이 필요합니다")?;
 
-                if value == 0 {
-                    return Err("MACD 빠른 기간은 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("macd_fast_period 설정이 필요합니다".to_string()),
-        };
-
-        let macd_slow_period = match config.get("macd_slow_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "MACD 느린 기간 파싱 오류".to_string())?;
-
-                if value == 0 {
-                    return Err("MACD 느린 기간은 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("macd_slow_period 설정이 필요합니다".to_string()),
-        };
+        let macd_slow_period =
+            config_utils::parse_usize(config, "macd_slow_period", Some(1), true)?
+                .ok_or("macd_slow_period 설정이 필요합니다")?;
 
         if macd_fast_period >= macd_slow_period {
             return Err(format!(
@@ -194,72 +195,12 @@ impl HybridStrategyConfigBase {
             ));
         }
 
-        let macd_signal_period = match config.get("macd_signal_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "MACD 시그널 기간 파싱 오류".to_string())?;
+        let macd_signal_period =
+            config_utils::parse_usize(config, "macd_signal_period", Some(1), true)?
+                .ok_or("macd_signal_period 설정이 필요합니다")?;
 
-                if value == 0 {
-                    return Err("MACD 시그널 기간은 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("macd_signal_period 설정이 필요합니다".to_string()),
-        };
-
-        // RSI 관련 설정
-        let rsi_period = match config.get("rsi_period") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<usize>()
-                    .map_err(|_| "RSI 기간 파싱 오류".to_string())?;
-
-                if value == 0 {
-                    return Err("RSI 기간은 0보다 커야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("rsi_period 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_lower = match config.get("rsi_lower") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<f64>()
-                    .map_err(|_| "RSI 하한값 파싱 오류".to_string())?;
-
-                if !(0.0..=100.0).contains(&value) {
-                    return Err(format!("RSI 하한값({value})은 0과 100 사이여야 합니다"));
-                }
-
-                value
-            }
-            None => return Err("rsi_lower 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_upper = match config.get("rsi_upper") {
-            Some(value_str) => {
-                let value = value_str
-                    .parse::<f64>()
-                    .map_err(|_| "RSI 상한값 파싱 오류".to_string())?;
-
-                if !(0.0..=100.0).contains(&value) {
-                    return Err(format!("RSI 상한값({value})은 0과 100 사이여야 합니다"));
-                }
-
-                value
-            }
-            None => return Err("rsi_upper 설정이 필요합니다".to_string()),
-        };
-
-        if rsi_lower >= rsi_upper {
-            return Err(format!(
-                "RSI 하한값({rsi_lower})은 상한값({rsi_upper})보다 작아야 합니다"
-            ));
-        }
+        // 공통 유틸리티를 사용하여 RSI 설정 파싱
+        let (rsi_period, rsi_lower, rsi_upper) = config_utils::parse_rsi_config(config)?;
 
         let result = HybridStrategyConfigBase {
             rsi_count: count,
@@ -273,13 +214,28 @@ impl HybridStrategyConfigBase {
             rsi_upper,
             bband_period: config
                 .get("bband_period")
-                .map_or(20, |s| s.parse::<usize>().unwrap()),
+                .map(|s| {
+                    s.parse::<usize>()
+                        .map_err(|e| format!("bband_period 파싱 오류: {e}"))
+                })
+                .transpose()?
+                .unwrap_or(20),
             bband_multiplier: config
                 .get("bband_multiplier")
-                .map_or(2.0, |s| s.parse::<f64>().unwrap()),
+                .map(|s| {
+                    s.parse::<f64>()
+                        .map_err(|e| format!("bband_multiplier 파싱 오류: {e}"))
+                })
+                .transpose()?
+                .unwrap_or(2.0),
             ma_rank_period: config
                 .get("ma_rank_period")
-                .map_or(20, |s| s.parse::<usize>().unwrap()),
+                .map(|s| {
+                    s.parse::<usize>()
+                        .map_err(|e| format!("ma_rank_period 파싱 오류: {e}"))
+                })
+                .transpose()?
+                .unwrap_or(20),
         };
 
         result.validate()?;
@@ -303,7 +259,10 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
             return 0.0;
         }
 
-        let current = ctx.items.last().unwrap();
+        let current = ctx
+            .items
+            .last()
+            .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
         let previous = &ctx.items[ctx.items.len() - 2];
         let config = self.config_base();
 
@@ -379,7 +338,10 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
             return 0.0;
         }
 
-        let current = ctx.items.last().unwrap();
+        let current = ctx
+            .items
+            .last()
+            .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
         let previous = &ctx.items[ctx.items.len() - 2];
         let config = self.config_base();
 

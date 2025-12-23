@@ -1,5 +1,6 @@
 use super::Strategy;
 use super::StrategyType;
+use crate::ConfigValidation;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
 use log::info;
@@ -55,7 +56,7 @@ impl RSIShortStrategyConfig {
             ma_periods: self.ma_periods.clone(),
         };
 
-        base.validate()
+        base.validate().map_err(|e| e.to_string())
     }
 
     /// JSON 문자열에서 설정 로드

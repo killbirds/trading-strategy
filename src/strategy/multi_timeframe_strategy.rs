@@ -8,8 +8,12 @@ use trading_chart::{Candle, CandleInterval};
 /// 멀티 타임프레임 분석 전략
 ///
 /// 여러 타임프레임의 데이터를 동시에 분석하여 매매 신호를 생성합니다.
+/// 각 타임프레임별로 별도의 캔들 저장소를 유지하여 타임프레임별 필터링을 수행합니다.
 pub struct MultiTimeframeStrategy<C: Candle + 'static> {
+    /// 전체 캔들 저장소 (모든 타임프레임 통합)
     storage: CandleStore<C>,
+    /// 타임프레임별 캔들 저장소
+    timeframe_storages: HashMap<CandleInterval, CandleStore<C>>,
     timeframe_weights: HashMap<CandleInterval, f64>,
     base_strategy: StrategyType,
     confirmation_threshold: f64,
@@ -99,15 +103,43 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
         // 포지션 타입 결정 (기본 전략의 포지션 타입을 따름)
         let position_type = StrategyFactory::position_from_strategy_type(base_strategy);
 
+        // 타임프레임별 캔들 저장소 초기화
+        let mut timeframe_storages = HashMap::new();
+        for interval in timeframe_weights.keys() {
+            // 각 타임프레임별로 해당 타임프레임의 캔들만 필터링하여 저장소 생성
+            let filtered_candles: Vec<C> = storage
+                .items()
+                .iter()
+                .filter(|candle| candle.interval() == interval)
+                .cloned()
+                .collect();
+
+            let timeframe_storage = CandleStore::new(
+                filtered_candles,
+                storage.max_size,
+                storage.use_duplicated_filter,
+            );
+            timeframe_storages.insert(*interval, timeframe_storage);
+        }
+
         // 각 타임프레임별 전략 인스턴스 생성
         for interval in timeframe_weights.keys() {
-            // 기본 전략 인스턴스를 각 타임프레임마다 생성
-            let strategy = StrategyFactory::build(base_strategy, storage, Some(config.clone()))?;
+            // 각 타임프레임별 저장소를 사용하여 전략 생성
+            let timeframe_storage = timeframe_storages.get(interval).ok_or_else(|| {
+                format!("타임프레임 {:?}에 대한 저장소를 찾을 수 없습니다", interval)
+            })?;
+            let strategy =
+                StrategyFactory::build(base_strategy, timeframe_storage, Some(config.clone()))?;
             strategies.insert(*interval, strategy);
         }
 
         Ok(MultiTimeframeStrategy {
-            storage: CandleStore::new(Vec::new(), 1000, false),
+            storage: CandleStore::new(
+                storage.items().to_vec(),
+                storage.max_size,
+                storage.use_duplicated_filter,
+            ),
+            timeframe_storages,
             timeframe_weights,
             base_strategy,
             confirmation_threshold,
@@ -124,6 +156,17 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
     fn update_signals(&mut self, candle: &C) {
         // 각 타임프레임별로 신호 업데이트
         for (interval, strategy) in &mut self.strategies {
+            // 해당 타임프레임의 캔들인지 확인
+            if candle.interval() != interval {
+                // 다른 타임프레임의 캔들은 해당 전략에 전달하지 않음
+                continue;
+            }
+
+            // 타임프레임별 저장소에 캔들 추가
+            if let Some(timeframe_storage) = self.timeframe_storages.get_mut(interval) {
+                timeframe_storage.add(candle.clone());
+            }
+
             // 각 타임프레임에 맞게 신호 생성
             let signal = if strategy.should_enter(candle) {
                 Signal::Enter
@@ -191,15 +234,22 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 
 impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
     fn next(&mut self, candle: C) {
-        // 저장소에 캔들 추가
+        let candle_interval = candle.interval();
+
+        // 전체 저장소에 캔들 추가
         self.storage.add(candle.clone());
 
-        // 각 전략에 캔들 데이터 전달
-        for strategy in self.strategies.values_mut() {
+        // 각 타임프레임별 저장소에 해당 타임프레임의 캔들만 추가
+        if let Some(timeframe_storage) = self.timeframe_storages.get_mut(candle_interval) {
+            timeframe_storage.add(candle.clone());
+        }
+
+        // 해당 타임프레임의 전략에만 캔들 데이터 전달
+        if let Some(strategy) = self.strategies.get_mut(candle_interval) {
             strategy.next(candle.clone());
         }
 
-        // 신호 업데이트
+        // 신호 업데이트 (참조 사용으로 클론 최소화)
         self.update_signals(&candle);
     }
 

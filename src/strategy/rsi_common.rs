@@ -1,5 +1,7 @@
 use super::Strategy;
+use super::config_utils;
 use crate::indicator::ma::MAType;
+use crate::{ConfigError, ConfigResult, ConfigValidation};
 use serde::Deserialize;
 use serde_json;
 use std::collections::HashMap;
@@ -25,36 +27,38 @@ pub struct RSIStrategyConfigBase {
     pub ma_periods: Vec<usize>,
 }
 
-impl RSIStrategyConfigBase {
-    /// 설정의 유효성을 검사합니다.
-    ///
-    /// 모든 설정 값이 유효한지 확인하고, 유효하지 않은 경우 오류 메시지를 반환합니다.
-    ///
-    /// # Returns
-    /// * `Result<(), String>` - 유효성 검사 결과 (성공 또는 오류 메시지)
-    pub fn validate(&self) -> Result<(), String> {
+impl ConfigValidation for RSIStrategyConfigBase {
+    fn validate(&self) -> ConfigResult<()> {
         if self.rsi_period < 2 {
-            return Err("RSI 기간은 2 이상이어야 합니다".to_string());
-        }
-
-        if self.rsi_lower >= self.rsi_upper {
-            return Err(format!(
-                "RSI 하한({})은 상한({})보다 작아야 합니다",
-                self.rsi_lower, self.rsi_upper
+            return Err(ConfigError::ValidationError(
+                "RSI 기간은 2 이상이어야 합니다".to_string(),
             ));
         }
 
+        if self.rsi_lower >= self.rsi_upper {
+            return Err(ConfigError::ValidationError(format!(
+                "RSI 하한({})은 상한({})보다 작아야 합니다",
+                self.rsi_lower, self.rsi_upper
+            )));
+        }
+
         if self.rsi_count == 0 {
-            return Err("RSI 판정 횟수는 0보다 커야 합니다".to_string());
+            return Err(ConfigError::ValidationError(
+                "RSI 판정 횟수는 0보다 커야 합니다".to_string(),
+            ));
         }
 
         if self.ma_periods.is_empty() {
-            return Err("이동평균 기간이 지정되지 않았습니다".to_string());
+            return Err(ConfigError::ValidationError(
+                "이동평균 기간이 지정되지 않았습니다".to_string(),
+            ));
         }
 
         Ok(())
     }
+}
 
+impl RSIStrategyConfigBase {
     /// JSON 문자열에서 설정 로드
     ///
     /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.
@@ -78,55 +82,15 @@ impl RSIStrategyConfigBase {
     pub fn from_hash_map(
         config: &HashMap<String, String>,
     ) -> Result<RSIStrategyConfigBase, String> {
+        // 공통 유틸리티를 사용하여 RSI 설정 파싱
+        let (rsi_period, rsi_lower, rsi_upper) = config_utils::parse_rsi_config(config)?;
+
         // RSI 카운트 설정
-        let rsi_count = match config.get("rsi_count") {
-            Some(count) => count
-                .parse::<usize>()
-                .map_err(|_| "RSI 카운트 파싱 오류".to_string())?,
-            None => return Err("rsi_count 설정이 필요합니다".to_string()),
-        };
-
-        // RSI 하단값 설정
-        let rsi_lower = match config.get("rsi_lower") {
-            Some(lower) => lower
-                .parse::<f64>()
-                .map_err(|_| "RSI 하단값 파싱 오류".to_string())?,
-            None => return Err("rsi_lower 설정이 필요합니다".to_string()),
-        };
-
-        // RSI 상단값 설정
-        let rsi_upper = match config.get("rsi_upper") {
-            Some(upper) => upper
-                .parse::<f64>()
-                .map_err(|_| "RSI 상단값 파싱 오류".to_string())?,
-            None => return Err("rsi_upper 설정이 필요합니다".to_string()),
-        };
-
-        // RSI 기간 설정
-        let rsi_period = match config.get("rsi_period") {
-            Some(period) => {
-                let value = period
-                    .parse::<usize>()
-                    .map_err(|_| "RSI 기간 파싱 오류".to_string())?;
-
-                if value < 2 {
-                    return Err("RSI 기간은 2 이상이어야 합니다".to_string());
-                }
-
-                value
-            }
-            None => return Err("rsi_period 설정이 필요합니다".to_string()),
-        };
+        let rsi_count = config_utils::parse_usize(config, "rsi_count", Some(1), true)?
+            .ok_or("rsi_count 설정이 필요합니다")?;
 
         // MA 유형 설정
-        let ma = match config.get("ma") {
-            Some(ma_type) => match ma_type.to_lowercase().as_str() {
-                "sma" => MAType::SMA,
-                "ema" => MAType::EMA,
-                _ => return Err(format!("알 수 없는 이동평균 유형: {ma_type}")),
-            },
-            None => return Err("ma 설정이 필요합니다".to_string()),
-        };
+        let ma = config_utils::parse_ma_type(config, None, true)?.ok_or("ma 설정이 필요합니다")?;
 
         // 이동평균 기간 설정
         let ma_periods = match config.get("ma_periods") {
@@ -143,13 +107,6 @@ impl RSIStrategyConfigBase {
             None => return Err("ma_periods 설정이 필요합니다".to_string()),
         };
 
-        // 유효성 검사
-        if rsi_lower >= rsi_upper {
-            return Err(format!(
-                "RSI 하단값({rsi_lower})이 상단값({rsi_upper})보다 크거나 같을 수 없습니다"
-            ));
-        }
-
         let result = RSIStrategyConfigBase {
             rsi_count,
             rsi_lower,
@@ -159,7 +116,7 @@ impl RSIStrategyConfigBase {
             ma_periods,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }

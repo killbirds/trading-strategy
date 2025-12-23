@@ -1,5 +1,6 @@
 use super::Strategy;
 use super::StrategyType;
+use super::config_utils;
 use super::copys_common::{CopysStrategyCommon, CopysStrategyConfigBase, CopysStrategyContext};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::bband_analyzer::BBandAnalyzer;
@@ -30,6 +31,7 @@ impl Default for CopysShortStrategyConfig {
                 rsi_lower: 30.0,
                 bband_period: 20,
                 bband_multiplier: 2.0,
+                ma_distance_threshold: 0.02,
             },
             rsi_count: 3,
         }
@@ -62,97 +64,28 @@ impl CopysShortStrategyConfig {
 
     /// HashMap에서 설정 로드
     fn from_hash_map(config: &HashMap<String, String>) -> Result<CopysShortStrategyConfig, String> {
-        // RSI 관련 설정
-        let rsi_period = match config.get("rsi_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "RSI 기간 파싱 오류".to_string())?;
+        // 공통 유틸리티를 사용하여 RSI 설정 파싱
+        let (rsi_period, rsi_lower, rsi_upper) = config_utils::parse_rsi_config(config)?;
 
-                if period < 2 {
-                    return Err("RSI 기간은 2 이상이어야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("rsi_period 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_lower = match config.get("rsi_lower") {
-            Some(lower_str) => {
-                let lower = lower_str
-                    .parse::<f64>()
-                    .map_err(|_| "RSI 하한값 파싱 오류".to_string())?;
-
-                if !(0.0..=100.0).contains(&lower) {
-                    return Err(format!("RSI 하한값({lower})은 0과 100 사이여야 합니다"));
-                }
-
-                lower
-            }
-            None => return Err("rsi_lower 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_upper = match config.get("rsi_upper") {
-            Some(upper_str) => {
-                let upper = upper_str
-                    .parse::<f64>()
-                    .map_err(|_| "RSI 상한값 파싱 오류".to_string())?;
-
-                if !(0.0..=100.0).contains(&upper) {
-                    return Err(format!("RSI 상한값({upper})은 0과 100 사이여야 합니다"));
-                }
-
-                upper
-            }
-            None => return Err("rsi_upper 설정이 필요합니다".to_string()),
-        };
-
-        let rsi_count = match config.get("rsi_count") {
-            Some(count_str) => {
-                let count = count_str
-                    .parse::<usize>()
-                    .map_err(|_| "RSI 판정 횟수 파싱 오류".to_string())?;
-
-                if count == 0 {
-                    return Err("RSI 판정 횟수는 0보다 커야 합니다".to_string());
-                }
-
-                count
-            }
-            None => return Err("rsi_count 설정이 필요합니다".to_string()),
-        };
+        // RSI 판정 횟수 설정
+        let rsi_count = config_utils::parse_usize(config, "rsi_count", Some(1), true)?
+            .ok_or("rsi_count 설정이 필요합니다")?;
 
         // 볼린저 밴드 관련 설정
-        let bband_period = match config.get("bband_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "볼린저 밴드 기간 파싱 오류".to_string())?;
+        let bband_period = config_utils::parse_usize(config, "bband_period", Some(2), true)?
+            .ok_or("bband_period 설정이 필요합니다")?;
 
-                if period < 2 {
-                    return Err("볼린저 밴드 기간은 2 이상이어야 합니다".to_string());
-                }
+        let bband_multiplier =
+            config_utils::parse_f64(config, "bband_multiplier", Some((0.0, f64::MAX)), true)?
+                .ok_or("bband_multiplier 설정이 필요합니다")?;
 
-                period
-            }
-            None => return Err("bband_period 설정이 필요합니다".to_string()),
-        };
+        if bband_multiplier <= 0.0 {
+            return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
+        }
 
-        let bband_multiplier = match config.get("bband_multiplier") {
-            Some(multiplier_str) => {
-                let multiplier = multiplier_str
-                    .parse::<f64>()
-                    .map_err(|_| "볼린저 밴드 승수 파싱 오류".to_string())?;
-
-                if multiplier <= 0.0 {
-                    return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
-                }
-
-                multiplier
-            }
-            None => return Err("bband_multiplier 설정이 필요합니다".to_string()),
-        };
+        let ma_distance_threshold =
+            config_utils::parse_f64(config, "ma_distance_threshold", Some((0.0, 1.0)), false)?
+                .unwrap_or(0.02);
 
         Ok(CopysShortStrategyConfig {
             base: CopysStrategyConfigBase {
@@ -161,6 +94,7 @@ impl CopysShortStrategyConfig {
                 rsi_upper,
                 bband_period,
                 bband_multiplier,
+                ma_distance_threshold,
             },
             rsi_count,
         })
@@ -275,12 +209,18 @@ impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysShortStrategy<C> {
     fn config_bband_multiplier(&self) -> f64 {
         self.config.base.bband_multiplier
     }
+
+    fn config_ma_distance_threshold(&self) -> f64 {
+        self.config.base.ma_distance_threshold
+    }
 }
 
 impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
     fn next(&mut self, candle: C) {
-        self.ctx.next(candle.clone());
-        self.bband_analyzer.next(candle.clone());
+        // 한 번만 클론하여 두 analyzer에 전달
+        let candle_clone = candle.clone();
+        self.ctx.next(candle);
+        self.bband_analyzer.next(candle_clone);
     }
 
     fn should_enter(&self, _candle: &C) -> bool {

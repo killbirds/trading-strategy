@@ -2,6 +2,7 @@ use super::Strategy;
 use super::StrategyType;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
+use crate::{ConfigResult, ConfigValidation};
 use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -45,14 +46,8 @@ impl Default for RSIStrategyConfig {
     }
 }
 
-impl RSIStrategyConfig {
-    /// 설정의 유효성을 검사합니다.
-    ///
-    /// 모든 설정 값이 유효한지 확인하고, 유효하지 않은 경우 오류 메시지를 반환합니다.
-    ///
-    /// # Returns
-    /// * `Result<(), String>` - 유효성 검사 결과 (성공 또는 오류 메시지)
-    pub fn validate(&self) -> Result<(), String> {
+impl ConfigValidation for RSIStrategyConfig {
+    fn validate(&self) -> ConfigResult<()> {
         let base = RSIStrategyConfigBase {
             rsi_count: self.rsi_count,
             rsi_lower: self.rsi_lower,
@@ -64,7 +59,9 @@ impl RSIStrategyConfig {
 
         base.validate()
     }
+}
 
+impl RSIStrategyConfig {
     /// JSON 문자열에서 설정 로드
     ///
     /// JSON 문자열로부터 설정을 로드하고, 로드에 실패할 경우 오류를 반환합니다.
@@ -173,34 +170,6 @@ impl<C: Candle + 'static> RSIStrategy<C> {
         };
 
         Self::new(storage, strategy_config)
-    }
-
-    /// RSI가 과매수 영역인지 확인
-    fn is_rsi_overbought(&self) -> bool {
-        if self.ctx.items.len() < self.config.rsi_count {
-            return false;
-        }
-
-        // 과매수 판단: RSI가 상단 임계값을 넘어서면 과매수로 판단
-        self.ctx
-            .items
-            .iter()
-            .take(self.config.rsi_count)
-            .all(|item| item.rsi.value > self.config.rsi_upper)
-    }
-
-    /// RSI가 과매도 영역인지 확인
-    fn is_rsi_oversold(&self) -> bool {
-        if self.ctx.items.len() < self.config.rsi_count {
-            return false;
-        }
-
-        // 과매도 판단: RSI가 하단 임계값 아래로 내려가면 과매도로 판단
-        self.ctx
-            .items
-            .iter()
-            .take(self.config.rsi_count)
-            .all(|item| item.rsi.value < self.config.rsi_lower)
     }
 }
 

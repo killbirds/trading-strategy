@@ -1,4 +1,5 @@
 use super::Strategy;
+use super::config_utils;
 use super::split;
 use crate::indicator::ma::MAType;
 use serde::Deserialize;
@@ -20,6 +21,20 @@ pub struct ThreeRSIStrategyConfigBase {
     pub ma_period: usize,
     /// ADX 계산 기간
     pub adx_period: usize,
+    /// ADX 강도 임계값 (기본값: 20.0)
+    #[serde(default = "default_adx_threshold")]
+    pub adx_threshold: f64,
+    /// RSI 중간값 임계값 (기본값: 50.0)
+    #[serde(default = "default_rsi_mid_threshold")]
+    pub rsi_mid_threshold: f64,
+}
+
+fn default_adx_threshold() -> f64 {
+    20.0
+}
+
+fn default_rsi_mid_threshold() -> f64 {
+    50.0
 }
 
 impl Default for ThreeRSIStrategyConfigBase {
@@ -30,6 +45,8 @@ impl Default for ThreeRSIStrategyConfigBase {
             ma: MAType::EMA,
             ma_period: 50,
             adx_period: 14,
+            adx_threshold: 20.0,
+            rsi_mid_threshold: 50.0,
         }
     }
 }
@@ -58,6 +75,14 @@ impl ThreeRSIStrategyConfigBase {
 
         if self.adx_period == 0 {
             return Err("ADX 기간은 0보다 커야 합니다".to_string());
+        }
+
+        if self.adx_threshold < 0.0 {
+            return Err("ADX 임계값은 0 이상이어야 합니다".to_string());
+        }
+
+        if self.rsi_mid_threshold < 0.0 || self.rsi_mid_threshold > 100.0 {
+            return Err("RSI 중간값 임계값은 0과 100 사이여야 합니다".to_string());
         }
 
         Ok(())
@@ -105,54 +130,36 @@ impl ThreeRSIStrategyConfigBase {
             None => return Err("rsi_periods 설정이 필요합니다".to_string()),
         };
 
-        // 이동평균 유형 설정
-        let ma = match config.get("ma").map(|s| s.as_str()) {
-            Some("sma") => MAType::SMA,
-            Some("ema") => MAType::EMA,
-            Some(unknown) => return Err(format!("알 수 없는 이동평균 유형: {unknown}")),
-            None => return Err("ma 설정이 필요합니다".to_string()),
-        };
+        // 공통 유틸리티를 사용하여 이동평균 타입 파싱
+        let ma = config_utils::parse_ma_type(config, None, true)?.ok_or("ma 설정이 필요합니다")?;
 
         // 이동평균 기간 설정
-        let ma_period = match config.get("ma_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "이동평균 기간 파싱 오류".to_string())?;
-
-                if period == 0 {
-                    return Err("이동평균 기간은 0보다 커야 합니다".to_string());
-                }
-
-                period
-            }
-            None => return Err("ma_period 설정이 필요합니다".to_string()),
-        };
+        let ma_period = config_utils::parse_usize(config, "ma_period", Some(1), true)?
+            .ok_or("ma_period 설정이 필요합니다")?;
 
         // ADX 기간 설정
-        let adx_period = match config.get("adx_period") {
-            Some(period_str) => {
-                let period = period_str
-                    .parse::<usize>()
-                    .map_err(|_| "ADX 기간 파싱 오류".to_string())?;
+        let adx_period = config_utils::parse_usize(config, "adx_period", Some(1), true)?
+            .ok_or("adx_period 설정이 필요합니다")?;
 
-                if period == 0 {
-                    return Err("ADX 기간은 0보다 커야 합니다".to_string());
-                }
+        // 공통 유틸리티를 사용하여 선택적 설정 파싱
+        let adx_threshold =
+            config_utils::parse_f64(config, "adx_threshold", Some((0.0, f64::MAX)), false)?
+                .unwrap_or(20.0);
 
-                period
-            }
-            None => return Err("adx_period 설정이 필요합니다".to_string()),
-        };
+        let rsi_mid_threshold =
+            config_utils::parse_f64(config, "rsi_mid_threshold", Some((0.0, 100.0)), false)?
+                .unwrap_or(50.0);
 
         let result = ThreeRSIStrategyConfigBase {
             rsi_periods,
             ma,
             ma_period,
             adx_period,
+            adx_threshold,
+            rsi_mid_threshold,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }
@@ -161,4 +168,10 @@ impl ThreeRSIStrategyConfigBase {
 pub trait ThreeRSIStrategyCommon<C: Candle + 'static>: Strategy<C> {
     /// 분석기 참조 반환
     fn context(&self) -> &ThreeRSIAnalyzer<C>;
+
+    /// 설정의 ADX 임계값 반환
+    fn config_adx_threshold(&self) -> f64;
+
+    /// 설정의 RSI 중간값 임계값 반환
+    fn config_rsi_mid_threshold(&self) -> f64;
 }

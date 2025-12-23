@@ -1,6 +1,7 @@
 use crate::analyzer::AnalyzerOps;
 use crate::indicator::ma::MAType;
 use crate::strategy::Strategy;
+use crate::strategy::config_utils;
 use crate::strategy::split_safe;
 use serde::Deserialize;
 use serde_json;
@@ -71,16 +72,8 @@ impl MAStrategyConfigBase {
 
     /// HashMap에서 설정 로드
     pub fn from_hash_map(config: &HashMap<String, String>) -> Result<MAStrategyConfigBase, String> {
-        // ma 유형 설정
-        let ma = match config.get("ma") {
-            Some(ma_type) => match ma_type.to_lowercase().as_str() {
-                "sma" => MAType::SMA,
-                "ema" => MAType::EMA,
-                "wma" => MAType::WMA,
-                _ => return Err(format!("알 수 없는 이동평균 유형: {ma_type}")),
-            },
-            None => return Err("ma 설정이 필요합니다".to_string()),
-        };
+        // 공통 유틸리티를 사용하여 MA 타입 파싱
+        let ma = config_utils::parse_ma_type(config, None, true)?.ok_or("ma 설정이 필요합니다")?;
 
         // 이동평균 기간 설정
         let ma_periods = match config.get("ma_periods") {
@@ -107,20 +100,9 @@ impl MAStrategyConfigBase {
         };
 
         // 크로스 판정 기간 설정
-        let cross_previous_periods = match config.get("cross_previous_periods") {
-            Some(cross_periods) => {
-                let periods = cross_periods
-                    .parse::<usize>()
-                    .map_err(|_| "크로스 판정 기간 파싱 오류".to_string())?;
-
-                if periods == 0 {
-                    return Err("크로스 판정 기간은 0보다 커야 합니다".to_string());
-                }
-
-                periods
-            }
-            None => return Err("cross_previous_periods 설정이 필요합니다".to_string()),
-        };
+        let cross_previous_periods =
+            config_utils::parse_usize(config, "cross_previous_periods", Some(1), true)?
+                .ok_or("cross_previous_periods 설정이 필요합니다")?;
 
         let result = MAStrategyConfigBase {
             ma,

@@ -104,6 +104,11 @@ impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysFilter<C> {
     fn config_bband_multiplier(&self) -> f64 {
         self.params.bband_multiplier
     }
+
+    fn config_ma_distance_threshold(&self) -> f64 {
+        // CopysParams에는 ma_distance_threshold 필드가 없으므로 기본값 반환
+        0.02
+    }
 }
 
 /// CopyS 전략 필터를 적용합니다.

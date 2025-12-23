@@ -69,7 +69,7 @@ impl BBandStrategyConfig {
     /// * `Result<BBandStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<BBandStrategyConfig, String> {
         let config = BBandStrategyConfigBase::from_json::<BBandStrategyConfig>(json)?;
-        config.validate()?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -86,7 +86,7 @@ impl BBandStrategyConfig {
             squeeze_threshold: base_config.squeeze_threshold,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }

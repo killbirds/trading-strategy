@@ -364,3 +364,150 @@ where
         }
     }
 }
+
+/// 공통 설정 파싱 유틸리티 모듈
+pub mod config_utils {
+    use super::*;
+    use crate::indicator::ma::MAType;
+
+    /// HashMap에서 usize 값 파싱
+    ///
+    /// # Arguments
+    /// * `config` - 설정 HashMap
+    /// * `key` - 설정 키
+    /// * `min_value` - 최소값 (검증용, None이면 검증 안 함)
+    /// * `required` - 필수 여부
+    ///
+    /// # Returns
+    /// * `Result<Option<usize>, String>` - 파싱된 값 또는 에러
+    pub fn parse_usize(
+        config: &HashMap<String, String>,
+        key: &str,
+        min_value: Option<usize>,
+        required: bool,
+    ) -> Result<Option<usize>, String> {
+        match config.get(key) {
+            Some(value_str) => {
+                let value = value_str
+                    .parse::<usize>()
+                    .map_err(|_| format!("{key} 파싱 오류"))?;
+
+                if let Some(min) = min_value
+                    && value < min
+                {
+                    return Err(format!("{key}은(는) {min} 이상이어야 합니다"));
+                }
+
+                Ok(Some(value))
+            }
+            None => {
+                if required {
+                    Err(format!("{key} 설정이 필요합니다"))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    /// HashMap에서 f64 값 파싱
+    ///
+    /// # Arguments
+    /// * `config` - 설정 HashMap
+    /// * `key` - 설정 키
+    /// * `range` - 값 범위 (min, max), None이면 검증 안 함
+    /// * `required` - 필수 여부
+    ///
+    /// # Returns
+    /// * `Result<Option<f64>, String>` - 파싱된 값 또는 에러
+    pub fn parse_f64(
+        config: &HashMap<String, String>,
+        key: &str,
+        range: Option<(f64, f64)>,
+        required: bool,
+    ) -> Result<Option<f64>, String> {
+        match config.get(key) {
+            Some(value_str) => {
+                let value = value_str
+                    .parse::<f64>()
+                    .map_err(|_| format!("{key} 파싱 오류"))?;
+
+                if let Some((min, max)) = range
+                    && (value < min || value > max)
+                {
+                    return Err(format!("{key}은(는) {min}과 {max} 사이여야 합니다"));
+                }
+
+                Ok(Some(value))
+            }
+            None => {
+                if required {
+                    Err(format!("{key} 설정이 필요합니다"))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    /// HashMap에서 이동평균 타입 파싱
+    ///
+    /// # Arguments
+    /// * `config` - 설정 HashMap
+    /// * `key` - 설정 키 (기본값: "ma")
+    /// * `required` - 필수 여부
+    ///
+    /// # Returns
+    /// * `Result<Option<MAType>, String>` - 파싱된 값 또는 에러
+    pub fn parse_ma_type(
+        config: &HashMap<String, String>,
+        key: Option<&str>,
+        required: bool,
+    ) -> Result<Option<MAType>, String> {
+        let key = key.unwrap_or("ma");
+        match config.get(key) {
+            Some(ma_type_str) => {
+                let ma_type = match ma_type_str.to_lowercase().as_str() {
+                    "sma" => MAType::SMA,
+                    "ema" => MAType::EMA,
+                    "wma" => MAType::WMA,
+                    _ => return Err(format!("알 수 없는 이동평균 유형: {ma_type_str}")),
+                };
+                Ok(Some(ma_type))
+            }
+            None => {
+                if required {
+                    Err(format!("{key} 설정이 필요합니다"))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    /// HashMap에서 RSI 설정 파싱 (공통)
+    ///
+    /// # Arguments
+    /// * `config` - 설정 HashMap
+    ///
+    /// # Returns
+    /// * `Result<(usize, f64, f64), String>` - (rsi_period, rsi_lower, rsi_upper) 또는 에러
+    pub fn parse_rsi_config(config: &HashMap<String, String>) -> Result<(usize, f64, f64), String> {
+        let rsi_period = parse_usize(config, "rsi_period", Some(2), true)?
+            .ok_or("rsi_period 설정이 필요합니다")?;
+
+        let rsi_lower = parse_f64(config, "rsi_lower", Some((0.0, 100.0)), true)?
+            .ok_or("rsi_lower 설정이 필요합니다")?;
+
+        let rsi_upper = parse_f64(config, "rsi_upper", Some((0.0, 100.0)), true)?
+            .ok_or("rsi_upper 설정이 필요합니다")?;
+
+        if rsi_lower >= rsi_upper {
+            return Err(format!(
+                "RSI 하한값({rsi_lower})은 상한값({rsi_upper})보다 작아야 합니다"
+            ));
+        }
+
+        Ok((rsi_period, rsi_lower, rsi_upper))
+    }
+}

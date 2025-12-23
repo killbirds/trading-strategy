@@ -24,6 +24,13 @@ pub struct CopysStrategyConfigBase {
     pub bband_period: usize,
     /// 볼린저밴드 표준편차 승수
     pub bband_multiplier: f64,
+    /// 이동평균선 거리 임계값 (비율, 기본값: 0.02 = 2%)
+    #[serde(default = "default_ma_distance_threshold")]
+    pub ma_distance_threshold: f64,
+}
+
+fn default_ma_distance_threshold() -> f64 {
+    0.02
 }
 
 impl CopysStrategyConfigBase {
@@ -51,6 +58,10 @@ impl CopysStrategyConfigBase {
 
         if self.bband_multiplier <= 0.0 {
             return Err("볼린저밴드 승수는 0보다 커야 합니다".to_string());
+        }
+
+        if self.ma_distance_threshold <= 0.0 || self.ma_distance_threshold > 1.0 {
+            return Err("이동평균선 거리 임계값은 0과 1 사이여야 합니다".to_string());
         }
 
         Ok(())
@@ -98,6 +109,9 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
 
     /// 볼린저밴드 배수 반환
     fn config_bband_multiplier(&self) -> f64;
+
+    /// 이동평균선 거리 임계값 반환
+    fn config_ma_distance_threshold(&self) -> f64;
 
     /// 매수 신호 체크 - RSI 과매도 + 볼린저밴드 하단 터치 + 이평선 지지
     fn check_buy_signal(&self, consecutive_n: usize) -> bool {
@@ -155,14 +169,15 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
         }
 
         let current_price = self.context().items[0].candle.close_price();
+        let threshold = self.config_ma_distance_threshold();
 
         // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 지지 가능)
         for i in 0..self.context().items[0].mas.len() {
             let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
             let distance_percent = ((current_price - ma_value) / ma_value).abs();
 
-            // 이평선과 2% 이내 거리에 있고, 이평선 위에 있으면 지지로 판단
-            if distance_percent <= 0.02 && current_price >= ma_value {
+            // 이평선과 설정된 임계값 이내 거리에 있고, 이평선 위에 있으면 지지로 판단
+            if distance_percent <= threshold && current_price >= ma_value {
                 return true;
             }
         }
@@ -177,14 +192,15 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
         }
 
         let current_price = self.context().items[0].candle.close_price();
+        let threshold = self.config_ma_distance_threshold();
 
         // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 저항 가능)
         for i in 0..self.context().items[0].mas.len() {
             let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
             let distance_percent = ((current_price - ma_value) / ma_value).abs();
 
-            // 이평선과 2% 이내 거리에 있고, 이평선 아래에 있으면 저항으로 판단
-            if distance_percent <= 0.02 && current_price <= ma_value {
+            // 이평선과 설정된 임계값 이내 거리에 있고, 이평선 아래에 있으면 저항으로 판단
+            if distance_percent <= threshold && current_price <= ma_value {
                 return true;
             }
         }

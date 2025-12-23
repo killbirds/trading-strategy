@@ -59,8 +59,8 @@ impl ConfigValidation for MACDStrategyConfig {
 impl MACDStrategyConfig {
     /// JSON 문자열에서 설정 로드
     fn from_json(json: &str) -> Result<MACDStrategyConfig, String> {
-        let config = MACDStrategyConfigBase::from_json::<MACDStrategyConfig>(json, true)?;
-        config.validate()?;
+        let config = MACDStrategyConfigBase::from_json::<MACDStrategyConfig>(json)?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -76,7 +76,7 @@ impl MACDStrategyConfig {
             confirm_period: base_config.confirm_period,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }

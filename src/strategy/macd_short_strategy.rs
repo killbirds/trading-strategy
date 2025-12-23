@@ -36,7 +36,7 @@ impl Default for MACDShortStrategyConfig {
             fast_period: 12,
             slow_period: 26,
             signal_period: 9,
-            histogram_threshold: 0.0,
+            histogram_threshold: -0.1,
             confirm_period: 3,
         }
     }
@@ -67,8 +67,8 @@ impl ConfigValidation for MACDShortStrategyConfig {
 impl MACDShortStrategyConfig {
     /// JSON 문자열에서 설정 로드
     fn from_json(json: &str) -> Result<MACDShortStrategyConfig, String> {
-        let config = MACDStrategyConfigBase::from_json::<MACDShortStrategyConfig>(json, false)?;
-        config.validate()?;
+        let config = MACDStrategyConfigBase::from_json::<MACDShortStrategyConfig>(json)?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -84,7 +84,7 @@ impl MACDShortStrategyConfig {
             confirm_period: base_config.confirm_period,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }

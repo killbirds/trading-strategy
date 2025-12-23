@@ -59,7 +59,7 @@ impl MAShortStrategyConfig {
     /// * `Result<MAShortStrategyConfig, String>` - 로드된 설정 또는 오류
     fn from_json(json: &str) -> Result<MAShortStrategyConfig, String> {
         let config = MAStrategyConfigBase::from_json::<MAShortStrategyConfig>(json)?;
-        config.validate()?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -73,7 +73,7 @@ impl MAShortStrategyConfig {
             cross_previous_periods: base_config.cross_previous_periods,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }
@@ -178,6 +178,9 @@ impl<C: Candle + 'static> Strategy<C> for MAShortStrategy<C> {
     fn should_exit(&self, _candle: &C) -> bool {
         // 단기 이동평균이 장기 이동평균보다 높아질 때(골든 크로스) 숏 청산
         self.check_cross_condition(|data| {
+            if data.mas.len() < 2 {
+                return false;
+            }
             let short_ma = data.mas.get_by_key_index(0).get();
             let long_ma = data.mas.get_by_key_index(data.mas.len() - 1).get();
             short_ma > long_ma

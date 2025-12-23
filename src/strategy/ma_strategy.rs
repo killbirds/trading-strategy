@@ -67,7 +67,7 @@ impl MAStrategyConfig {
     /// JSON 문자열에서 설정 로드
     fn from_json(json: &str) -> Result<MAStrategyConfig, String> {
         let config = MAStrategyConfigBase::from_json::<MAStrategyConfig>(json)?;
-        config.validate()?;
+        config.validate().map_err(|e| e.to_string())?;
         Ok(config)
     }
 
@@ -81,7 +81,7 @@ impl MAStrategyConfig {
             cross_previous_periods: base_config.cross_previous_periods,
         };
 
-        result.validate()?;
+        result.validate().map_err(|e| e.to_string())?;
         Ok(result)
     }
 }
@@ -183,8 +183,11 @@ impl<C: Candle + 'static> Strategy<C> for MAStrategy<C> {
     fn should_exit(&self, _candle: &C) -> bool {
         // 단기 이동평균이 장기 이동평균보다 낮아질 때(데드 크로스) 롱 청산
         self.check_cross_condition(|data| {
+            if data.mas.len() < 2 {
+                return false;
+            }
             let short_ma = data.mas.get_by_key_index(0).get();
-            let long_ma = data.mas.get_by_key_index(2).get();
+            let long_ma = data.mas.get_by_key_index(data.mas.len() - 1).get();
             short_ma < long_ma
         })
     }

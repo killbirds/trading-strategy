@@ -1,3 +1,4 @@
+use super::config_utils;
 use crate::{ConfigError, ConfigResult, ConfigValidation};
 use log::{debug, error, info};
 use serde::Deserialize;
@@ -101,170 +102,69 @@ impl BBandStrategyConfigBase {
     ) -> Result<BBandStrategyConfigBase, String> {
         debug!("볼린저 밴드 전략 HashMap 설정 파싱 시작: {config:?}");
 
-        // 확인 캔들 수 설정
-        let count = match config.get("count") {
-            Some(count_str) => {
-                debug!("count 설정 파싱: {count_str}");
-                let count = match count_str.parse::<usize>() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        let error_msg = format!("확인 캔들 수 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
-
-                if count == 0 {
-                    let error_msg = "확인 캔들 수는 0보다 커야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
-
-                count
-            }
-            None => {
+        // 공통 유틸리티를 사용하여 설정 파싱
+        let count = config_utils::parse_usize(config, "count", Some(1), true)
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })?
+            .ok_or_else(|| {
                 let error_msg = "count 설정이 필요합니다".to_string();
                 error!("{error_msg}");
-                return Err(error_msg);
-            }
-        };
+                error_msg
+            })?;
 
-        // 볼린저 밴드 계산 기간 설정
-        let period = match config.get("period") {
-            Some(period_str) => {
-                debug!("period 설정 파싱: {period_str}");
-                let period = match period_str.parse::<usize>() {
-                    Ok(p) => p,
-                    Err(e) => {
-                        let error_msg = format!("볼린저 밴드 계산 기간 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
-
-                if period < 2 {
-                    let error_msg = "볼린저 밴드 계산 기간은 2 이상이어야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
-
-                period
-            }
-            None => {
+        let period = config_utils::parse_usize(config, "period", Some(2), true)
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })?
+            .ok_or_else(|| {
                 let error_msg = "period 설정이 필요합니다".to_string();
                 error!("{error_msg}");
-                return Err(error_msg);
-            }
-        };
+                error_msg
+            })?;
 
-        // 볼린저 밴드 승수 설정
-        let multiplier = match config.get("multiplier") {
-            Some(multiplier_str) => {
-                debug!("multiplier 설정 파싱: {multiplier_str}");
-                let multiplier = match multiplier_str.parse::<f64>() {
-                    Ok(m) => m,
-                    Err(e) => {
-                        let error_msg = format!("볼린저 밴드 승수 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
-
-                if multiplier <= 0.0 {
-                    let error_msg = "볼린저 밴드 승수는 0보다 커야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
-
-                multiplier
-            }
-            None => {
+        let multiplier = config_utils::parse_f64(config, "multiplier", Some((0.0, f64::MAX)), true)
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })?
+            .ok_or_else(|| {
                 let error_msg = "multiplier 설정이 필요합니다".to_string();
                 error!("{error_msg}");
-                return Err(error_msg);
-            }
-        };
+                error_msg
+            })?;
 
-        // 밴드 폭 감소 확인 기간 설정 (선택적)
-        let narrowing_period = match config.get("narrowing_period") {
-            Some(narrowing_period_str) => {
-                debug!("narrowing_period 설정 파싱: {narrowing_period_str}");
-                let narrowing_period = match narrowing_period_str.parse::<usize>() {
-                    Ok(np) => np,
-                    Err(e) => {
-                        let error_msg = format!("밴드 폭 감소 확인 기간 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
+        if multiplier <= 0.0 {
+            let error_msg = "볼린저 밴드 승수는 0보다 커야 합니다".to_string();
+            error!("{error_msg}");
+            return Err(error_msg);
+        }
 
-                if narrowing_period == 0 {
-                    let error_msg = "밴드 폭 감소 확인 기간은 0보다 커야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
+        // 공통 유틸리티를 사용하여 선택적 설정 파싱
+        let narrowing_period =
+            config_utils::parse_usize(config, "narrowing_period", Some(1), false)
+                .map_err(|e| {
+                    error!("{e}");
+                    e
+                })?
+                .unwrap_or(5);
 
-                narrowing_period
-            }
-            None => {
-                debug!("narrowing_period 설정이 없음, 기본값 사용: 5");
-                5 // 기본값
-            }
-        };
+        let squeeze_period = config_utils::parse_usize(config, "squeeze_period", Some(1), false)
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })?
+            .unwrap_or(5);
 
-        // 좁은 상태 유지 기간 설정 (선택적)
-        let squeeze_period = match config.get("squeeze_period") {
-            Some(squeeze_period_str) => {
-                debug!("squeeze_period 설정 파싱: {squeeze_period_str}");
-                let squeeze_period = match squeeze_period_str.parse::<usize>() {
-                    Ok(sp) => sp,
-                    Err(e) => {
-                        let error_msg = format!("좁은 상태 유지 기간 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
-
-                if squeeze_period == 0 {
-                    let error_msg = "좁은 상태 유지 기간은 0보다 커야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
-
-                squeeze_period
-            }
-            None => {
-                debug!("squeeze_period 설정이 없음, 기본값 사용: 5");
-                5 // 기본값
-            }
-        };
-
-        // 스퀴즈 임계값 설정 (선택적)
-        let squeeze_threshold = match config.get("squeeze_threshold") {
-            Some(squeeze_threshold_str) => {
-                debug!("squeeze_threshold 설정 파싱: {squeeze_threshold_str}");
-                let squeeze_threshold = match squeeze_threshold_str.parse::<f64>() {
-                    Ok(st) => st,
-                    Err(e) => {
-                        let error_msg = format!("스퀴즈 임계값 파싱 오류: {e}");
-                        error!("{error_msg}");
-                        return Err(error_msg);
-                    }
-                };
-
-                if squeeze_threshold < 0.0 {
-                    let error_msg = "스퀴즈 임계값은 0 이상이어야 합니다".to_string();
-                    error!("{error_msg}");
-                    return Err(error_msg);
-                }
-
-                squeeze_threshold
-            }
-            None => {
-                debug!("squeeze_threshold 설정이 없음, 기본값 사용: 0.02");
-                0.02 // 기본값 (2%)
-            }
-        };
+        let squeeze_threshold =
+            config_utils::parse_f64(config, "squeeze_threshold", Some((0.0, f64::MAX)), false)
+                .map_err(|e| {
+                    error!("{e}");
+                    e
+                })?
+                .unwrap_or(0.02);
 
         let result = BBandStrategyConfigBase {
             count,

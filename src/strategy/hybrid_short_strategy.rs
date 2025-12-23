@@ -1,6 +1,8 @@
 use super::Strategy;
 use super::StrategyType;
-use super::hybrid_common::{HybridAnalyzer, HybridStrategyCommon, HybridStrategyConfigBase};
+use super::hybrid_common::{
+    HybridAnalyzer, HybridStrategyCommon, HybridStrategyConfigBase, SignalCache,
+};
 use crate::analyzer::base::AnalyzerOps;
 use crate::candle_store::CandleStore;
 use crate::model::PositionType;
@@ -10,17 +12,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use trading_chart::Candle;
-
-/// 성능 최적화를 위한 캐시 구조체
-#[derive(Debug, Default)]
-struct SignalCache {
-    // 매수 신호 캐시
-    buy_signal_strength: Option<f64>,
-    // 매도 신호 캐시
-    sell_signal_strength: Option<f64>,
-    // 마지막 캔들 인덱스 (캐시 무효화에 사용)
-    last_candle_index: usize,
-}
 
 /// 하이브리드 숏 전략 설정
 #[derive(Debug, Deserialize)]
@@ -37,10 +28,12 @@ pub struct HybridShortStrategyConfig {
     pub exit_threshold: f64,
 
     /// 손절 수준 (기본값: -7.0)
+    /// 주의: 현재 구현에서는 사용되지 않으며, 향후 확장을 위해 예약된 설정입니다.
     #[serde(default = "default_stop_loss")]
     pub stop_loss: f64,
 
     /// 이익 실현 수준 (기본값: 10.0)
+    /// 주의: 현재 구현에서는 사용되지 않으며, 향후 확장을 위해 예약된 설정입니다.
     #[serde(default = "default_take_profit")]
     pub take_profit: f64,
 }
@@ -255,28 +248,30 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
     /// 캐시를 리셋하고 새로운 데이터에 대한 준비
     fn reset_cache(&self) {
         let mut cache = self.cache.borrow_mut();
-        cache.buy_signal_strength = None;
-        cache.sell_signal_strength = None;
-        if self.ctx.items.last().is_some() {
-            cache.last_candle_index = self.ctx.items.len();
-        }
+        cache.reset(self.ctx.items.len());
     }
 
     /// 매도(숏 진입) 신호 강도 계산 - 최적화된 버전
     fn calculate_sell_signal_strength_optimized(&self, profit_percentage: f64) -> f64 {
         // 아이템이 충분하지 않으면 신호 없음
-        if self.ctx.items.len() < 2 {
+        let items_len = self.ctx.items.len();
+        if items_len < 2 {
             return 0.0;
         }
 
         // 캐시 확인
-        let mut cache = self.cache.borrow_mut();
-        if cache.sell_signal_strength.is_some() && cache.last_candle_index == self.ctx.items.len() {
-            return cache.sell_signal_strength.unwrap();
+        let cache = self.cache.borrow_mut();
+        if let Some(strength) = cache.get_sell_signal_strength(items_len) {
+            return strength;
         }
+        drop(cache);
 
-        let current = self.ctx.items.last().unwrap();
-        let previous = &self.ctx.items[self.ctx.items.len() - 2];
+        let current = self
+            .ctx
+            .items
+            .last()
+            .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
+        let previous = &self.ctx.items[items_len - 2];
         let config = &self.config.base;
 
         let mut strength = 0.0;
@@ -312,10 +307,8 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         }
 
         // 4. 추세 확인 (숏 전략에서는 하락 추세가 유리)
-        if self.ctx.items.len() >= 5 {
-            let price_5_ago = self.ctx.items[self.ctx.items.len() - 5]
-                .candle
-                .close_price();
+        if items_len >= 5 {
+            let price_5_ago = self.ctx.items[items_len - 5].candle.close_price();
             let current_price = current.candle.close_price();
 
             if current_price < price_5_ago {
@@ -339,8 +332,8 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         };
 
         // 캐시 업데이트
-        cache.sell_signal_strength = Some(final_strength);
-        cache.last_candle_index = self.ctx.items.len();
+        let mut cache = self.cache.borrow_mut();
+        cache.set_sell_signal_strength(final_strength, items_len);
 
         // 결과 반환
         final_strength
@@ -349,18 +342,24 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
     /// 매수(숏 청산) 신호 강도 계산 - 최적화된 버전
     fn calculate_buy_signal_strength_optimized(&self) -> f64 {
         // 아이템이 충분하지 않으면 신호 없음
-        if self.ctx.items.len() < 2 {
+        let items_len = self.ctx.items.len();
+        if items_len < 2 {
             return 0.0;
         }
 
         // 캐시 확인
-        let mut cache = self.cache.borrow_mut();
-        if cache.buy_signal_strength.is_some() && cache.last_candle_index == self.ctx.items.len() {
-            return cache.buy_signal_strength.unwrap();
+        let cache = self.cache.borrow_mut();
+        if let Some(strength) = cache.get_buy_signal_strength(items_len) {
+            return strength;
         }
+        drop(cache);
 
-        let current = self.ctx.items.last().unwrap();
-        let previous = &self.ctx.items[self.ctx.items.len() - 2];
+        let current = self
+            .ctx
+            .items
+            .last()
+            .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
+        let previous = &self.ctx.items[items_len - 2];
         let config = &self.config.base;
 
         let mut strength = 0.0;
@@ -396,10 +395,8 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         }
 
         // 4. 추세 확인 (숏 청산이므로 상승 추세가 신호가 됨)
-        if self.ctx.items.len() >= 5 {
-            let price_5_ago = self.ctx.items[self.ctx.items.len() - 5]
-                .candle
-                .close_price();
+        if items_len >= 5 {
+            let price_5_ago = self.ctx.items[items_len - 5].candle.close_price();
             let current_price = current.candle.close_price();
 
             if current_price > price_5_ago {
@@ -417,8 +414,8 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         };
 
         // 캐시 업데이트
-        cache.buy_signal_strength = Some(final_strength);
-        cache.last_candle_index = self.ctx.items.len();
+        let mut cache = self.cache.borrow_mut();
+        cache.set_buy_signal_strength(final_strength, items_len);
 
         // 결과 반환
         final_strength
