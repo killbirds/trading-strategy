@@ -261,9 +261,9 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
 
         let current = ctx
             .items
-            .last()
+            .first()
             .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
-        let previous = &ctx.items[ctx.items.len() - 2];
+        let previous = &ctx.items[1];
         let config = self.config_base();
 
         let mut strength = 0.0;
@@ -340,9 +340,9 @@ pub trait HybridStrategyCommon<C: Candle + Clone + 'static>: Strategy<C> {
 
         let current = ctx
             .items
-            .last()
+            .first()
             .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
-        let previous = &ctx.items[ctx.items.len() - 2];
+        let previous = &ctx.items[1];
         let config = self.config_base();
 
         let mut strength = 0.0;

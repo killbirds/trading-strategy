@@ -269,9 +269,9 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         let current = self
             .ctx
             .items
-            .last()
+            .first()
             .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
-        let previous = &self.ctx.items[items_len - 2];
+        let previous = &self.ctx.items[1];
         let config = &self.config.base;
 
         let mut strength = 0.0;
@@ -308,7 +308,7 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
 
         // 4. 추세 확인 (숏 전략에서는 하락 추세가 유리)
         if items_len >= 5 {
-            let price_5_ago = self.ctx.items[items_len - 5].candle.close_price();
+            let price_5_ago = self.ctx.items[4].candle.close_price();
             let current_price = current.candle.close_price();
 
             if current_price < price_5_ago {
@@ -357,9 +357,9 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
         let current = self
             .ctx
             .items
-            .last()
+            .first()
             .expect("items.len() >= 2 체크 후이므로 항상 존재해야 함");
-        let previous = &self.ctx.items[items_len - 2];
+        let previous = &self.ctx.items[1];
         let config = &self.config.base;
 
         let mut strength = 0.0;
@@ -396,7 +396,7 @@ impl<C: Candle + Clone + 'static> HybridShortStrategy<C> {
 
         // 4. 추세 확인 (숏 청산이므로 상승 추세가 신호가 됨)
         if items_len >= 5 {
-            let price_5_ago = self.ctx.items[items_len - 5].candle.close_price();
+            let price_5_ago = self.ctx.items[4].candle.close_price();
             let current_price = current.candle.close_price();
 
             if current_price > price_5_ago {
