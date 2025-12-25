@@ -171,7 +171,7 @@ where
     /// # Returns
     /// * `MACD` - 계산된 MACD 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MACD {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 MACD 지표 생성

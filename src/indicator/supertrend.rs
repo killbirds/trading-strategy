@@ -177,7 +177,7 @@ impl<C: Candle> SuperTrendBuilder<C> {
 
     /// 저장소에서 슈퍼트렌드 지표 생성
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> SuperTrend {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 슈퍼트렌드 지표 생성

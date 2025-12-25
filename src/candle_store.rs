@@ -180,11 +180,13 @@ where
         result
     }
 
-    /// 저장된 캔들을 시간 순서대로 정렬하여 반환합니다.
+    /// 저장된 캔들을 시간 오름차순으로 정렬하여 반환합니다.
+    ///
+    /// 오래된 캔들부터 최신 캔들 순서로 정렬된 벡터를 반환합니다.
     ///
     /// # Returns
-    /// * `Vec<T>` - 시간 순서로 정렬된 캔들 목록
-    pub fn get_time_ordered_items(&self) -> Vec<T> {
+    /// * `Vec<T>` - 시간 오름차순으로 정렬된 캔들 목록 (오래된 것부터 최신 순서)
+    pub fn get_ascending_items(&self) -> Vec<T> {
         // 내림차순으로 저장된 데이터를 오름차순으로 변환
         self.items.iter().rev().cloned().collect()
     }

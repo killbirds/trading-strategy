@@ -153,7 +153,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     }
 
     fn init_from_storage(&mut self, storage: &CandleStore<C>) {
-        self.init(storage.get_time_ordered_items())
+        self.init(storage.get_ascending_items())
     }
 
     /// 특정 인덱스의 데이터에서 값 추출

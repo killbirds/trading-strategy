@@ -228,7 +228,7 @@ where
     /// # Returns
     /// * `Ichimoku` - 계산된 일목균형표 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Ichimoku {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 일목균형표 지표 계산

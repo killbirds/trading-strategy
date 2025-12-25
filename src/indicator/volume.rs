@@ -173,7 +173,7 @@ where
     /// # Returns
     /// * `Volume` - 계산된 볼륨 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> Volume {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 볼륨 지표 생성

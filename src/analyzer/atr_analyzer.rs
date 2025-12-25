@@ -63,7 +63,7 @@ impl<C: Candle + 'static> ATRAnalyzer<C> {
 
     /// 저장소에서 초기 데이터 계산
     pub fn init_from_storage(&mut self, storage: &CandleStore<C>) {
-        for candle in storage.get_time_ordered_items().iter() {
+        for candle in storage.get_ascending_items().iter() {
             self.next(candle.clone());
         }
     }

@@ -48,7 +48,7 @@ where
     }
 
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> SMA {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     pub fn build(&mut self, data: &[C]) -> SMA {

@@ -97,7 +97,7 @@ impl<C: Candle> ATRBuilder<C> {
     /// # Returns
     /// * `ATR` - 계산된 ATR 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> ATR {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 ATR 지표 생성

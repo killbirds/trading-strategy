@@ -216,7 +216,7 @@ fn test_is_fall_insufficient_candles() {
 }
 
 #[test]
-fn test_get_time_ordered_items() {
+fn test_get_ascending_items() {
     let candles = vec![
         TestCandle::new(3, 110.0, 115.0, 105.0, 112.0, 1000.0),
         TestCandle::new(1, 100.0, 105.0, 95.0, 102.0, 1000.0),
@@ -224,12 +224,12 @@ fn test_get_time_ordered_items() {
     ];
 
     let store = CandleStore::<TestCandle>::new(candles, 100, false);
-    let time_ordered = store.get_time_ordered_items();
+    let ascending_items = store.get_ascending_items();
 
-    assert_eq!(time_ordered.len(), 3);
-    assert_eq!(time_ordered[0].datetime().timestamp(), 1);
-    assert_eq!(time_ordered[1].datetime().timestamp(), 2);
-    assert_eq!(time_ordered[2].datetime().timestamp(), 3);
+    assert_eq!(ascending_items.len(), 3);
+    assert_eq!(ascending_items[0].datetime().timestamp(), 1);
+    assert_eq!(ascending_items[1].datetime().timestamp(), 2);
+    assert_eq!(ascending_items[2].datetime().timestamp(), 3);
 }
 
 #[test]

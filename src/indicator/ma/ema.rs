@@ -115,7 +115,7 @@ where
     /// # Returns
     /// * `EMA` - 계산된 EMA 지표
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> EMA {
-        self.build(&storage.get_time_ordered_items())
+        self.build(&storage.get_ascending_items())
     }
 
     /// 데이터 벡터에서 EMA 지표 생성
