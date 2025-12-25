@@ -1,8 +1,55 @@
 use anyhow::Result;
+use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 use trading_chart::Candle;
+
+// 공통 deserializer 매크로
+macro_rules! impl_filter_type_deserialize {
+    ($type:ident, $visitor:ident, $name:literal) => {
+        impl<'de> Deserialize<'de> for $type {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct $visitor;
+
+                impl<'de> Visitor<'de> for $visitor {
+                    type Value = $type;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                        formatter.write_str("정수 또는 문자열")
+                    }
+
+                    fn visit_i64<E>(self, value: i64) -> Result<$type, E>
+                    where
+                        E: de::Error,
+                    {
+                        Ok($type::from(value as i32))
+                    }
+
+                    fn visit_u64<E>(self, value: u64) -> Result<$type, E>
+                    where
+                        E: de::Error,
+                    {
+                        Ok($type::from(value as i32))
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<$type, E>
+                    where
+                        E: de::Error,
+                    {
+                        $type::from_str(value)
+                            .map_err(|e| E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, e)))
+                    }
+                }
+
+                deserializer.deserialize_any($visitor)
+            }
+        }
+    };
+}
 
 // 각 필터 모듈 가져오기
 mod adx;
@@ -145,8 +192,8 @@ impl FromStr for TechnicalFilterType {
 }
 
 /// RSI 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum RSIFilterType {
     Overbought = 0,
     Oversold = 1,
@@ -218,9 +265,54 @@ impl From<RSIFilterType> for i32 {
     }
 }
 
+impl FromStr for RSIFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Overbought" => Ok(RSIFilterType::Overbought),
+            "Oversold" => Ok(RSIFilterType::Oversold),
+            "NormalRange" => Ok(RSIFilterType::NormalRange),
+            "CrossAboveThreshold" => Ok(RSIFilterType::CrossAboveThreshold),
+            "CrossBelowThreshold" => Ok(RSIFilterType::CrossBelowThreshold),
+            "CrossAbove50" => Ok(RSIFilterType::CrossAbove50),
+            "CrossBelow50" => Ok(RSIFilterType::CrossBelow50),
+            "RisingTrend" => Ok(RSIFilterType::RisingTrend),
+            "FallingTrend" => Ok(RSIFilterType::FallingTrend),
+            "CrossAbove40" => Ok(RSIFilterType::CrossAbove40),
+            "CrossBelow60" => Ok(RSIFilterType::CrossBelow60),
+            "CrossAbove20" => Ok(RSIFilterType::CrossAbove20),
+            "CrossBelow80" => Ok(RSIFilterType::CrossBelow80),
+            "Sideways" => Ok(RSIFilterType::Sideways),
+            "StrongRisingMomentum" => Ok(RSIFilterType::StrongRisingMomentum),
+            "StrongFallingMomentum" => Ok(RSIFilterType::StrongFallingMomentum),
+            "NeutralRange" => Ok(RSIFilterType::NeutralRange),
+            "Above40" => Ok(RSIFilterType::Above40),
+            "Below60" => Ok(RSIFilterType::Below60),
+            "Above50" => Ok(RSIFilterType::Above50),
+            "Below50" => Ok(RSIFilterType::Below50),
+            "Divergence" => Ok(RSIFilterType::Divergence),
+            "Convergence" => Ok(RSIFilterType::Convergence),
+            "Stable" => Ok(RSIFilterType::Stable),
+            "NeutralTrend" => Ok(RSIFilterType::NeutralTrend),
+            "Bullish" => Ok(RSIFilterType::Bullish),
+            "Bearish" => Ok(RSIFilterType::Bearish),
+            _ => {
+                // 숫자로 파싱 시도
+                match s.parse::<i32>() {
+                    Ok(num) => Ok(RSIFilterType::from(num)),
+                    Err(_) => Err(anyhow::anyhow!("알 수 없는 RSI 필터 타입: {}", s)),
+                }
+            }
+        }
+    }
+}
+
+impl_filter_type_deserialize!(RSIFilterType, RSIFilterTypeVisitor, "RSI");
+
 /// MACD 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum MACDFilterType {
     MacdAboveSignal = 0,
     MacdBelowSignal = 1,
@@ -280,9 +372,45 @@ impl From<MACDFilterType> for i32 {
     }
 }
 
+impl FromStr for MACDFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "MacdAboveSignal" => Ok(MACDFilterType::MacdAboveSignal),
+            "MacdBelowSignal" => Ok(MACDFilterType::MacdBelowSignal),
+            "SignalCrossAbove" => Ok(MACDFilterType::SignalCrossAbove),
+            "SignalCrossBelow" => Ok(MACDFilterType::SignalCrossBelow),
+            "HistogramAboveThreshold" => Ok(MACDFilterType::HistogramAboveThreshold),
+            "HistogramBelowThreshold" => Ok(MACDFilterType::HistogramBelowThreshold),
+            "ZeroLineCrossAbove" => Ok(MACDFilterType::ZeroLineCrossAbove),
+            "ZeroLineCrossBelow" => Ok(MACDFilterType::ZeroLineCrossBelow),
+            "HistogramNegativeTurn" => Ok(MACDFilterType::HistogramNegativeTurn),
+            "HistogramPositiveTurn" => Ok(MACDFilterType::HistogramPositiveTurn),
+            "StrongUptrend" => Ok(MACDFilterType::StrongUptrend),
+            "StrongDowntrend" => Ok(MACDFilterType::StrongDowntrend),
+            "MacdRising" => Ok(MACDFilterType::MacdRising),
+            "MacdFalling" => Ok(MACDFilterType::MacdFalling),
+            "HistogramExpanding" => Ok(MACDFilterType::HistogramExpanding),
+            "HistogramContracting" => Ok(MACDFilterType::HistogramContracting),
+            "Divergence" => Ok(MACDFilterType::Divergence),
+            "Convergence" => Ok(MACDFilterType::Convergence),
+            "Overbought" => Ok(MACDFilterType::Overbought),
+            "Oversold" => Ok(MACDFilterType::Oversold),
+            "Sideways" => Ok(MACDFilterType::Sideways),
+            _ => match s.parse::<i32>() {
+                Ok(num) => Ok(MACDFilterType::from(num)),
+                Err(_) => Err(anyhow::anyhow!("알 수 없는 MACD 필터 타입: {}", s)),
+            },
+        }
+    }
+}
+
+impl_filter_type_deserialize!(MACDFilterType, MACDFilterTypeVisitor, "MACD");
+
 /// 볼린저 밴드 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum BollingerBandFilterType {
     AboveUpperBand = 0,
     BelowLowerBand = 1,
@@ -362,9 +490,75 @@ impl From<BollingerBandFilterType> for i32 {
     }
 }
 
+impl FromStr for BollingerBandFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "AboveUpperBand" => Ok(BollingerBandFilterType::AboveUpperBand),
+            "BelowLowerBand" => Ok(BollingerBandFilterType::BelowLowerBand),
+            "InsideBand" => Ok(BollingerBandFilterType::InsideBand),
+            "OutsideBand" => Ok(BollingerBandFilterType::OutsideBand),
+            "AboveMiddleBand" => Ok(BollingerBandFilterType::AboveMiddleBand),
+            "BelowMiddleBand" => Ok(BollingerBandFilterType::BelowMiddleBand),
+            "BandWidthSufficient" => Ok(BollingerBandFilterType::BandWidthSufficient),
+            "BreakThroughLowerBand" => Ok(BollingerBandFilterType::BreakThroughLowerBand),
+            "SqueezeBreakout" => Ok(BollingerBandFilterType::SqueezeBreakout),
+            "EnhancedSqueezeBreakout" => Ok(BollingerBandFilterType::EnhancedSqueezeBreakout),
+            "SqueezeState" => Ok(BollingerBandFilterType::SqueezeState),
+            "BandWidthNarrowing" => Ok(BollingerBandFilterType::BandWidthNarrowing),
+            "SqueezeExpansionStart" => Ok(BollingerBandFilterType::SqueezeExpansionStart),
+            "BreakThroughUpperBand" => Ok(BollingerBandFilterType::BreakThroughUpperBand),
+            "BreakThroughLowerBandFromBelow" => {
+                Ok(BollingerBandFilterType::BreakThroughLowerBandFromBelow)
+            }
+            "BandWidthExpanding" => Ok(BollingerBandFilterType::BandWidthExpanding),
+            "MiddleBandSideways" => Ok(BollingerBandFilterType::MiddleBandSideways),
+            "UpperBandSideways" => Ok(BollingerBandFilterType::UpperBandSideways),
+            "LowerBandSideways" => Ok(BollingerBandFilterType::LowerBandSideways),
+            "BandWidthSideways" => Ok(BollingerBandFilterType::BandWidthSideways),
+            "UpperBandTouch" => Ok(BollingerBandFilterType::UpperBandTouch),
+            "LowerBandTouch" => Ok(BollingerBandFilterType::LowerBandTouch),
+            "BandWidthThresholdBreakthrough" => {
+                Ok(BollingerBandFilterType::BandWidthThresholdBreakthrough)
+            }
+            "PriceMovingToUpperFromMiddle" => {
+                Ok(BollingerBandFilterType::PriceMovingToUpperFromMiddle)
+            }
+            "PriceMovingToLowerFromMiddle" => {
+                Ok(BollingerBandFilterType::PriceMovingToLowerFromMiddle)
+            }
+            "BandConvergenceThenDivergence" => {
+                Ok(BollingerBandFilterType::BandConvergenceThenDivergence)
+            }
+            "BandDivergenceThenConvergence" => {
+                Ok(BollingerBandFilterType::BandDivergenceThenConvergence)
+            }
+            "PriceMovingToUpperWithinBand" => {
+                Ok(BollingerBandFilterType::PriceMovingToUpperWithinBand)
+            }
+            "PriceMovingToLowerWithinBand" => {
+                Ok(BollingerBandFilterType::PriceMovingToLowerWithinBand)
+            }
+            "LowVolatility" => Ok(BollingerBandFilterType::LowVolatility),
+            "HighVolatility" => Ok(BollingerBandFilterType::HighVolatility),
+            _ => match s.parse::<i32>() {
+                Ok(num) => Ok(BollingerBandFilterType::from(num)),
+                Err(_) => Err(anyhow::anyhow!("알 수 없는 BollingerBand 필터 타입: {}", s)),
+            },
+        }
+    }
+}
+
+impl_filter_type_deserialize!(
+    BollingerBandFilterType,
+    BollingerBandFilterTypeVisitor,
+    "BollingerBand"
+);
+
 /// ADX 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum ADXFilterType {
     BelowThreshold = 0,
     AboveThreshold = 1,
@@ -444,9 +638,65 @@ impl From<ADXFilterType> for i32 {
     }
 }
 
+impl FromStr for ADXFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("BelowThreshold", ADXFilterType::BelowThreshold),
+            ("AboveThreshold", ADXFilterType::AboveThreshold),
+            ("PDIAboveMDI", ADXFilterType::PDIAboveMDI),
+            ("MDIAbovePDI", ADXFilterType::MDIAbovePDI),
+            ("StrongUptrend", ADXFilterType::StrongUptrend),
+            ("StrongDowntrend", ADXFilterType::StrongDowntrend),
+            ("ADXRising", ADXFilterType::ADXRising),
+            ("ADXFalling", ADXFilterType::ADXFalling),
+            ("DIGapExpanding", ADXFilterType::DIGapExpanding),
+            ("DIGapContracting", ADXFilterType::DIGapContracting),
+            ("ExtremeHigh", ADXFilterType::ExtremeHigh),
+            ("ExtremeLow", ADXFilterType::ExtremeLow),
+            ("MiddleLevel", ADXFilterType::MiddleLevel),
+            ("PDICrossAboveMDI", ADXFilterType::PDICrossAboveMDI),
+            ("MDICrossAbovePDI", ADXFilterType::MDICrossAbovePDI),
+            ("Sideways", ADXFilterType::Sideways),
+            ("Surge", ADXFilterType::Surge),
+            ("Crash", ADXFilterType::Crash),
+            ("StrongDirectionality", ADXFilterType::StrongDirectionality),
+            ("WeakDirectionality", ADXFilterType::WeakDirectionality),
+            (
+                "TrendStrengthHigherThanDirection",
+                ADXFilterType::TrendStrengthHigherThanDirection,
+            ),
+            ("ADXHigherThanMDI", ADXFilterType::ADXHigherThanMDI),
+            ("PDIHigherThanADX", ADXFilterType::PDIHigherThanADX),
+            ("MDIHigherThanADX", ADXFilterType::MDIHigherThanADX),
+            ("TrendReversalDown", ADXFilterType::TrendReversalDown),
+            ("TrendReversalUp", ADXFilterType::TrendReversalUp),
+            ("DICrossover", ADXFilterType::DICrossover),
+            ("ExtremePDI", ADXFilterType::ExtremePDI),
+            ("ExtremeMDI", ADXFilterType::ExtremeMDI),
+            ("Stable", ADXFilterType::Stable),
+            ("Unstable", ADXFilterType::Unstable),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(ADXFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 ADX 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(ADXFilterType, ADXFilterTypeVisitor, "ADX");
+
 /// 이동평균선 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum MovingAverageFilterType {
     PriceAboveFirstMA = 0,
     PriceAboveLastMA = 1,
@@ -506,9 +756,83 @@ impl From<MovingAverageFilterType> for i32 {
     }
 }
 
+impl FromStr for MovingAverageFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            (
+                "PriceAboveFirstMA",
+                MovingAverageFilterType::PriceAboveFirstMA,
+            ),
+            (
+                "PriceAboveLastMA",
+                MovingAverageFilterType::PriceAboveLastMA,
+            ),
+            (
+                "RegularArrangement",
+                MovingAverageFilterType::RegularArrangement,
+            ),
+            (
+                "FirstMAAboveLastMA",
+                MovingAverageFilterType::FirstMAAboveLastMA,
+            ),
+            (
+                "FirstMABelowLastMA",
+                MovingAverageFilterType::FirstMABelowLastMA,
+            ),
+            ("GoldenCross", MovingAverageFilterType::GoldenCross),
+            ("PriceBetweenMA", MovingAverageFilterType::PriceBetweenMA),
+            ("MAConvergence", MovingAverageFilterType::MAConvergence),
+            ("MADivergence", MovingAverageFilterType::MADivergence),
+            ("AllMAAbove", MovingAverageFilterType::AllMAAbove),
+            ("AllMABelow", MovingAverageFilterType::AllMABelow),
+            (
+                "ReverseArrangement",
+                MovingAverageFilterType::ReverseArrangement,
+            ),
+            ("DeadCross", MovingAverageFilterType::DeadCross),
+            ("MASideways", MovingAverageFilterType::MASideways),
+            ("StrongUptrend", MovingAverageFilterType::StrongUptrend),
+            ("StrongDowntrend", MovingAverageFilterType::StrongDowntrend),
+            ("PriceCrossingMA", MovingAverageFilterType::PriceCrossingMA),
+            (
+                "ConvergenceDivergence",
+                MovingAverageFilterType::ConvergenceDivergence,
+            ),
+            (
+                "DivergenceConvergence",
+                MovingAverageFilterType::DivergenceConvergence,
+            ),
+            (
+                "ParallelMovement",
+                MovingAverageFilterType::ParallelMovement,
+            ),
+            ("NearCrossover", MovingAverageFilterType::NearCrossover),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(MovingAverageFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 MovingAverage 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(
+    MovingAverageFilterType,
+    MovingAverageFilterTypeVisitor,
+    "MovingAverage"
+);
+
 /// 이치모쿠 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum IchimokuFilterType {
     PriceAboveCloud = 0,
     PriceBelowCloud = 1,
@@ -552,9 +876,47 @@ impl From<IchimokuFilterType> for i32 {
     }
 }
 
+impl FromStr for IchimokuFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("PriceAboveCloud", IchimokuFilterType::PriceAboveCloud),
+            ("PriceBelowCloud", IchimokuFilterType::PriceBelowCloud),
+            ("TenkanAboveKijun", IchimokuFilterType::TenkanAboveKijun),
+            ("GoldenCross", IchimokuFilterType::GoldenCross),
+            ("DeadCross", IchimokuFilterType::DeadCross),
+            ("CloudBreakoutUp", IchimokuFilterType::CloudBreakoutUp),
+            ("CloudBreakdown", IchimokuFilterType::CloudBreakdown),
+            ("BuySignal", IchimokuFilterType::BuySignal),
+            ("SellSignal", IchimokuFilterType::SellSignal),
+            ("CloudThickening", IchimokuFilterType::CloudThickening),
+            ("PerfectAlignment", IchimokuFilterType::PerfectAlignment),
+            (
+                "PerfectReverseAlignment",
+                IchimokuFilterType::PerfectReverseAlignment,
+            ),
+            ("StrongBuySignal", IchimokuFilterType::StrongBuySignal),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(IchimokuFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 Ichimoku 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(IchimokuFilterType, IchimokuFilterTypeVisitor, "Ichimoku");
+
 /// VWAP 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum VWAPFilterType {
     PriceAboveVWAP = 0,
     PriceBelowVWAP = 1,
@@ -596,9 +958,43 @@ impl From<VWAPFilterType> for i32 {
     }
 }
 
+impl FromStr for VWAPFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("PriceAboveVWAP", VWAPFilterType::PriceAboveVWAP),
+            ("PriceBelowVWAP", VWAPFilterType::PriceBelowVWAP),
+            ("PriceNearVWAP", VWAPFilterType::PriceNearVWAP),
+            ("VWAPBreakoutUp", VWAPFilterType::VWAPBreakoutUp),
+            ("VWAPBreakdown", VWAPFilterType::VWAPBreakdown),
+            ("VWAPRebound", VWAPFilterType::VWAPRebound),
+            ("DivergingFromVWAP", VWAPFilterType::DivergingFromVWAP),
+            ("ConvergingToVWAP", VWAPFilterType::ConvergingToVWAP),
+            ("StrongUptrend", VWAPFilterType::StrongUptrend),
+            ("StrongDowntrend", VWAPFilterType::StrongDowntrend),
+            ("TrendStrengthening", VWAPFilterType::TrendStrengthening),
+            ("TrendWeakening", VWAPFilterType::TrendWeakening),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(VWAPFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 VWAP 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(VWAPFilterType, VWAPFilterTypeVisitor, "VWAP");
+
 /// CopyS 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum CopysFilterType {
     BasicBuySignal = 0,
     BasicSellSignal = 1,
@@ -648,9 +1044,53 @@ impl From<CopysFilterType> for i32 {
     }
 }
 
+impl FromStr for CopysFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("BasicBuySignal", CopysFilterType::BasicBuySignal),
+            ("BasicSellSignal", CopysFilterType::BasicSellSignal),
+            ("RSIOversold", CopysFilterType::RSIOversold),
+            ("RSIOverbought", CopysFilterType::RSIOverbought),
+            ("BBandLowerTouch", CopysFilterType::BBandLowerTouch),
+            ("BBandUpperTouch", CopysFilterType::BBandUpperTouch),
+            ("MASupport", CopysFilterType::MASupport),
+            ("MAResistance", CopysFilterType::MAResistance),
+            ("StrongBuySignal", CopysFilterType::StrongBuySignal),
+            ("StrongSellSignal", CopysFilterType::StrongSellSignal),
+            ("WeakBuySignal", CopysFilterType::WeakBuySignal),
+            ("WeakSellSignal", CopysFilterType::WeakSellSignal),
+            ("RSINeutral", CopysFilterType::RSINeutral),
+            ("BBandInside", CopysFilterType::BBandInside),
+            (
+                "MARegularArrangement",
+                CopysFilterType::MARegularArrangement,
+            ),
+            (
+                "MAReverseArrangement",
+                CopysFilterType::MAReverseArrangement,
+            ),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(CopysFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 Copys 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(CopysFilterType, CopysFilterTypeVisitor, "Copys");
+
 /// ATR 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum ATRFilterType {
     AboveThreshold = 0,
     VolatilityExpanding = 1,
@@ -682,9 +1122,41 @@ impl From<ATRFilterType> for i32 {
     }
 }
 
+impl FromStr for ATRFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("AboveThreshold", ATRFilterType::AboveThreshold),
+            ("VolatilityExpanding", ATRFilterType::VolatilityExpanding),
+            (
+                "VolatilityContracting",
+                ATRFilterType::VolatilityContracting,
+            ),
+            ("HighVolatility", ATRFilterType::HighVolatility),
+            ("LowVolatility", ATRFilterType::LowVolatility),
+            ("VolatilityIncreasing", ATRFilterType::VolatilityIncreasing),
+            ("VolatilityDecreasing", ATRFilterType::VolatilityDecreasing),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(ATRFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 ATR 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(ATRFilterType, ATRFilterTypeVisitor, "ATR");
+
 /// SuperTrend 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum SuperTrendFilterType {
     AllUptrend = 0,
     AllDowntrend = 1,
@@ -720,9 +1192,56 @@ impl From<SuperTrendFilterType> for i32 {
     }
 }
 
+impl FromStr for SuperTrendFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("AllUptrend", SuperTrendFilterType::AllUptrend),
+            ("AllDowntrend", SuperTrendFilterType::AllDowntrend),
+            (
+                "PriceAboveSupertrend",
+                SuperTrendFilterType::PriceAboveSupertrend,
+            ),
+            (
+                "PriceBelowSupertrend",
+                SuperTrendFilterType::PriceBelowSupertrend,
+            ),
+            (
+                "PriceCrossingAbove",
+                SuperTrendFilterType::PriceCrossingAbove,
+            ),
+            (
+                "PriceCrossingBelow",
+                SuperTrendFilterType::PriceCrossingBelow,
+            ),
+            ("TrendChanged", SuperTrendFilterType::TrendChanged),
+            ("Uptrend", SuperTrendFilterType::Uptrend),
+            ("Downtrend", SuperTrendFilterType::Downtrend),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(SuperTrendFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 SuperTrend 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(
+    SuperTrendFilterType,
+    SuperTrendFilterTypeVisitor,
+    "SuperTrend"
+);
+
 /// Volume 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum VolumeFilterType {
     VolumeAboveAverage = 0,
     VolumeBelowAverage = 1,
@@ -782,9 +1301,79 @@ impl From<VolumeFilterType> for i32 {
     }
 }
 
+impl FromStr for VolumeFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("VolumeAboveAverage", VolumeFilterType::VolumeAboveAverage),
+            ("VolumeBelowAverage", VolumeFilterType::VolumeBelowAverage),
+            ("VolumeSurge", VolumeFilterType::VolumeSurge),
+            ("VolumeDecline", VolumeFilterType::VolumeDecline),
+            (
+                "VolumeSignificantlyAbove",
+                VolumeFilterType::VolumeSignificantlyAbove,
+            ),
+            (
+                "BullishWithIncreasedVolume",
+                VolumeFilterType::BullishWithIncreasedVolume,
+            ),
+            (
+                "BearishWithIncreasedVolume",
+                VolumeFilterType::BearishWithIncreasedVolume,
+            ),
+            (
+                "IncreasingVolumeInUptrend",
+                VolumeFilterType::IncreasingVolumeInUptrend,
+            ),
+            (
+                "DecreasingVolumeInDowntrend",
+                VolumeFilterType::DecreasingVolumeInDowntrend,
+            ),
+            ("VolumeSharpDecline", VolumeFilterType::VolumeSharpDecline),
+            ("VolumeStable", VolumeFilterType::VolumeStable),
+            ("VolumeVolatile", VolumeFilterType::VolumeVolatile),
+            (
+                "BullishWithDecreasedVolume",
+                VolumeFilterType::BullishWithDecreasedVolume,
+            ),
+            (
+                "BearishWithDecreasedVolume",
+                VolumeFilterType::BearishWithDecreasedVolume,
+            ),
+            ("VolumeDoubleAverage", VolumeFilterType::VolumeDoubleAverage),
+            ("VolumeHalfAverage", VolumeFilterType::VolumeHalfAverage),
+            (
+                "VolumeConsecutiveIncrease",
+                VolumeFilterType::VolumeConsecutiveIncrease,
+            ),
+            (
+                "VolumeConsecutiveDecrease",
+                VolumeFilterType::VolumeConsecutiveDecrease,
+            ),
+            ("VolumeSideways", VolumeFilterType::VolumeSideways),
+            ("VolumeExtremelyHigh", VolumeFilterType::VolumeExtremelyHigh),
+            ("VolumeExtremelyLow", VolumeFilterType::VolumeExtremelyLow),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(VolumeFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 Volume 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(VolumeFilterType, VolumeFilterTypeVisitor, "Volume");
+
 /// ThreeRSI 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum ThreeRSIFilterType {
     AllRSILessThan50 = 0,
     AllRSIGreaterThan50 = 1,
@@ -866,9 +1455,84 @@ impl From<ThreeRSIFilterType> for i32 {
     }
 }
 
+impl FromStr for ThreeRSIFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            ("AllRSILessThan50", ThreeRSIFilterType::AllRSILessThan50),
+            (
+                "AllRSIGreaterThan50",
+                ThreeRSIFilterType::AllRSIGreaterThan50,
+            ),
+            (
+                "RSIReverseArrangement",
+                ThreeRSIFilterType::RSIReverseArrangement,
+            ),
+            (
+                "RSIRegularArrangement",
+                ThreeRSIFilterType::RSIRegularArrangement,
+            ),
+            ("CandleLowBelowMA", ThreeRSIFilterType::CandleLowBelowMA),
+            ("CandleHighAboveMA", ThreeRSIFilterType::CandleHighAboveMA),
+            ("ADXGreaterThan20", ThreeRSIFilterType::ADXGreaterThan20),
+            ("AllRSILessThan30", ThreeRSIFilterType::AllRSILessThan30),
+            (
+                "AllRSIGreaterThan70",
+                ThreeRSIFilterType::AllRSIGreaterThan70,
+            ),
+            ("RSIStableRange", ThreeRSIFilterType::RSIStableRange),
+            ("RSIBullishRange", ThreeRSIFilterType::RSIBullishRange),
+            ("RSIBearishRange", ThreeRSIFilterType::RSIBearishRange),
+            ("RSIOverboughtRange", ThreeRSIFilterType::RSIOverboughtRange),
+            ("RSIOversoldRange", ThreeRSIFilterType::RSIOversoldRange),
+            ("RSICrossAbove50", ThreeRSIFilterType::RSICrossAbove50),
+            ("RSICrossBelow50", ThreeRSIFilterType::RSICrossBelow50),
+            ("RSICrossAbove40", ThreeRSIFilterType::RSICrossAbove40),
+            ("RSICrossBelow60", ThreeRSIFilterType::RSICrossBelow60),
+            ("RSICrossAbove20", ThreeRSIFilterType::RSICrossAbove20),
+            ("RSICrossBelow80", ThreeRSIFilterType::RSICrossBelow80),
+            ("RSISideways", ThreeRSIFilterType::RSISideways),
+            ("RSIBullishMomentum", ThreeRSIFilterType::RSIBullishMomentum),
+            ("RSIBearishMomentum", ThreeRSIFilterType::RSIBearishMomentum),
+            ("RSIDivergence", ThreeRSIFilterType::RSIDivergence),
+            ("RSIConvergence", ThreeRSIFilterType::RSIConvergence),
+            ("RSIDoubleBottom", ThreeRSIFilterType::RSIDoubleBottom),
+            ("RSIDoubleTop", ThreeRSIFilterType::RSIDoubleTop),
+            (
+                "RSIOverboughtReversal",
+                ThreeRSIFilterType::RSIOverboughtReversal,
+            ),
+            (
+                "RSIOversoldReversal",
+                ThreeRSIFilterType::RSIOversoldReversal,
+            ),
+            ("RSINeutralTrend", ThreeRSIFilterType::RSINeutralTrend),
+            (
+                "RSIExtremeOverbought",
+                ThreeRSIFilterType::RSIExtremeOverbought,
+            ),
+            ("RSIExtremeOversold", ThreeRSIFilterType::RSIExtremeOversold),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(ThreeRSIFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 ThreeRSI 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(ThreeRSIFilterType, ThreeRSIFilterTypeVisitor, "ThreeRSI");
+
 /// CandlePattern 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum CandlePatternFilterType {
     StrongBullishPattern = 0,
     StrongBearishPattern = 1,
@@ -968,9 +1632,161 @@ impl From<CandlePatternFilterType> for i32 {
     }
 }
 
+impl FromStr for CandlePatternFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            (
+                "StrongBullishPattern",
+                CandlePatternFilterType::StrongBullishPattern,
+            ),
+            (
+                "StrongBearishPattern",
+                CandlePatternFilterType::StrongBearishPattern,
+            ),
+            ("ReversalPattern", CandlePatternFilterType::ReversalPattern),
+            (
+                "ContinuationPattern",
+                CandlePatternFilterType::ContinuationPattern,
+            ),
+            (
+                "VolumeConfirmedPattern",
+                CandlePatternFilterType::VolumeConfirmedPattern,
+            ),
+            (
+                "HighReliabilityPattern",
+                CandlePatternFilterType::HighReliabilityPattern,
+            ),
+            (
+                "ContextAlignedPattern",
+                CandlePatternFilterType::ContextAlignedPattern,
+            ),
+            (
+                "StrongReversalSignal",
+                CandlePatternFilterType::StrongReversalSignal,
+            ),
+            (
+                "HighConfidenceSignal",
+                CandlePatternFilterType::HighConfidenceSignal,
+            ),
+            (
+                "VolumeConfirmedSignal",
+                CandlePatternFilterType::VolumeConfirmedSignal,
+            ),
+            (
+                "PatternClusteringSignal",
+                CandlePatternFilterType::PatternClusteringSignal,
+            ),
+            ("HammerPattern", CandlePatternFilterType::HammerPattern),
+            (
+                "ShootingStarPattern",
+                CandlePatternFilterType::ShootingStarPattern,
+            ),
+            ("DojiPattern", CandlePatternFilterType::DojiPattern),
+            (
+                "SpinningTopPattern",
+                CandlePatternFilterType::SpinningTopPattern,
+            ),
+            ("MarubozuPattern", CandlePatternFilterType::MarubozuPattern),
+            (
+                "MorningStarPattern",
+                CandlePatternFilterType::MorningStarPattern,
+            ),
+            (
+                "EveningStarPattern",
+                CandlePatternFilterType::EveningStarPattern,
+            ),
+            (
+                "EngulfingPattern",
+                CandlePatternFilterType::EngulfingPattern,
+            ),
+            ("PiercingPattern", CandlePatternFilterType::PiercingPattern),
+            (
+                "DarkCloudPattern",
+                CandlePatternFilterType::DarkCloudPattern,
+            ),
+            ("HaramiPattern", CandlePatternFilterType::HaramiPattern),
+            ("TweezerPattern", CandlePatternFilterType::TweezerPattern),
+            ("TriStarPattern", CandlePatternFilterType::TriStarPattern),
+            (
+                "AdvanceBlockPattern",
+                CandlePatternFilterType::AdvanceBlockPattern,
+            ),
+            (
+                "DeliberanceBlockPattern",
+                CandlePatternFilterType::DeliberanceBlockPattern,
+            ),
+            (
+                "BreakawayPattern",
+                CandlePatternFilterType::BreakawayPattern,
+            ),
+            (
+                "ConcealmentPattern",
+                CandlePatternFilterType::ConcealmentPattern,
+            ),
+            (
+                "CounterattackPattern",
+                CandlePatternFilterType::CounterattackPattern,
+            ),
+            (
+                "DarkCloudCoverPattern",
+                CandlePatternFilterType::DarkCloudCoverPattern,
+            ),
+            (
+                "RisingWindowPattern",
+                CandlePatternFilterType::RisingWindowPattern,
+            ),
+            (
+                "FallingWindowPattern",
+                CandlePatternFilterType::FallingWindowPattern,
+            ),
+            (
+                "HighBreakoutPattern",
+                CandlePatternFilterType::HighBreakoutPattern,
+            ),
+            (
+                "LowBreakoutPattern",
+                CandlePatternFilterType::LowBreakoutPattern,
+            ),
+            ("GapPattern", CandlePatternFilterType::GapPattern),
+            ("GapFillPattern", CandlePatternFilterType::GapFillPattern),
+            (
+                "DoubleBottomPattern",
+                CandlePatternFilterType::DoubleBottomPattern,
+            ),
+            (
+                "DoubleTopPattern",
+                CandlePatternFilterType::DoubleTopPattern,
+            ),
+            ("TrianglePattern", CandlePatternFilterType::TrianglePattern),
+            ("FlagPattern", CandlePatternFilterType::FlagPattern),
+            ("PennantPattern", CandlePatternFilterType::PennantPattern),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        // 숫자로 파싱 시도
+        match s.parse::<i32>() {
+            Ok(num) => Ok(CandlePatternFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 CandlePattern 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(
+    CandlePatternFilterType,
+    CandlePatternFilterTypeVisitor,
+    "CandlePattern"
+);
+
 /// SupportResistance 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum SupportResistanceFilterType {
     SupportBreakdown = 0,
     ResistanceBreakout = 1,
@@ -1008,9 +1824,69 @@ impl From<SupportResistanceFilterType> for i32 {
     }
 }
 
+impl FromStr for SupportResistanceFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            (
+                "SupportBreakdown",
+                SupportResistanceFilterType::SupportBreakdown,
+            ),
+            (
+                "ResistanceBreakout",
+                SupportResistanceFilterType::ResistanceBreakout,
+            ),
+            ("SupportBounce", SupportResistanceFilterType::SupportBounce),
+            (
+                "ResistanceRejection",
+                SupportResistanceFilterType::ResistanceRejection,
+            ),
+            (
+                "NearStrongSupport",
+                SupportResistanceFilterType::NearStrongSupport,
+            ),
+            (
+                "NearStrongResistance",
+                SupportResistanceFilterType::NearStrongResistance,
+            ),
+            ("AboveSupport", SupportResistanceFilterType::AboveSupport),
+            (
+                "BelowResistance",
+                SupportResistanceFilterType::BelowResistance,
+            ),
+            ("NearSupport", SupportResistanceFilterType::NearSupport),
+            (
+                "NearResistance",
+                SupportResistanceFilterType::NearResistance,
+            ),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(SupportResistanceFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!(
+                "알 수 없는 SupportResistance 필터 타입: {}",
+                s
+            )),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(
+    SupportResistanceFilterType,
+    SupportResistanceFilterTypeVisitor,
+    "SupportResistance"
+);
+
 /// Momentum 필터 타입
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(from = "i32", into = "i32")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
 pub enum MomentumFilterType {
     StrongPositiveMomentum = 0,
     StrongNegativeMomentum = 1,
@@ -1069,6 +1945,76 @@ impl From<MomentumFilterType> for i32 {
         value as i32
     }
 }
+
+impl FromStr for MomentumFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let variants = [
+            (
+                "StrongPositiveMomentum",
+                MomentumFilterType::StrongPositiveMomentum,
+            ),
+            (
+                "StrongNegativeMomentum",
+                MomentumFilterType::StrongNegativeMomentum,
+            ),
+            (
+                "AcceleratingMomentum",
+                MomentumFilterType::AcceleratingMomentum,
+            ),
+            (
+                "DeceleratingMomentum",
+                MomentumFilterType::DeceleratingMomentum,
+            ),
+            ("Overbought", MomentumFilterType::Overbought),
+            ("Oversold", MomentumFilterType::Oversold),
+            ("MomentumDivergence", MomentumFilterType::MomentumDivergence),
+            ("BullishDivergence", MomentumFilterType::BullishDivergence),
+            ("BearishDivergence", MomentumFilterType::BearishDivergence),
+            ("PersistentMomentum", MomentumFilterType::PersistentMomentum),
+            ("StableMomentum", MomentumFilterType::StableMomentum),
+            (
+                "MomentumReversalSignal",
+                MomentumFilterType::MomentumReversalSignal,
+            ),
+            ("MomentumSideways", MomentumFilterType::MomentumSideways),
+            ("MomentumSurge", MomentumFilterType::MomentumSurge),
+            ("MomentumCrash", MomentumFilterType::MomentumCrash),
+            (
+                "MomentumConvergence",
+                MomentumFilterType::MomentumConvergence,
+            ),
+            (
+                "MomentumDivergencePattern",
+                MomentumFilterType::MomentumDivergencePattern,
+            ),
+            ("MomentumParallel", MomentumFilterType::MomentumParallel),
+            ("MomentumCrossover", MomentumFilterType::MomentumCrossover),
+            (
+                "MomentumSupportTest",
+                MomentumFilterType::MomentumSupportTest,
+            ),
+            (
+                "MomentumResistanceTest",
+                MomentumFilterType::MomentumResistanceTest,
+            ),
+        ];
+
+        for (name, variant) in &variants {
+            if s == *name {
+                return Ok(*variant);
+            }
+        }
+
+        match s.parse::<i32>() {
+            Ok(num) => Ok(MomentumFilterType::from(num)),
+            Err(_) => Err(anyhow::anyhow!("알 수 없는 Momentum 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(MomentumFilterType, MomentumFilterTypeVisitor, "Momentum");
 
 /// RSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
