@@ -1,17 +1,18 @@
 use super::{SuperTrendFilterType, SuperTrendParams, utils};
 use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// SuperTrend 필터 함수
-pub fn filter_supertrend<C: Candle + 'static>(
+pub(crate) fn filter_supertrend<C: Candle + 'static>(
     symbol: &str,
     params: &SuperTrendParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     SuperTrendFilter::check_filter(
         symbol,
-        candles,
+        candle_store,
         params.period,
         params.multiplier,
         params.filter_type,
@@ -24,10 +25,10 @@ pub fn filter_supertrend<C: Candle + 'static>(
 pub struct SuperTrendFilter;
 
 impl SuperTrendFilter {
-    /// SuperTrend 필터 확인
-    pub fn check_filter<C: Candle + 'static>(
+    /// SuperTrend 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
+    pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
-        candles: &[C],
+        candle_store: &CandleStore<C>,
         period: usize,
         multiplier: f64,
         filter_type: SuperTrendFilterType,
@@ -39,20 +40,11 @@ impl SuperTrendFilter {
 
         // 경계 조건 체크
         let required_length = period.max(consecutive_n);
-        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
+        if !utils::check_sufficient_candles(candle_store.len(), required_length, _symbol) {
             return Ok(false);
         }
-
-        // SuperTrend 분석기 생성
-        let candle_store = utils::create_candle_store(candles);
-        let mut analyzer = SuperTrendAnalyzer::new(&[(period, multiplier)], &candle_store);
-
-        // 캔들 데이터 처리
-        for candle in candles {
-            analyzer.next(candle.clone());
-        }
-
-        use crate::analyzer::base::AnalyzerOps;
+        // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
+        let analyzer = SuperTrendAnalyzer::new(&[(period, multiplier)], candle_store);
 
         // analyzer 메서드들이 이미 consecutive_n을 처리하거나, 직접 호출
         let result = match filter_type {
@@ -141,7 +133,8 @@ mod tests {
             },
         ];
 
-        let result = SuperTrendFilter::check_filter("TEST", &candles, 2, 2.0, 0.into(), 1, 0);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = SuperTrendFilter::check_filter("TEST", &candle_store, 2, 2.0, 0.into(), 1, 0);
         assert!(result.is_ok());
     }
 }

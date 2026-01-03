@@ -1,14 +1,15 @@
 use super::{VWAPFilterType, VWAPParams, utils};
 use crate::analyzer::vwap_analyzer::VWAPAnalyzer;
+use crate::candle_store::CandleStore;
 use crate::indicator::vwap::VWAPParams as IndicatorVWAPParams;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 VWAP 필터 적용
-pub fn filter_vwap<C: Candle + 'static>(
+pub(crate) fn filter_vwap<C: Candle + 'static>(
     coin: &str,
     params: &VWAPParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "VWAP 필터 적용 - 기간: {}, 타입: {:?}, 연속성: {}, 임계값: {:.2}%",
@@ -23,12 +24,9 @@ pub fn filter_vwap<C: Candle + 'static>(
 
     // 경계 조건 체크
     let required_length = params.period + params.consecutive_n;
-    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), required_length, coin) {
         return Ok(false);
     }
-
-    // 캔들 데이터로 CandleStore 생성
-    let candle_store = utils::create_candle_store(candles);
 
     // VWAP 매개변수 설정
     let vwap_params = IndicatorVWAPParams {
@@ -36,7 +34,7 @@ pub fn filter_vwap<C: Candle + 'static>(
     };
 
     // VWAPAnalyzer 생성
-    let analyzer = VWAPAnalyzer::new(&[vwap_params], &candle_store);
+    let analyzer = VWAPAnalyzer::new(&[vwap_params], candle_store);
 
     log::debug!("코인 {coin} VWAP 분석기 생성 완료");
 

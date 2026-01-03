@@ -1,15 +1,16 @@
 use super::{RSIFilterType, RSIParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::rsi_analyzer::RSIAnalyzer;
+use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 RSI 필터 적용
-pub fn filter_rsi<C: Candle + 'static>(
+pub(crate) fn filter_rsi<C: Candle + 'static>(
     coin: &str,
     params: &RSIParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 타입: {:?}, 연속성: {}",
@@ -25,17 +26,14 @@ pub fn filter_rsi<C: Candle + 'static>(
 
     // 경계 조건 체크
     let required_length = params.period + params.consecutive_n;
-    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), required_length, coin) {
         return Ok(false);
     }
-
-    // 캔들 데이터로 CandleStore 생성
-    let candle_store = utils::create_candle_store(candles);
 
     // RSIAnalyzer 생성
     let ma_type = MAType::SMA;
     let ma_periods: Vec<usize> = vec![params.period];
-    let analyzer = RSIAnalyzer::new(params.period, &ma_type, &ma_periods, &candle_store);
+    let analyzer = RSIAnalyzer::new(params.period, &ma_type, &ma_periods, candle_store);
 
     // 테스트 데이터의 캔들 수와 RSI 계산 결과에 정확한 처리를 위해 최소한의 항목 검증
     if analyzer.items.is_empty() {
@@ -43,7 +41,7 @@ pub fn filter_rsi<C: Candle + 'static>(
     }
 
     // 테스트 데이터의 캔들 패턴 확인 - 마지막 부분은 연속 하락 패턴
-    let trend_descending = is_trend_descending(candles);
+    let trend_descending = candle_store.is_fall(4);
 
     let result = match params.filter_type {
         RSIFilterType::Overbought => analyzer.is_all(
@@ -336,27 +334,6 @@ pub fn filter_rsi<C: Candle + 'static>(
     Ok(result)
 }
 
-// 캔들 데이터의 추세가 하락인지 확인
-fn is_trend_descending<C: Candle>(candles: &[C]) -> bool {
-    if candles.len() < 5 {
-        return false;
-    }
-
-    // 마지막 5개 캔들이 연속 하락 패턴인지 확인
-    let mut descending_count = 0;
-    for i in 1..5 {
-        let current_idx = candles.len() - i;
-        let previous_idx = candles.len() - i - 1;
-
-        if candles[current_idx].close_price() < candles[previous_idx].close_price() {
-            descending_count += 1;
-        }
-    }
-
-    // 4개 중 3개 이상이 하락이면 하락 추세로 판단
-    descending_count >= 3
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -489,7 +466,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 과매수 임계값(70) 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -518,7 +496,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 현재 테스트는 하락 추세로 인해 RSI 값이 실제 과매도 상태가 아닐 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -537,7 +516,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 두 임계값 사이에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -555,7 +535,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 임계값을 위로 돌파했는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -593,7 +574,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 현재 테스트는 RSI 계산 로직에 따라 임계값 돌파 조건이 일치하지 않을 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -612,7 +594,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 유효하지 않은 필터 타입은 항상 false 반환
     }
@@ -640,7 +623,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 현재 테스트는 RSI 계산 로직에 따라 연속 조건이 일치하지 않을 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -659,7 +643,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
     }
@@ -676,7 +661,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 40을 상향 돌파했는지 확인
         let is_breakthrough = result.unwrap();
@@ -695,7 +681,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 60을 하향 돌파했는지 확인
         let is_breakthrough = result.unwrap();
@@ -714,7 +701,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 횡보 중인지 확인
         let is_sideways = result.unwrap();
@@ -733,7 +721,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 50 근처에서 중립 상태인지 확인
         let is_neutral = result.unwrap();
@@ -752,7 +741,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI 다이버전스 패턴 확인
         let is_divergence = result.unwrap();
@@ -771,7 +761,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI 컨버전스 패턴 확인
         let is_convergence = result.unwrap();
@@ -790,7 +781,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 30-70 구간에서 안정적인지 확인
         let is_stable = result.unwrap();
@@ -809,7 +801,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 50을 중심으로 중립적 추세인지 확인
         let is_neutral_trend = result.unwrap();
@@ -828,7 +821,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 강세 구간(60-80)인지 확인
         let is_bullish = result.unwrap();
@@ -847,7 +841,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_rsi("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // RSI가 약세 구간(20-40)인지 확인
         let is_bearish = result.unwrap();

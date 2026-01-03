@@ -1,6 +1,7 @@
 use super::{IchimokuFilterType, IchimokuParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::ichimoku_analyzer::IchimokuAnalyzer;
+use crate::candle_store::CandleStore;
 use crate::indicator::ichimoku::IchimokuParams as IndicatorIchimokuParams;
 use anyhow::Result;
 use trading_chart::Candle;
@@ -15,10 +16,10 @@ pub struct IchimokuValues {
 }
 
 /// 개별 코인에 대한 이치모쿠 필터 적용
-pub fn filter_ichimoku<C: Candle + 'static>(
+pub(crate) fn filter_ichimoku<C: Candle + 'static>(
     coin: &str,
     params: &IchimokuParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "이치모쿠 필터 적용 - 전환선: {}, 기준선: {}, 선행스팬B: {}, 타입: {:?}, 연속성: {}",
@@ -36,12 +37,9 @@ pub fn filter_ichimoku<C: Candle + 'static>(
 
     // 필터링 로직
     let required_length = params.senkou_span_b_period + params.kijun_period + params.consecutive_n; // 데이터 필요량
-    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), required_length, coin) {
         return Ok(false);
     }
-
-    // 캔들 데이터로 CandleStore 생성
-    let candle_store = utils::create_candle_store(candles);
 
     // IchimokuParams 생성
     let ichimoku_params = IndicatorIchimokuParams {
@@ -52,7 +50,7 @@ pub fn filter_ichimoku<C: Candle + 'static>(
     let indicator_params = vec![ichimoku_params];
 
     // IchimokuAnalyzer 생성
-    let analyzer = IchimokuAnalyzer::new(&indicator_params, &candle_store);
+    let analyzer = IchimokuAnalyzer::new(&indicator_params, candle_store);
 
     log::debug!("코인 {coin} 이치모쿠 분석기 생성 완료");
 

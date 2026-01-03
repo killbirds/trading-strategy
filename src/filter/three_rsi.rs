@@ -1,25 +1,21 @@
 use super::{ThreeRSIFilterType, ThreeRSIParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::three_rsi_analyzer::ThreeRSIAnalyzer;
+use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// ThreeRSI 필터 함수
-pub fn filter_three_rsi<C: Candle + 'static>(
+pub(crate) fn filter_three_rsi<C: Candle + 'static>(
     symbol: &str,
     params: &ThreeRSIParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
+    ma_type: MAType,
 ) -> Result<bool> {
-    let ma_type = match params.ma_type.as_str() {
-        "EMA" => MAType::EMA,
-        "WMA" => MAType::WMA,
-        _ => MAType::SMA,
-    };
-
     ThreeRSIFilter::check_filter(
         symbol,
-        candles,
+        candle_store,
         &params.rsi_periods,
         ma_type,
         params.ma_period,
@@ -34,10 +30,10 @@ pub fn filter_three_rsi<C: Candle + 'static>(
 pub struct ThreeRSIFilter;
 
 impl ThreeRSIFilter {
-    /// ThreeRSI 필터 확인
-    pub fn check_filter<C: Candle + 'static>(
+    /// ThreeRSI 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
+    pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
-        candles: &[C],
+        candle_store: &CandleStore<C>,
         rsi_periods: &[usize],
         ma_type: MAType,
         ma_period: usize,
@@ -55,19 +51,12 @@ impl ThreeRSIFilter {
 
         // 경계 조건 체크
         let required_length = ma_period.max(consecutive_n);
-        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
+        if !utils::check_sufficient_candles(candle_store.len(), required_length, _symbol) {
             return Ok(false);
         }
-
-        // ThreeRSI 분석기 생성
-        let candle_store = utils::create_candle_store(candles);
-        let mut analyzer =
-            ThreeRSIAnalyzer::new(rsi_periods, &ma_type, ma_period, adx_period, &candle_store);
-
-        // 캔들 데이터 처리
-        for candle in candles {
-            analyzer.next(candle.clone());
-        }
+        // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
+        let analyzer =
+            ThreeRSIAnalyzer::new(rsi_periods, &ma_type, ma_period, adx_period, candle_store);
 
         // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
         let result = match filter_type {
@@ -282,9 +271,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,
@@ -341,9 +331,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             5,
@@ -400,9 +391,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,
@@ -462,9 +454,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,
@@ -524,9 +517,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,
@@ -586,9 +580,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,
@@ -648,9 +643,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = ThreeRSIFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             &[7, 14, 21],
             MAType::SMA,
             20,

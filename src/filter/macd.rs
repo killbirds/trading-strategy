@@ -1,14 +1,15 @@
 use super::{MACDFilterType, MACDParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::macd_analyzer::MACDAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 MACD 필터 적용
-pub fn filter_macd<C: Candle + 'static>(
+pub(crate) fn filter_macd<C: Candle + 'static>(
     coin: &str,
     params: &MACDParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "MACD 필터 적용 - 빠른 기간: {}, 느린 기간: {}, 시그널 기간: {}, 타입: {:?}, 연속성: {}",
@@ -26,19 +27,16 @@ pub fn filter_macd<C: Candle + 'static>(
 
     // 필터링 로직
     let required_length = params.slow_period + params.signal_period + params.consecutive_n; // 최소 필요 캔들 수
-    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), required_length, coin) {
         return Ok(false);
     }
-
-    // 캔들 데이터로 CandleStore 생성
-    let candle_store = utils::create_candle_store(candles);
 
     // MACDAnalyzer 생성
     let analyzer = MACDAnalyzer::new(
         params.fast_period,
         params.slow_period,
         params.signal_period,
-        &candle_store,
+        candle_store,
     );
 
     log::debug!("코인 {coin} MACD 분석기 생성 완료");

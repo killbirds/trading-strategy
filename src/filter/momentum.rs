@@ -1,18 +1,19 @@
 use super::{MomentumFilterType, MomentumParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::momentum_analyzer::MomentumAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// Momentum 필터 함수
-pub fn filter_momentum<C: Candle + 'static>(
+pub(crate) fn filter_momentum<C: Candle + Clone + 'static>(
     symbol: &str,
     params: &MomentumParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     MomentumFilter::check_filter(
         symbol,
-        candles,
+        candle_store,
         params.rsi_period,
         params.stoch_period,
         params.williams_period,
@@ -31,10 +32,10 @@ pub fn filter_momentum<C: Candle + 'static>(
 pub struct MomentumFilter;
 
 impl MomentumFilter {
-    /// Momentum 필터 확인
-    pub fn check_filter<C: Candle + Clone + 'static>(
+    /// Momentum 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
+    pub(crate) fn check_filter<C: Candle + Clone + 'static>(
         _symbol: &str,
-        candles: &[C],
+        candle_store: &CandleStore<C>,
         rsi_period: usize,
         stoch_period: usize,
         williams_period: usize,
@@ -57,14 +58,12 @@ impl MomentumFilter {
 
         // 경계 조건 체크
         let required_length = history_length.max(consecutive_n);
-        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
+        if !utils::check_sufficient_candles(candle_store.len(), required_length, _symbol) {
             return Ok(false);
         }
-
-        // Momentum 분석기 생성
-        let candle_store = utils::create_candle_store(candles);
-        let mut analyzer = MomentumAnalyzer::new(
-            &candle_store,
+        // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
+        let analyzer = MomentumAnalyzer::new(
+            candle_store,
             rsi_period,
             stoch_period,
             williams_period,
@@ -73,11 +72,6 @@ impl MomentumFilter {
             momentum_period,
             history_length,
         );
-
-        // 캔들 데이터 처리
-        for candle in candles {
-            analyzer.next(candle.clone());
-        }
 
         // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
         let result = match filter_type {
@@ -163,7 +157,6 @@ impl MomentumFilter {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    // use trading_chart::BasicCandle;
 
     #[test]
     fn test_momentum_filter() {
@@ -210,9 +203,10 @@ mod tests {
             },
         ];
 
+        let candle_store = utils::create_candle_store(&candles);
         let result = MomentumFilter::check_filter(
             "TEST",
-            &candles,
+            &candle_store,
             14,
             14,
             14,

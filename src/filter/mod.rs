@@ -2718,15 +2718,8 @@ impl TechnicalFilterConfig {
     }
 }
 
-// 각 필터 함수 재노출(re-export)
-pub use adx::filter_adx;
-pub use bollinger_band::filter_bollinger_band;
-pub use copys::filter_copys;
-pub use ichimoku::{IchimokuValues, filter_ichimoku};
-pub use macd::filter_macd;
-pub use moving_average::filter_moving_average;
-pub use rsi::filter_rsi;
-pub use vwap::filter_vwap;
+// Filter functions are now pub(crate) and accessed through TechnicalFilter::check_filter
+pub use ichimoku::IchimokuValues;
 
 /// 기술적 지표 필터링 적용
 pub struct TechnicalFilter;
@@ -2738,37 +2731,9 @@ impl TechnicalFilter {
         filter: &TechnicalFilterConfig,
         candles: &[C],
     ) -> Result<bool> {
-        match filter {
-            TechnicalFilterConfig::RSI(params) => filter_rsi(symbol, params, candles),
-            TechnicalFilterConfig::MACD(params) => filter_macd(symbol, params, candles),
-            TechnicalFilterConfig::BollingerBand(params) => {
-                filter_bollinger_band(symbol, params, candles)
-            }
-            TechnicalFilterConfig::ADX(params) => filter_adx(symbol, params, candles),
-            TechnicalFilterConfig::MovingAverage(params) => {
-                filter_moving_average(symbol, params, candles)
-            }
-            TechnicalFilterConfig::Ichimoku(params) => filter_ichimoku(symbol, params, candles),
-            TechnicalFilterConfig::VWAP(params) => filter_vwap(symbol, params, candles),
-            TechnicalFilterConfig::Copys(params) => filter_copys(symbol, params, candles),
-            TechnicalFilterConfig::ATR(params) => atr::filter_atr(symbol, params, candles),
-            TechnicalFilterConfig::SuperTrend(params) => {
-                supertrend::filter_supertrend(symbol, params, candles)
-            }
-            TechnicalFilterConfig::Volume(params) => volume::filter_volume(symbol, params, candles),
-            TechnicalFilterConfig::ThreeRSI(params) => {
-                three_rsi::filter_three_rsi(symbol, params, candles)
-            }
-            TechnicalFilterConfig::CandlePattern(params) => {
-                candle_pattern::filter_candle_pattern(symbol, params, candles)
-            }
-            TechnicalFilterConfig::SupportResistance(params) => {
-                support_resistance::filter_support_resistance(symbol, params, candles)
-            }
-            TechnicalFilterConfig::Momentum(params) => {
-                momentum::filter_momentum(symbol, params, candles)
-            }
-        }
+        // CandleStore를 생성하고 내부 check_filter 사용
+        let candle_store = utils::create_candle_store(candles);
+        Self::check_filter_internal(symbol, filter, &candle_store)
     }
 
     /// 개별 코인에 여러 기술적 필터 적용
@@ -2777,6 +2742,9 @@ impl TechnicalFilter {
         filters: &[TechnicalFilterConfig],
         candles: &[C],
     ) -> Result<bool> {
+        // CandleStore를 한 번만 생성하여 재사용
+        let candle_store = utils::create_candle_store(candles);
+
         for filter in filters {
             log::debug!(
                 "코인 {} 기술적 필터 적용 중: {:?}",
@@ -2784,8 +2752,8 @@ impl TechnicalFilter {
                 filter.filter_type()
             );
 
-            // 각 필터 적용 결과 확인
-            match Self::check_filter(symbol, filter, candles) {
+            // 각 필터 적용 결과 확인 (CandleStore 재사용)
+            match Self::check_filter_internal(symbol, filter, &candle_store) {
                 Ok(true) => {
                     // 필터 통과, 다음 필터로 진행
                     log::debug!("코인 {} 필터 {} 통과", symbol, filter.filter_type());
@@ -2812,6 +2780,56 @@ impl TechnicalFilter {
         // 모든 필터 통과
         log::debug!("코인 {symbol} 모든 필터 통과");
         Ok(true)
+    }
+
+    /// 개별 코인에 대한 기술적 필터 적용 (내부 헬퍼 함수, CandleStore 재사용)
+    fn check_filter_internal<C: Candle + 'static>(
+        symbol: &str,
+        filter: &TechnicalFilterConfig,
+        candle_store: &crate::candle_store::CandleStore<C>,
+    ) -> Result<bool> {
+        match filter {
+            TechnicalFilterConfig::RSI(params) => rsi::filter_rsi(symbol, params, candle_store),
+            TechnicalFilterConfig::MACD(params) => macd::filter_macd(symbol, params, candle_store),
+            TechnicalFilterConfig::BollingerBand(params) => {
+                bollinger_band::filter_bollinger_band(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::ADX(params) => adx::filter_adx(symbol, params, candle_store),
+            TechnicalFilterConfig::MovingAverage(params) => {
+                moving_average::filter_moving_average(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::Ichimoku(params) => {
+                ichimoku::filter_ichimoku(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::VWAP(params) => vwap::filter_vwap(symbol, params, candle_store),
+            TechnicalFilterConfig::Copys(params) => {
+                copys::filter_copys(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::ATR(params) => atr::filter_atr(symbol, params, candle_store),
+            TechnicalFilterConfig::SuperTrend(params) => {
+                supertrend::filter_supertrend(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::Volume(params) => {
+                volume::filter_volume(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::ThreeRSI(params) => {
+                let ma_type = match params.ma_type.as_str() {
+                    "EMA" => crate::indicator::ma::MAType::EMA,
+                    "WMA" => crate::indicator::ma::MAType::WMA,
+                    _ => crate::indicator::ma::MAType::SMA,
+                };
+                three_rsi::filter_three_rsi(symbol, params, candle_store, ma_type)
+            }
+            TechnicalFilterConfig::CandlePattern(params) => {
+                candle_pattern::filter_candle_pattern(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::SupportResistance(params) => {
+                support_resistance::filter_support_resistance(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::Momentum(params) => {
+                momentum::filter_momentum(symbol, params, candle_store)
+            }
+        }
     }
 }
 

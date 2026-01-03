@@ -228,3 +228,18 @@ pub fn create_strategy_context_for_filter<C: Candle + 'static>(
 
     Ok(analyzer)
 }
+
+/// Copys 필터에서 임시로 사용할 컨텍스트 생성 (CandleStore 재사용)
+pub fn create_strategy_context_for_filter_with_store<C: Candle + 'static>(
+    _symbol: &str,
+    rsi_period: usize,
+    ma_type: &MAType,
+    ma_periods: &[usize],
+    candle_store: &CandleStore<C>,
+) -> anyhow::Result<RSIAnalyzer<C>> {
+    // CandleStore를 재사용하여 RSIAnalyzer 생성
+    // init_from_storage가 이미 호출되었으므로 추가 작업 불필요
+    let analyzer = RSIAnalyzer::new(rsi_period, ma_type, ma_periods, candle_store);
+
+    Ok(analyzer)
+}

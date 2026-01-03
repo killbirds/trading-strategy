@@ -1,12 +1,14 @@
 use super::{ADXFilterType, ADXParams, utils};
 use crate::analyzer::adx_analyzer::ADXAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
-pub fn filter_adx<C: Candle + 'static>(
+/// 개별 코인에 대한 ADX 필터 적용
+pub(crate) fn filter_adx<C: Candle + 'static>(
     coin: &str,
     params: &ADXParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "ADX 필터 적용 - 기간: {}, 임계값: {}, 타입: {:?}, 연속성: {}",
@@ -28,16 +30,13 @@ pub fn filter_adx<C: Candle + 'static>(
     let required_length = params.period * 2 + params.consecutive_n; // ADX 계산에 필요한 최소 기간 + 연속성
 
     // 경계 조건 체크
-    if !utils::check_sufficient_candles(candles.len(), required_length, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), required_length, coin) {
         return Ok(false);
     }
 
-    // CandleStore 생성 및 ADXAnalyzer 초기화
-    let candle_store = utils::create_candle_store(candles);
-
     // ADXAnalyzer 생성 (trading-strategy의 analyzer 사용)
     let adx_periods = vec![params.period];
-    let analyzer = ADXAnalyzer::new(&adx_periods, &candle_store);
+    let analyzer = ADXAnalyzer::new(&adx_periods, candle_store);
 
     // analyzer에서 ADX 값 가져오기
     let adx = analyzer.get_adx(params.period);
@@ -497,7 +496,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_extreme_high = result.unwrap();
         println!("ADX 극도 높음 테스트 결과: {is_extreme_high}");
@@ -514,7 +514,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_extreme_low = result.unwrap();
         println!("ADX 극도 낮음 테스트 결과: {is_extreme_low}");
@@ -531,7 +532,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_middle_level = result.unwrap();
         println!("ADX 중간 수준 테스트 결과: {is_middle_level}");
@@ -548,7 +550,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_cross_above = result.unwrap();
         println!("+DI가 -DI를 상향 돌파 테스트 결과: {is_cross_above}");
@@ -565,7 +568,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_cross_above = result.unwrap();
         println!("-DI가 +DI를 상향 돌파 테스트 결과: {is_cross_above}");
@@ -582,7 +586,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_sideways = result.unwrap();
         println!("ADX 횡보 테스트 결과: {is_sideways}");
@@ -599,7 +604,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_surge = result.unwrap();
         println!("ADX 급등 테스트 결과: {is_surge}");
@@ -616,7 +622,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_crash = result.unwrap();
         println!("ADX 급락 테스트 결과: {is_crash}");
@@ -633,7 +640,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_strong_directionality = result.unwrap();
         println!("강한 방향성 테스트 결과: {is_strong_directionality}");
@@ -650,7 +658,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_weak_directionality = result.unwrap();
         println!("약한 방향성 테스트 결과: {is_weak_directionality}");
@@ -667,7 +676,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_trend_strength_higher = result.unwrap();
         println!("추세 강도 > 방향성 테스트 결과: {is_trend_strength_higher}");
@@ -684,7 +694,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_direction_higher = result.unwrap();
         println!("방향성 > 추세 강도 테스트 결과: {is_direction_higher}");
@@ -701,7 +712,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_reversal_down = result.unwrap();
         println!("ADX 상승에서 하락 전환 테스트 결과: {is_reversal_down}");
@@ -718,7 +730,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_reversal_up = result.unwrap();
         println!("ADX 하락에서 상승 전환 테스트 결과: {is_reversal_up}");
@@ -735,7 +748,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_crossover = result.unwrap();
         println!("+DI와 -DI 교차 테스트 결과: {is_crossover}");
@@ -752,7 +766,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_extreme_pdi = result.unwrap();
         println!("+DI 극도 높음 테스트 결과: {is_extreme_pdi}");
@@ -769,7 +784,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_extreme_mdi = result.unwrap();
         println!("-DI 극도 높음 테스트 결과: {is_extreme_mdi}");
@@ -786,7 +802,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_stable = result.unwrap();
         println!("ADX 안정적 테스트 결과: {is_stable}");
@@ -803,7 +820,8 @@ mod tests {
             p: 0,
         };
 
-        let result = filter_adx("TEST", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_adx("TEST", &params, &candle_store);
         assert!(result.is_ok());
         let is_unstable = result.unwrap();
         println!("ADX 불안정 테스트 결과: {is_unstable}");

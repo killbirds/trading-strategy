@@ -1,17 +1,18 @@
 use super::{ATRFilterType, ATRParams, utils};
 use crate::analyzer::atr_analyzer::ATRAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// ATR 필터 함수
-pub fn filter_atr<C: Candle + 'static>(
+pub(crate) fn filter_atr<C: Candle + 'static>(
     symbol: &str,
     params: &ATRParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     ATRFilter::check_filter(
         symbol,
-        candles,
+        candle_store,
         params.period,
         params.threshold,
         params.filter_type,
@@ -25,9 +26,9 @@ pub struct ATRFilter;
 
 impl ATRFilter {
     /// ATR 필터 확인
-    pub fn check_filter<C: Candle + 'static>(
+    pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
-        candles: &[C],
+        candle_store: &CandleStore<C>,
         period: usize,
         threshold: f64,
         filter_type: ATRFilterType,
@@ -39,18 +40,11 @@ impl ATRFilter {
 
         // 경계 조건 체크
         let required_length = period.max(consecutive_n);
-        if !utils::check_sufficient_candles(candles.len(), required_length, _symbol) {
+        if !utils::check_sufficient_candles(candle_store.len(), required_length, _symbol) {
             return Ok(false);
         }
-
-        // ATR 분석기 생성
-        let candle_store = utils::create_candle_store(candles);
-        let mut analyzer = ATRAnalyzer::new(&[period], &candle_store);
-
-        // 캔들 데이터 처리
-        for candle in candles {
-            analyzer.next(candle.clone());
-        }
+        // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
+        let analyzer = ATRAnalyzer::new(&[period], candle_store);
 
         use crate::analyzer::base::AnalyzerOps;
 
@@ -141,7 +135,8 @@ mod tests {
             },
         ];
 
-        let result = ATRFilter::check_filter("TEST", &candles, 2, 5.0, 0.into(), 1, 0);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = ATRFilter::check_filter("TEST", &candle_store, 2, 5.0, 0.into(), 1, 0);
         assert!(result.is_ok());
     }
 }

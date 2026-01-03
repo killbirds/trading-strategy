@@ -1,14 +1,15 @@
 use super::{BollingerBandFilterType, BollingerBandParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::bband_analyzer::BBandAnalyzer;
+use crate::candle_store::CandleStore;
 use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 볼린저 밴드 필터 적용
-pub fn filter_bollinger_band<C: Candle + 'static>(
+pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
     coin: &str,
     params: &BollingerBandParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
         "볼린저 밴드 필터 적용 - 기간: {}, 편차 배수: {}, 타입: {:?}, 연속성: {}",
@@ -22,15 +23,12 @@ pub fn filter_bollinger_band<C: Candle + 'static>(
     utils::validate_period(params.period, "BollingerBand")?;
 
     // 경계 조건 체크
-    if !utils::check_sufficient_candles(candles.len(), params.period, coin) {
+    if !utils::check_sufficient_candles(candle_store.len(), params.period, coin) {
         return Ok(false);
     }
 
-    // 캔들 데이터로 CandleStore 생성
-    let candle_store = utils::create_candle_store(candles);
-
     // BBandAnalyzer 생성
-    let analyzer = BBandAnalyzer::new(params.period, params.dev_mult, &candle_store);
+    let analyzer = BBandAnalyzer::new(params.period, params.dev_mult, candle_store);
 
     // 기존 볼린저 밴드 계산 결과도 가져옴 (로깅용)
     let (lower, middle, upper) = analyzer.get_bband();
@@ -376,7 +374,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 가격이 상단 밴드 위에 있는지 확인
         let is_above = result.unwrap();
@@ -394,7 +393,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 가격이 하단 밴드 아래에 있는지 확인
         let is_below = result.unwrap();
@@ -412,7 +412,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 상단 밴드 돌파 확인
         let is_breakthrough = result.unwrap();
@@ -430,7 +431,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 하단 밴드 돌파 확인
         let is_breakthrough = result.unwrap();
@@ -448,7 +450,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 밴드 확장 확인
         let is_expanding = result.unwrap();
@@ -466,7 +469,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 중간 밴드 횡보 확인
         let is_sideways = result.unwrap();
@@ -484,7 +488,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 상단 밴드 터치 후 하락 확인
         let is_touch = result.unwrap();
@@ -502,7 +507,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 하단 밴드 터치 후 상승 확인
         let is_touch = result.unwrap();
@@ -520,7 +526,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 저변동성 확인
         let is_low_vol = result.unwrap();
@@ -538,7 +545,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         // 고변동성 확인
         let is_high_vol = result.unwrap();
@@ -556,7 +564,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
     }
@@ -572,7 +581,8 @@ mod tests {
             p: 0,
             ..Default::default()
         };
-        let result = filter_bollinger_band("TEST/USDT", &params, &candles);
+        let candle_store = utils::create_candle_store(&candles);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 유효하지 않은 필터 타입은 항상 false 반환
     }

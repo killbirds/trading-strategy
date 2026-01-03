@@ -2,7 +2,6 @@ mod common_test_utils;
 use common_test_utils::*;
 
 use trading_strategy::analyzer::atr_analyzer::ATRAnalyzer;
-use trading_strategy::analyzer::base::AnalyzerOps;
 use trading_strategy::candle_store::CandleStore;
 
 #[test]

@@ -7,7 +7,7 @@ use crate::analyzer::bband_analyzer::BBandAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use crate::strategy::copys_common::{
-    CopysStrategyCommon, CopysStrategyContext, create_strategy_context_for_filter,
+    CopysStrategyCommon, CopysStrategyContext, create_strategy_context_for_filter_with_store,
 };
 use crate::strategy::{Strategy, StrategyType};
 
@@ -25,12 +25,14 @@ struct CopysFilter<C: Candle> {
 }
 
 impl<C: Candle + 'static> CopysFilter<C> {
-    fn new(ctx: CopysStrategyContext<C>, params: CopysParams, candles: &[C]) -> Self {
-        // 캔들 데이터로 CandleStore 생성하여 볼린저밴드 분석기 초기화
-        let candles_vec = candles.to_vec();
-        let storage = CandleStore::<C>::new(candles_vec, candles.len() * 2, false);
+    fn new_with_store(
+        ctx: CopysStrategyContext<C>,
+        params: CopysParams,
+        candle_store: &CandleStore<C>,
+    ) -> Self {
+        // CandleStore 재사용하여 볼린저밴드 분석기 초기화
         let bband_analyzer =
-            BBandAnalyzer::new(params.bband_period, params.bband_multiplier, &storage);
+            BBandAnalyzer::new(params.bband_period, params.bband_multiplier, candle_store);
 
         Self {
             ctx,
@@ -111,17 +113,17 @@ impl<C: Candle + 'static> CopysStrategyCommon<C> for CopysFilter<C> {
     }
 }
 
-/// CopyS 전략 필터를 적용합니다.
-pub fn filter_copys<C: Candle + 'static>(
+/// CopyS 전략 필터를 적용합니다
+pub(crate) fn filter_copys<C: Candle + 'static>(
     symbol: &str,
     params: &CopysParams,
-    candles: &[C],
+    candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    if candles.len() < 60 {
+    if candle_store.len() < 60 {
         log::warn!(
             "코인 {} CopyS 필터에 필요한 캔들 데이터가 부족합니다. 필요: {} >= 60",
             symbol,
-            candles.len()
+            candle_store.len()
         );
         return Ok(false);
     }
@@ -134,13 +136,13 @@ pub fn filter_copys<C: Candle + 'static>(
         params.ma_periods.clone()
     };
 
-    // 전략 컨텍스트 생성
-    let ctx = match create_strategy_context_for_filter(
+    // 전략 컨텍스트 생성 (CandleStore 재사용)
+    let ctx = match create_strategy_context_for_filter_with_store(
         symbol,
         params.rsi_period,
         &ma_type,
         &ma_periods,
-        candles,
+        candle_store,
     ) {
         Ok(context) => context,
         Err(e) => {
@@ -149,13 +151,9 @@ pub fn filter_copys<C: Candle + 'static>(
         }
     };
 
-    // 모의 전략 객체 생성 (캔들 데이터로 초기화)
-    let mut filter = CopysFilter::new(ctx, params.clone(), candles);
-
-    // 캔들 데이터로 분석기 업데이트
-    for candle in candles {
-        filter.next(candle.clone());
-    }
+    // 모의 전략 객체 생성 (CandleStore 재사용)
+    // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
+    let filter = CopysFilter::new_with_store(ctx, params.clone(), candle_store);
 
     // 전략 신호 체크
     let result = match params.filter_type {
