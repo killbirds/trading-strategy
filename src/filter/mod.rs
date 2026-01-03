@@ -719,6 +719,8 @@ pub enum MovingAverageFilterType {
     DivergenceConvergence = 18,
     ParallelMovement = 19,
     NearCrossover = 20,
+    PriceBelowFirstMA = 21,
+    PriceBelowLastMA = 22,
 }
 
 impl From<i32> for MovingAverageFilterType {
@@ -745,6 +747,8 @@ impl From<i32> for MovingAverageFilterType {
             18 => MovingAverageFilterType::DivergenceConvergence,
             19 => MovingAverageFilterType::ParallelMovement,
             20 => MovingAverageFilterType::NearCrossover,
+            21 => MovingAverageFilterType::PriceBelowFirstMA,
+            22 => MovingAverageFilterType::PriceBelowLastMA,
             _ => MovingAverageFilterType::PriceAboveFirstMA,
         }
     }
@@ -809,6 +813,14 @@ impl FromStr for MovingAverageFilterType {
                 MovingAverageFilterType::ParallelMovement,
             ),
             ("NearCrossover", MovingAverageFilterType::NearCrossover),
+            (
+                "PriceBelowFirstMA",
+                MovingAverageFilterType::PriceBelowFirstMA,
+            ),
+            (
+                "PriceBelowLastMA",
+                MovingAverageFilterType::PriceBelowLastMA,
+            ),
         ];
 
         for (name, variant) in &variants {

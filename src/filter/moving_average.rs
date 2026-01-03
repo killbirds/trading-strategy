@@ -69,6 +69,24 @@ pub fn filter_moving_average<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
+        MovingAverageFilterType::PriceBelowFirstMA => analyzer.is_all(
+            |data| {
+                let price = data.candle.close_price();
+                let first_ma = data.mas.get_by_key_index(first_index).get();
+                price < first_ma
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        MovingAverageFilterType::PriceBelowLastMA => analyzer.is_all(
+            |data| {
+                let price = data.candle.close_price();
+                let last_ma = data.mas.get_by_key_index(last_index).get();
+                price < last_ma
+            },
+            params.consecutive_n,
+            params.p,
+        ),
         MovingAverageFilterType::RegularArrangement => {
             analyzer.is_ma_regular_arrangement(params.consecutive_n, params.p)
         }
