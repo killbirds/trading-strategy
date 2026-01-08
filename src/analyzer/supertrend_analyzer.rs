@@ -427,11 +427,11 @@ impl<C: Candle> AnalyzerOps<SuperTrendAnalyzerData<C>, C> for SuperTrendAnalyzer
         SuperTrendAnalyzerData::new(candle, supertrends)
     }
 
-    fn datum(&self) -> &Vec<SuperTrendAnalyzerData<C>> {
+    fn items(&self) -> &Vec<SuperTrendAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<SuperTrendAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<SuperTrendAnalyzerData<C>> {
         &mut self.items
     }
 }

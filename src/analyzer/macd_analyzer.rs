@@ -313,11 +313,11 @@ impl<C: Candle> AnalyzerOps<MACDAnalyzerData<C>, C> for MACDAnalyzer<C> {
         MACDAnalyzerData::new(candle, macd)
     }
 
-    fn datum(&self) -> &Vec<MACDAnalyzerData<C>> {
+    fn items(&self) -> &Vec<MACDAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<MACDAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<MACDAnalyzerData<C>> {
         &mut self.items
     }
 }

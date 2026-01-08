@@ -425,11 +425,11 @@ impl<C: Candle> AnalyzerOps<VWAPAnalyzerData<C>, C> for VWAPAnalyzer<C> {
         VWAPAnalyzerData::new(candle, vwaps)
     }
 
-    fn datum(&self) -> &Vec<VWAPAnalyzerData<C>> {
+    fn items(&self) -> &Vec<VWAPAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<VWAPAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<VWAPAnalyzerData<C>> {
         &mut self.items
     }
 }

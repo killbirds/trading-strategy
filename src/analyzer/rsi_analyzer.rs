@@ -177,11 +177,11 @@ impl<C: Candle> AnalyzerOps<RSIAnalyzerData<C>, C> for RSIAnalyzer<C> {
         RSIAnalyzerData::new(candle, mas, rsi)
     }
 
-    fn datum(&self) -> &Vec<RSIAnalyzerData<C>> {
+    fn items(&self) -> &Vec<RSIAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<RSIAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<RSIAnalyzerData<C>> {
         &mut self.items
     }
 }

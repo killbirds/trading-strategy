@@ -621,11 +621,11 @@ impl<C: Candle + 'static> AnalyzerOps<SupportResistanceAnalyzerData<C>, C>
         SupportResistanceAnalyzerData::new(candle, levels, nearest_support, nearest_resistance)
     }
 
-    fn datum(&self) -> &Vec<SupportResistanceAnalyzerData<C>> {
+    fn items(&self) -> &Vec<SupportResistanceAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<SupportResistanceAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<SupportResistanceAnalyzerData<C>> {
         &mut self.items
     }
 }

@@ -173,11 +173,11 @@ impl<C: Candle> AnalyzerOps<MAAnalyzerData<C>, C> for MAAnalyzer<C> {
         MAAnalyzerData::new(candle, mas)
     }
 
-    fn datum(&self) -> &Vec<MAAnalyzerData<C>> {
+    fn items(&self) -> &Vec<MAAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<MAAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<MAAnalyzerData<C>> {
         &mut self.items
     }
 }

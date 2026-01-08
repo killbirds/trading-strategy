@@ -864,11 +864,11 @@ impl<C: Candle + 'static + Clone> AnalyzerOps<SlopeAnalyzerData<C>, C> for Slope
         SlopeAnalyzerData::new(candle, value)
     }
 
-    fn datum(&self) -> &Vec<SlopeAnalyzerData<C>> {
+    fn items(&self) -> &Vec<SlopeAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<SlopeAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<SlopeAnalyzerData<C>> {
         &mut self.items
     }
 }

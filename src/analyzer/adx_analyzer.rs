@@ -285,11 +285,11 @@ impl<C: Candle> AnalyzerOps<ADXAnalyzerData<C>, C> for ADXAnalyzer<C> {
         ADXAnalyzerData::new(candle, adxs)
     }
 
-    fn datum(&self) -> &Vec<ADXAnalyzerData<C>> {
+    fn items(&self) -> &Vec<ADXAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<ADXAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<ADXAnalyzerData<C>> {
         &mut self.items
     }
 }

@@ -122,26 +122,24 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `candle` - 새로운 캔들 데이터
     fn next(&mut self, candle: C) {
         let next_data = self.next_data(candle);
-        let datum = self.datum_mut();
+        let items = self.items_mut();
 
-        if datum.len() < 200 {
-            datum.insert(0, next_data);
+        if items.len() < 200 {
+            items.insert(0, next_data);
         } else {
-            datum.rotate_right(1);
-            if let Some(first) = datum.first_mut() {
-                *first = next_data;
-            }
+            items.pop();
+            items.insert(0, next_data);
         }
     }
 
     /// 전략 데이터 컬렉션 참조 반환
-    fn datum(&self) -> &Vec<Data>;
+    fn items(&self) -> &Vec<Data>;
 
     /// 전략 데이터 컬렉션 가변 참조 반환
-    fn datum_mut(&mut self) -> &mut Vec<Data>;
+    fn items_mut(&mut self) -> &mut Vec<Data>;
 
     fn get(&self, index: usize) -> Option<&Data> {
-        self.datum().get(index)
+        self.items().get(index)
     }
 
     /// 초기 캔들 데이터로 컨텍스트 초기화
@@ -189,7 +187,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Returns
     /// * `f64` - 계산된 수익률 (인덱스가 범위를 벗어나면 0.0 반환)
     fn get_rate_of_return(&self, index: usize, get_value: impl Fn(&Data) -> f64) -> f64 {
-        self.datum()
+        self.items()
             .get(index)
             .map(|data| data.get_rate_of_return(&get_value))
             .unwrap_or(0.0)
@@ -208,7 +206,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         index: usize,
         get_value: impl Fn(&Data) -> f64,
     ) -> Option<f64> {
-        self.datum()
+        self.items()
             .get(index)
             .map(|data| data.get_rate_of_return(&get_value))
     }
@@ -224,7 +222,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// * `bool` - 모든 데이터가 조건을 만족하면 true
     ///
     fn is_all(&self, is_fn: impl Fn(&Data) -> bool, n: usize, p: usize) -> bool {
-        let data = self.datum();
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + p {
             return false;
@@ -251,7 +249,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         m: usize,
         p: usize,
     ) -> bool {
-        let data = self.datum();
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + m + p {
             return false;
@@ -337,7 +335,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         p: usize,
         threshold: f64,
     ) -> Option<usize> {
-        let data = self.datum();
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + p {
             return None;
@@ -363,7 +361,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         p: usize,
         threshold: f64,
     ) -> Option<usize> {
-        let data = self.datum();
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + p {
             return None;
@@ -381,8 +379,11 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     ///
     /// # Returns
     /// * `bool` - 모든 조건이 충족되면 true
-    fn detect_pattern(&self, conditions: Vec<impl Fn(&Data) -> bool>, n: usize, p: usize) -> bool {
-        let data = self.datum();
+    fn detect_pattern<F>(&self, conditions: Vec<F>, n: usize, p: usize) -> bool
+    where
+        F: Fn(&Data) -> bool,
+    {
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + p {
             return false;
@@ -395,6 +396,8 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
 
     /// 지정된 기간 동안 거래량이 급증했는지 확인
     ///
+    /// 평균 거래량 계산을 위해 최소 n + p + 1개의 데이터가 필요합니다.
+    ///
     /// # Arguments
     /// * `n` - 검사할 캔들 수
     /// * `p` - 과거 시점 확인을 위한 오프셋 (기본값: 0)
@@ -403,8 +406,8 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
     /// # Returns
     /// * `bool` - 거래량 급증이 감지되면 true
     fn is_volume_spike(&self, n: usize, p: usize, threshold: f64) -> bool {
-        let data = self.datum();
-        // 데이터 길이 검증
+        let data = self.items();
+        // 데이터 길이 검증 (평균 계산을 위해 추가 데이터 필요)
         if data.len() <= n + p {
             return false;
         }
@@ -441,7 +444,7 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
         p: usize,
         threshold: f64,
     ) -> bool {
-        let data = self.datum();
+        let data = self.items();
         // 데이터 길이 검증
         if data.len() < n + p {
             return false;
@@ -449,10 +452,6 @@ pub trait AnalyzerOps<Data: AnalyzerDataOps<C>, C: Candle> {
 
         // 최근 n개의 값들을 수집
         let values: Vec<f64> = data.iter().skip(p).take(n).map(get_value).collect();
-
-        if values.len() < n {
-            return false;
-        }
 
         // 최대값과 최소값의 차이를 계산
         let max_value = values.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));

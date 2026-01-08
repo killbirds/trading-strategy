@@ -829,11 +829,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<MarketStructureAnalyzerData<C>, C>
         )
     }
 
-    fn datum(&self) -> &Vec<MarketStructureAnalyzerData<C>> {
+    fn items(&self) -> &Vec<MarketStructureAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<MarketStructureAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<MarketStructureAnalyzerData<C>> {
         &mut self.items
     }
 }

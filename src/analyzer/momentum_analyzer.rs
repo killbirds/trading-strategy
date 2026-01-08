@@ -1048,11 +1048,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<MomentumAnalyzerData<C>, C> for Mo
         )
     }
 
-    fn datum(&self) -> &Vec<MomentumAnalyzerData<C>> {
+    fn items(&self) -> &Vec<MomentumAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<MomentumAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<MomentumAnalyzerData<C>> {
         &mut self.items
     }
 }

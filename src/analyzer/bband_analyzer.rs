@@ -621,11 +621,11 @@ impl<C: Candle> AnalyzerOps<BBandAnalyzerData<C>, C> for BBandAnalyzer<C> {
         BBandAnalyzerData::new(candle, bband)
     }
 
-    fn datum(&self) -> &Vec<BBandAnalyzerData<C>> {
+    fn items(&self) -> &Vec<BBandAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<BBandAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<BBandAnalyzerData<C>> {
         &mut self.items
     }
 }

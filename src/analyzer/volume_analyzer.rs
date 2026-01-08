@@ -410,11 +410,11 @@ impl<C: Candle> AnalyzerOps<VolumeAnalyzerData<C>, C> for VolumeAnalyzer<C> {
         VolumeAnalyzerData::new(candle, volumes)
     }
 
-    fn datum(&self) -> &Vec<VolumeAnalyzerData<C>> {
+    fn items(&self) -> &Vec<VolumeAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<VolumeAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<VolumeAnalyzerData<C>> {
         &mut self.items
     }
 }

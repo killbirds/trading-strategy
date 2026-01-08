@@ -844,11 +844,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<PriceActionAnalyzerData<C>, C>
         )
     }
 
-    fn datum(&self) -> &Vec<PriceActionAnalyzerData<C>> {
+    fn items(&self) -> &Vec<PriceActionAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<PriceActionAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<PriceActionAnalyzerData<C>> {
         &mut self.items
     }
 }

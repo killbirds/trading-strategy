@@ -375,11 +375,11 @@ impl<C: Candle + 'static> AnalyzerOps<ATRAnalyzerData<C>, C> for ATRAnalyzer<C> 
         ATRAnalyzerData::new(candle, atrs)
     }
 
-    fn datum(&self) -> &Vec<ATRAnalyzerData<C>> {
+    fn items(&self) -> &Vec<ATRAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<ATRAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<ATRAnalyzerData<C>> {
         &mut self.items
     }
 }

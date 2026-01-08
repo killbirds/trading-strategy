@@ -1017,11 +1017,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<SignalStrengthAnalyzerData<C>, C>
         )
     }
 
-    fn datum(&self) -> &Vec<SignalStrengthAnalyzerData<C>> {
+    fn items(&self) -> &Vec<SignalStrengthAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<SignalStrengthAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<SignalStrengthAnalyzerData<C>> {
         &mut self.items
     }
 }

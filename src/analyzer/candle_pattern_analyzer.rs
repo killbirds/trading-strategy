@@ -1007,11 +1007,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<CandlePatternAnalyzerData<C>, C>
         )
     }
 
-    fn datum(&self) -> &Vec<CandlePatternAnalyzerData<C>> {
+    fn items(&self) -> &Vec<CandlePatternAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<CandlePatternAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<CandlePatternAnalyzerData<C>> {
         &mut self.items
     }
 }

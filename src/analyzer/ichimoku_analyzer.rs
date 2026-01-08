@@ -439,11 +439,11 @@ impl<C: Candle> AnalyzerOps<IchimokuAnalyzerData<C>, C> for IchimokuAnalyzer<C> 
         IchimokuAnalyzerData::new(candle, ichimokus)
     }
 
-    fn datum(&self) -> &Vec<IchimokuAnalyzerData<C>> {
+    fn items(&self) -> &Vec<IchimokuAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<IchimokuAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<IchimokuAnalyzerData<C>> {
         &mut self.items
     }
 }

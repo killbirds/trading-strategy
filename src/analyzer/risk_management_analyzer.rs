@@ -808,11 +808,11 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<RiskManagementAnalyzerData<C>, C>
         )
     }
 
-    fn datum(&self) -> &Vec<RiskManagementAnalyzerData<C>> {
+    fn items(&self) -> &Vec<RiskManagementAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<RiskManagementAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<RiskManagementAnalyzerData<C>> {
         &mut self.items
     }
 }

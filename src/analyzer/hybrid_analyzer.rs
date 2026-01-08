@@ -1023,11 +1023,11 @@ impl<C: Candle + Clone> AnalyzerOps<HybridAnalyzerData<C>, C> for HybridAnalyzer
         data.clone_with_stored_values()
     }
 
-    fn datum(&self) -> &Vec<HybridAnalyzerData<C>> {
+    fn items(&self) -> &Vec<HybridAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<HybridAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<HybridAnalyzerData<C>> {
         &mut self.items
     }
 }

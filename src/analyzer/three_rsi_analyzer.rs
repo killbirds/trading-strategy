@@ -200,11 +200,11 @@ impl<C: Candle> AnalyzerOps<ThreeRSIAnalyzerData<C>, C> for ThreeRSIAnalyzer<C> 
         ThreeRSIAnalyzerData::new(candle, rsis, ma, adx)
     }
 
-    fn datum(&self) -> &Vec<ThreeRSIAnalyzerData<C>> {
+    fn items(&self) -> &Vec<ThreeRSIAnalyzerData<C>> {
         &self.items
     }
 
-    fn datum_mut(&mut self) -> &mut Vec<ThreeRSIAnalyzerData<C>> {
+    fn items_mut(&mut self) -> &mut Vec<ThreeRSIAnalyzerData<C>> {
         &mut self.items
     }
 }
