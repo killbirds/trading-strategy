@@ -29,6 +29,7 @@ pub mod price_action_analyzer;
 pub mod risk_management_analyzer;
 pub mod rsi_analyzer;
 pub mod signal_strength_analyzer;
+pub mod slope_analyzer;
 pub mod supertrend_analyzer;
 pub mod support_resistance_analyzer;
 pub mod three_rsi_analyzer;
@@ -71,6 +72,9 @@ pub use rsi_analyzer::{RSIAnalyzer, RSIAnalyzerData};
 pub use signal_strength_analyzer::{
     AnalyzerWeights, SignalAnalysis, SignalDirection, SignalQuality, SignalStrengthAnalyzer,
     SignalStrengthAnalyzerData, SignalStrengthLevel,
+};
+pub use slope_analyzer::{
+    IndicatorTypeConfig, SlopeAnalysis, SlopeAnalyzer, SlopeAnalyzerData, SlopeDirection,
 };
 pub use supertrend_analyzer::{SuperTrendAnalyzer, SuperTrendAnalyzerData};
 pub use support_resistance_analyzer::{

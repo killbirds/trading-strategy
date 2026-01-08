@@ -62,6 +62,7 @@ mod macd;
 mod momentum;
 mod moving_average;
 mod rsi;
+mod slope;
 mod supertrend;
 mod support_resistance;
 mod three_rsi;
@@ -142,6 +143,8 @@ pub enum TechnicalFilterType {
     SupportResistance,
     /// Momentum 기반 필터 (모멘텀)
     Momentum,
+    /// Slope 기반 필터 (기울기)
+    Slope,
 }
 
 impl fmt::Display for TechnicalFilterType {
@@ -162,6 +165,7 @@ impl fmt::Display for TechnicalFilterType {
             TechnicalFilterType::CandlePattern => write!(f, "CandlePattern"),
             TechnicalFilterType::SupportResistance => write!(f, "SupportResistance"),
             TechnicalFilterType::Momentum => write!(f, "Momentum"),
+            TechnicalFilterType::Slope => write!(f, "Slope"),
         }
     }
 }
@@ -186,6 +190,7 @@ impl FromStr for TechnicalFilterType {
             "CANDLEPATTERN" => Ok(TechnicalFilterType::CandlePattern),
             "SUPPORTRESISTANCE" => Ok(TechnicalFilterType::SupportResistance),
             "MOMENTUM" => Ok(TechnicalFilterType::Momentum),
+            "SLOPE" => Ok(TechnicalFilterType::Slope),
             _ => Err(anyhow::anyhow!("알 수 없는 필터 타입: {}", s)),
         }
     }
@@ -2648,6 +2653,109 @@ impl Default for MomentumParams {
     }
 }
 
+/// Slope 필터 타입
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(into = "i32")]
+pub enum SlopeFilterType {
+    Upward = 0,
+    Downward = 1,
+    Sideways = 2,
+    StrengthAboveThreshold = 3,
+    Accelerating = 4,
+    Decelerating = 5,
+    StrongUpward = 6,
+    StrongDownward = 7,
+    HighRSquared = 8,
+}
+
+impl From<i32> for SlopeFilterType {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => SlopeFilterType::Upward,
+            1 => SlopeFilterType::Downward,
+            2 => SlopeFilterType::Sideways,
+            3 => SlopeFilterType::StrengthAboveThreshold,
+            4 => SlopeFilterType::Accelerating,
+            5 => SlopeFilterType::Decelerating,
+            6 => SlopeFilterType::StrongUpward,
+            7 => SlopeFilterType::StrongDownward,
+            8 => SlopeFilterType::HighRSquared,
+            _ => SlopeFilterType::Upward,
+        }
+    }
+}
+
+impl From<SlopeFilterType> for i32 {
+    fn from(value: SlopeFilterType) -> Self {
+        value as i32
+    }
+}
+
+impl FromStr for SlopeFilterType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Upward" => Ok(SlopeFilterType::Upward),
+            "Downward" => Ok(SlopeFilterType::Downward),
+            "Sideways" => Ok(SlopeFilterType::Sideways),
+            "StrengthAboveThreshold" => Ok(SlopeFilterType::StrengthAboveThreshold),
+            "Accelerating" => Ok(SlopeFilterType::Accelerating),
+            "Decelerating" => Ok(SlopeFilterType::Decelerating),
+            "StrongUpward" => Ok(SlopeFilterType::StrongUpward),
+            "StrongDownward" => Ok(SlopeFilterType::StrongDownward),
+            "HighRSquared" => Ok(SlopeFilterType::HighRSquared),
+            _ => Err(anyhow::anyhow!("알 수 없는 Slope 필터 타입: {}", s)),
+        }
+    }
+}
+
+impl_filter_type_deserialize!(SlopeFilterType, SlopeFilterTypeVisitor, "Slope");
+
+/// Slope 필터 파라미터
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlopeParams {
+    /// 분석할 지표 타입 설정
+    pub indicator_type: crate::analyzer::IndicatorTypeConfig,
+    /// 분석 기간 (기본값: 20)
+    pub period: usize,
+    /// 필터 유형
+    pub filter_type: SlopeFilterType,
+    /// 연속 캔들 수 (기본값: 1)
+    pub consecutive_n: usize,
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    #[serde(default)]
+    pub p: usize,
+    /// 선형 회귀 사용 여부 (기본값: false)
+    #[serde(default)]
+    pub use_linear_regression: Option<bool>,
+    /// 기울기 강도 임계값 (기본값: 0.01)
+    #[serde(default)]
+    pub strength_threshold: Option<f64>,
+    /// R² 임계값 (기본값: 0.7)
+    #[serde(default)]
+    pub r_squared_threshold: Option<f64>,
+    /// 단기 기간 (가속도/감속도 분석용, 기본값: period / 2)
+    #[serde(default)]
+    pub short_period: Option<usize>,
+}
+
+impl Default for SlopeParams {
+    fn default() -> Self {
+        Self {
+            indicator_type: crate::analyzer::IndicatorTypeConfig::ClosePrice,
+            period: 20,
+            filter_type: SlopeFilterType::Upward,
+            consecutive_n: 1,
+            p: 0,
+            use_linear_regression: None,
+            strength_threshold: None,
+            r_squared_threshold: None,
+            short_period: None,
+        }
+    }
+}
+
 /// 기술적 필터 설정
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -2693,6 +2801,9 @@ pub enum TechnicalFilterConfig {
     /// Momentum 필터 설정
     #[serde(rename = "MOMENTUM")]
     Momentum(MomentumParams),
+    /// Slope 필터 설정
+    #[serde(rename = "SLOPE")]
+    Slope(SlopeParams),
 }
 
 impl TechnicalFilterConfig {
@@ -2714,6 +2825,7 @@ impl TechnicalFilterConfig {
             Self::CandlePattern(_) => TechnicalFilterType::CandlePattern,
             Self::SupportResistance(_) => TechnicalFilterType::SupportResistance,
             Self::Momentum(_) => TechnicalFilterType::Momentum,
+            Self::Slope(_) => TechnicalFilterType::Slope,
         }
     }
 }
@@ -2828,6 +2940,9 @@ impl TechnicalFilter {
             }
             TechnicalFilterConfig::Momentum(params) => {
                 momentum::filter_momentum(symbol, params, candle_store)
+            }
+            TechnicalFilterConfig::Slope(params) => {
+                slope::filter_slope(symbol, params, candle_store)
             }
         }
     }

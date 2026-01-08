@@ -6,9 +6,9 @@
 
 ## 빠른 참조
 
-- **총 필터 종류**: 15개 (RSI, MACD, BollingerBand, ADX, MovingAverage, Ichimoku, VWAP, Copys, ATR, SuperTrend, Volume, ThreeRSI, CandlePattern, SupportResistance, Momentum)
-- **총 필터 타입 수**: 약 300개 이상
-- **최소 필요 캔들 수**: 필터별 상이 (RSI: period+consecutive_n, MACD: slow_period+signal_period+consecutive_n 등)
+- **총 필터 종류**: 16개 (RSI, MACD, BollingerBand, ADX, MovingAverage, Ichimoku, VWAP, Copys, ATR, SuperTrend, Volume, ThreeRSI, CandlePattern, SupportResistance, Momentum, Slope)
+- **총 필터 타입 수**: 약 310개 이상
+- **최소 필요 캔들 수**: 필터별 상이 (RSI: period+consecutive_n, MACD: slow_period+signal_period+consecutive_n, Slope: period+consecutive_n 등)
 
 ## 목차
 
@@ -29,6 +29,7 @@
    - [CandlePattern 필터](#candlepattern-필터)
    - [SupportResistance 필터](#supportresistance-필터)
    - [Momentum 필터](#momentum-필터)
+   - [Slope 필터](#slope-필터)
 3. [확실한 상승 신호 필터](#확실한-상승-신호-필터-매수-기회)
 4. [확실한 하락 신호 필터](#확실한-하락-신호-필터-매도-기회)
 5. [중립/대기 신호 필터](#중립대기-신호-필터)
@@ -53,7 +54,7 @@
 [[filters]]
 type = "필터_타입"
 # 필터별 고유 파라미터들...
-filter_type = 0        # 필터 동작 방식 (0부터 시작하는 정수)
+filter_type = "FilterTypeName"  # 필터 동작 방식 (enum 이름 또는 0부터 시작하는 정수)
 consecutive_n = 1      # 조건을 만족해야 하는 연속 캔들 수
 p = 0                  # 과거 시점 확인을 위한 오프셋 (기본값: 0, 현재 캔들 기준)
 ```
@@ -93,7 +94,7 @@ p = 0                  # 과거 시점 확인을 위한 오프셋 (기본값: 0,
 period = 14                    # RSI 계산 기간 (기본값: 14)
 oversold = 30.0                # 과매도 기준점 (기본값: 30.0)
 overbought = 70.0              # 과매수 기준점 (기본값: 70.0)
-filter_type = 0                # 필터 타입 (0-30)
+filter_type = "Overbought"    # 필터 타입 (enum 이름 또는 0-30)
 consecutive_n = 1               # 연속 캔들 수 (기본값: 1)
 p = 0                           # 오프셋 (기본값: 0)
 sideways_threshold = 0.02       # 횡보 판단 임계값 (기본값: 0.02 = 2%)
@@ -166,7 +167,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 1  # 과매도 상태
+filter_type = "Oversold"  # 과매도 상태
 consecutive_n = 2  # 2개 연속 과매도 확인
 ```
 
@@ -177,7 +178,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 5  # 50 상향 돌파
+filter_type = "CrossAbove50"  # 50 상향 돌파
 consecutive_n = 1
 ```
 
@@ -188,7 +189,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 14  # 강한 상승 모멘텀
+filter_type = "StrongRisingMomentum"  # 강한 상승 모멘텀
 consecutive_n = 2
 momentum_threshold = 3.0  # RSI가 3.0 이상 상승
 ```
@@ -206,7 +207,7 @@ momentum_threshold = 3.0  # RSI가 3.0 이상 상승
 fast_period = 12                # 빠른 이동평균 기간 (기본값: 12)
 slow_period = 26                 # 느린 이동평균 기간 (기본값: 26)
 signal_period = 9                # 시그널 라인 기간 (기본값: 9)
-filter_type = 0                  # 필터 타입 (0-20)
+filter_type = "MacdAboveSignal" # 필터 타입 (enum 이름 또는 0-20)
 consecutive_n = 1                # 연속 캔들 수 (기본값: 1)
 threshold = 0.0                  # 히스토그램 임계값 (기본값: 0.0)
 p = 0                            # 오프셋 (기본값: 0)
@@ -279,7 +280,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 2  # 시그널 상향돌파
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
 consecutive_n = 1
 threshold = 0.0
 ```
@@ -291,7 +292,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 4  # 히스토그램 > 임계값
+filter_type = "HistogramAboveThreshold"  # 히스토그램 > 임계값
 consecutive_n = 2
 threshold = 0.001  # 히스토그램이 0.001 이상
 ```
@@ -303,7 +304,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 6  # 제로라인 상향돌파
+filter_type = "ZeroLineCrossAbove"  # 제로라인 상향돌파
 consecutive_n = 1
 ```
 
@@ -314,7 +315,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 17  # MACD 컨버전스
+filter_type = "Convergence"  # MACD 컨버전스
 consecutive_n = 1
 ```
 
@@ -330,7 +331,7 @@ consecutive_n = 1
 ```toml
 period = 20                       # 볼린저 밴드 기간 (기본값: 20)
 dev_mult = 2.0                    # 표준편차 배수 (기본값: 2.0)
-filter_type = 0                   # 필터 타입 (0-30)
+filter_type = "AboveUpperBand"    # 필터 타입 (enum 이름 또는 0-30)
 consecutive_n = 1                 # 연속 캔들 수 (기본값: 1)
 p = 0                             # 오프셋 (기본값: 0)
 squeeze_threshold = 0.02          # 스퀴즈/횡보 임계값 (기본값: 0.02 = 2%)
@@ -404,7 +405,7 @@ lower_touch_threshold = 1.01      # 하단 밴드 터치 임계값 (기본값: 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 7  # 하단밴드 상향돌파
+filter_type = "BreakThroughLowerBand"  # 하단밴드 상향돌파
 consecutive_n = 1
 ```
 
@@ -414,7 +415,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 8  # 스퀴즈 돌파
+filter_type = "SqueezeBreakout"  # 스퀴즈 돌파
 consecutive_n = 1
 squeeze_breakout_period = 5
 ```
@@ -426,7 +427,7 @@ squeeze_breakout_period = 5
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 10  # 스퀴즈 상태
+filter_type = "SqueezeState"  # 스퀴즈 상태
 consecutive_n = 3
 squeeze_threshold = 0.02
 
@@ -435,7 +436,7 @@ squeeze_threshold = 0.02
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 8  # 스퀴즈 돌파
+filter_type = "SqueezeBreakout"  # 스퀴즈 돌파
 consecutive_n = 1
 ```
 
@@ -445,7 +446,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 9  # 향상된 스퀴즈 돌파
+filter_type = "EnhancedSqueezeBreakout"  # 향상된 스퀴즈 돌파
 consecutive_n = 1
 enhanced_narrowing_period = 3
 enhanced_squeeze_period = 2
@@ -484,7 +485,7 @@ threshold = 25.0      # ADX 임계값
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 4  # 강한 상승 추세
+filter_type = "StrongUptrend"  # 강한 상승 추세
 consecutive_n = 2
 ```
 
@@ -519,7 +520,7 @@ periods = [5, 20]     # 이동평균 기간 목록
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20, 60]
-filter_type = 2  # 정규 배열
+filter_type = "RegularArrangement"  # 정규 배열
 consecutive_n = 3
 ```
 
@@ -560,7 +561,7 @@ type = "ICHIMOKU"
 tenkan_period = 9
 kijun_period = 26
 senkou_span_b_period = 52
-filter_type = 7  # 매수 신호
+filter_type = "BuySignal"  # 매수 신호
 consecutive_n = 1
 ```
 
@@ -597,7 +598,7 @@ threshold = 0.05      # 임계값 (5%)
 [[filters]]
 type = "VWAP"
 period = 20
-filter_type = 3  # VWAP 상향돌파
+filter_type = "VWAPBreakoutUp"  # VWAP 상향돌파
 consecutive_n = 1
 threshold = 0.03
 ```
@@ -642,7 +643,7 @@ type = "COPYS"
 rsi_period = 14
 rsi_upper = 70.0
 rsi_lower = 30.0
-filter_type = 8  # 강한 매수 신호
+filter_type = "StrongBuySignal"  # 강한 매수 신호
 consecutive_n = 2
 ```
 
@@ -675,7 +676,7 @@ threshold = 0.01      # ATR 임계값
 type = "ATR"
 period = 14
 threshold = 0.015
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
 consecutive_n = 1
 ```
 
@@ -710,7 +711,7 @@ multiplier = 3.0      # SuperTrend 승수
 type = "SUPERTREND"
 period = 10
 multiplier = 3.0
-filter_type = 4  # 상향 돌파
+filter_type = "PriceCrossingAbove"  # 상향 돌파
 consecutive_n = 1
 ```
 
@@ -745,7 +746,7 @@ threshold = 1.5       # Volume 임계값
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 5  # 상승과 함께 볼륨 증가
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -782,7 +783,7 @@ rsi_periods = [7, 14, 21]
 ma_type = "EMA"
 ma_period = 20
 adx_period = 14
-filter_type = 3  # RSI 정상 배열
+filter_type = "RSIRegularArrangement"  # RSI 정상 배열
 consecutive_n = 2
 ```
 
@@ -823,7 +824,7 @@ min_body_ratio = 0.4
 min_shadow_ratio = 0.2
 pattern_history_length = 7
 threshold = 0.6
-filter_type = 5  # 높은 신뢰도 패턴
+filter_type = "HighReliabilityPattern"  # 높은 신뢰도 패턴
 consecutive_n = 1
 ```
 
@@ -863,7 +864,7 @@ lookback_period = 30
 touch_threshold = 0.008
 min_touch_count = 3
 threshold = 0.03
-filter_type = 1  # 저항선 상향 돌파
+filter_type = "ResistanceBreakout"  # 저항선 상향 돌파
 consecutive_n = 1
 ```
 
@@ -913,8 +914,153 @@ cci_period = 20
 momentum_period = 10
 history_length = 50
 threshold = 0.6
-filter_type = 2  # 가속하는 모멘텀
+filter_type = "AcceleratingMomentum"  # 가속하는 모멘텀
 consecutive_n = 2
+```
+
+---
+
+### Slope 필터
+
+**목적**: 기술적 지표의 기울기를 통한 추세 방향 및 강도 분석
+
+**최소 필요 캔들 수**: `period + consecutive_n` (예: period=20, consecutive_n=1이면 최소 21개 캔들 필요)
+
+#### 파라미터
+```toml
+indicator_type = "close_price"  # 분석할 지표 타입
+period = 20                      # 분석 기간 (기본값: 20)
+filter_type = "Upward"           # 필터 타입 (enum 이름: "Upward", "Downward", "Sideways", "StrengthAboveThreshold", "Accelerating", "Decelerating", "StrongUpward", "StrongDownward", "HighRSquared")
+consecutive_n = 1                # 연속 캔들 수 (기본값: 1)
+p = 0                            # 오프셋 (기본값: 0)
+use_linear_regression = false    # 선형 회귀 사용 여부 (기본값: false)
+strength_threshold = 0.02        # 기울기 강도 임계값 (기본값: 필터 타입에 따라 다름)
+                                  # - "Upward", "Downward", "StrongUpward", "StrongDownward": 0.02
+                                  # - "StrengthAboveThreshold": 0.01
+r_squared_threshold = 0.7        # R² 임계값 (기본값: 0.7)
+short_period = 10                # 단기 기간 (가속도/감속도 분석용, 기본값: period / 2)
+```
+
+#### 지표 타입 (indicator_type)
+
+지표 타입은 `IndicatorTypeConfig` enum을 사용합니다:
+
+| 지표 타입 | 설명 | 예시 |
+|----------|------|------|
+| `ClosePrice` | 종가 기울기 | `indicator_type = "ClosePrice"` |
+| `HighPrice` | 고가 기울기 | `indicator_type = "HighPrice"` |
+| `LowPrice` | 저가 기울기 | `indicator_type = "LowPrice"` |
+| `MovingAverage` | 이동평균 기울기 | `indicator_type = { ma_type = "EMA", period = 20 }` |
+| `RSI` | RSI 기울기 | `indicator_type = { period = 14 }` |
+| `MACD` | MACD 라인 기울기 | `indicator_type = { fast_period = 12, slow_period = 26, signal_period = 9 }` |
+| `MACDLine` | MACD 라인 기울기 | 동일 |
+| `MACDSignalLine` | MACD 시그널 라인 기울기 | 동일 |
+| `MACDHistogram` | MACD 히스토그램 기울기 | 동일 |
+
+#### 필터 타입 (총 9개)
+
+**기본 방향 신호**
+| 값 | enum 이름 | 설명 | 계산 방식 | 사용 시기 |
+|----|----------|------|----------|----------|
+| 0 | `"Upward"` | 상승 기울기 | 기울기 > 0 && 강도 ≥ strength_threshold (기본값: 0.02) | 상승 추세 확인 |
+| 1 | `"Downward"` | 하락 기울기 | 기울기 < 0 && 강도 ≥ strength_threshold (기본값: 0.02) | 하락 추세 확인 |
+| 2 | `"Sideways"` | 횡보 | 기울기 ≈ 0 | 중립 상태 |
+
+**강도 신호**
+| 값 | enum 이름 | 설명 | 계산 방식 | 사용 시기 |
+|----|----------|------|----------|----------|
+| 3 | `"StrengthAboveThreshold"` | 강도가 임계값 초과 | \|기울기\| ≥ strength_threshold (기본값: 0.01) | 강한 추세 |
+| 6 | `"StrongUpward"` | 강한 상승 기울기 | 기울기 > 0 && 강도 ≥ strength_threshold (기본값: 0.02) | 강한 상승 |
+| 7 | `"StrongDownward"` | 강한 하락 기울기 | 기울기 < 0 && 강도 ≥ strength_threshold (기본값: 0.02) | 강한 하락 |
+
+**가속도/감속도 신호**
+| 값 | enum 이름 | 설명 | 계산 방식 | 사용 시기 |
+|----|----------|------|----------|----------|
+| 4 | `"Accelerating"` | 가속도 (단기 > 장기) | 단기 기울기 강도 > 장기 기울기 강도 | 추세 강화 |
+| 5 | `"Decelerating"` | 감속도 (단기 < 장기) | 단기 기울기 강도 < 장기 기울기 강도 | 추세 약화 |
+
+**신뢰도 신호**
+| 값 | enum 이름 | 설명 | 계산 방식 | 사용 시기 |
+|----|----------|------|----------|----------|
+| 8 | `"HighRSquared"` | 높은 R² 값 | R² ≥ r_squared_threshold | 선형 추세 신뢰도 높음 |
+
+#### 설정 예시
+
+**종가 상승 기울기 확인**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+use_linear_regression = false
+```
+
+**이동평균 상승 기울기 (선형 회귀 사용)**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = { MovingAverage = { ma_type = "EMA", period = 20 } }
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+use_linear_regression = true  # 선형 회귀 사용
+```
+
+**RSI 강한 상승 기울기**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = { RSI = { period = 14 } }
+period = 20
+filter_type = "StrongUpward"  # 강한 상승 기울기
+consecutive_n = 2
+strength_threshold = 0.02  # 기울기 강도 0.02 이상
+```
+
+**MACD 라인 가속도 확인**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = { MACDLine = { fast_period = 12, slow_period = 26, signal_period = 9 } }
+period = 20
+filter_type = "Accelerating"  # 가속도
+consecutive_n = 1
+short_period = 10  # 단기 기간
+use_linear_regression = true
+```
+
+**고가 상승 기울기 (돌파 확인)**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = "HighPrice"
+period = 10
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+```
+
+**저가 하락 기울기 (하락 확인)**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = "LowPrice"
+period = 10
+filter_type = "Downward"  # 하락 기울기
+consecutive_n = 2
+```
+
+**높은 신뢰도 상승 추세**
+```toml
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "HighRSquared"  # 높은 R² 값
+consecutive_n = 1
+use_linear_regression = true
+r_squared_threshold = 0.8  # R² 0.8 이상
 ```
 
 ---
@@ -928,7 +1074,7 @@ consecutive_n = 2
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 4  # 강한 상승 추세
+filter_type = "StrongUptrend"  # 강한 상승 추세
 consecutive_n = 2
 
 # RSI 정상 범위 유지
@@ -937,14 +1083,14 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 2  # 정상 범위
+filter_type = "NormalRange"  # 정상 범위
 consecutive_n = 1
 
 # 이동평균 정규 배열
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20, 60]
-filter_type = 2  # 정규 배열
+filter_type = "RegularArrangement"  # 정규 배열
 consecutive_n = 3
 
 # 거래량 동반 상승
@@ -952,7 +1098,7 @@ consecutive_n = 3
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 5  # 상승과 함께 볼륨 증가
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -964,7 +1110,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 1  # 과매도
+filter_type = "Oversold"  # 과매도
 consecutive_n = 2
 
 # 볼린저 밴드 하단 터치
@@ -972,7 +1118,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 1  # 하단밴드 아래
+filter_type = "BelowLowerBand"  # 하단밴드 아래
 consecutive_n = 1
 
 # 지지선 반등
@@ -982,7 +1128,7 @@ lookback_period = 30
 touch_threshold = 0.01
 min_touch_count = 2
 threshold = 0.03
-filter_type = 2  # 지지선 반등
+filter_type = "SupportBounce"  # 지지선 반등
 consecutive_n = 1
 ```
 
@@ -993,7 +1139,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 10  # 스퀴즈 상태
+filter_type = "SqueezeState"  # 스퀴즈 상태
 consecutive_n = 3
 
 # 변동성 확장
@@ -1001,7 +1147,7 @@ consecutive_n = 3
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
 consecutive_n = 1
 
 # 거래량 급등
@@ -1009,7 +1155,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 2  # 볼륨 급등
+filter_type = "VolumeSurge"  # 볼륨 급등
 consecutive_n = 1
 ```
 
@@ -1402,6 +1548,19 @@ consecutive_n = 1
 | 19 | 모멘텀 지지 테스트 | 지지 확인 |
 | 20 | 모멘텀 저항 테스트 | 저항 확인 |
 
+### Slope 필터 (9개 타입)
+| 값 | enum 이름 | 설명 | 사용 시기 |
+|----|----------|------|----------|
+| 0 | `"Upward"` | 상승 기울기 | 상승 추세 확인 |
+| 1 | `"Downward"` | 하락 기울기 | 하락 추세 확인 |
+| 2 | `"Sideways"` | 횡보 | 중립 상태 |
+| 3 | `"StrengthAboveThreshold"` | 강도가 임계값 초과 | 강한 추세 |
+| 4 | `"Accelerating"` | 가속도 (단기 > 장기) | 추세 강화 |
+| 5 | `"Decelerating"` | 감속도 (단기 < 장기) | 추세 약화 |
+| 6 | `"StrongUpward"` | 강한 상승 기울기 | 강한 상승 |
+| 7 | `"StrongDownward"` | 강한 하락 기울기 | 강한 하락 |
+| 8 | `"HighRSquared"` | 높은 R² 값 | 선형 추세 신뢰도 높음 |
+
 ---
 
 ## 📈 확실한 상승 신호 필터 (매수 기회)
@@ -1429,6 +1588,9 @@ consecutive_n = 1
 | **SuperTrend** | 4 | 상향 돌파 | 5 |
 | **CopyS** | 8 | 강한 매수 신호 | 5 |
 | **SupportResistance** | 2 | 지지선 반등 | 5 |
+| **Slope** | 0 (`"Upward"`) | 상승 기울기 | 4 |
+| **Slope** | 6 (`"StrongUpward"`) | 강한 상승 기울기 | 5 |
+| **Slope** | 4 (`"Accelerating"`) | 가속도 (단기 > 장기) | 4 |
 
 ### 📈 상승 추세 신호
 | 필터 | 타입 | 설명 | 신호 강도 |
@@ -1466,6 +1628,9 @@ consecutive_n = 1
 | **Momentum** | 0 | 강한 양의 모멘텀 | 4 |
 | **Momentum** | 2 | 가속하는 모멘텀 | 4 |
 | **Momentum** | 7 | 불리시 다이버전스 | 4 |
+| **Slope** | 0 (`"Upward"`) | 상승 기울기 | 4 |
+| **Slope** | 3 (`"StrengthAboveThreshold"`) | 강도가 임계값 초과 | 4 |
+| **Slope** | 8 (`"HighRSquared"`) | 높은 R² 값 (신뢰도 높음) | 4 |
 
 ---
 
@@ -1526,6 +1691,9 @@ consecutive_n = 1
 | **Momentum** | 1 | 강한 음의 모멘텀 | 4 |
 | **Momentum** | 3 | 감속하는 모멘텀 | 4 |
 | **Momentum** | 8 | 베어리시 다이버전스 | 4 |
+| **Slope** | 1 (`"Downward"`) | 하락 기울기 | 4 |
+| **Slope** | 7 (`"StrongDownward"`) | 강한 하락 기울기 | 5 |
+| **Slope** | 5 (`"Decelerating"`) | 감속도 (단기 < 장기) | 4 |
 
 ---
 
@@ -1556,6 +1724,7 @@ consecutive_n = 1
 | **ThreeRSI** | 6 | ADX가 20 이상 | 강한 추세 |
 | **Momentum** | 4 | 과매수 상태 | 반락 준비 |
 | **Momentum** | 5 | 과매도 상태 | 반등 준비 |
+| **Slope** | 2 | 횡보 | 중립 상태 |
 
 ---
 
@@ -1790,7 +1959,7 @@ consecutive_n = 1
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 4  # ADX > 임계값 & +DI > -DI (강한 상승)
+filter_type = "StrongUptrend"  # ADX > 임계값 & +DI > -DI (강한 상승)
 consecutive_n = 2
 
 # RSI 상승 모멘텀 확인
@@ -1799,14 +1968,14 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 14  # 강한 상승 모멘텀
+filter_type = "StrongRisingMomentum"  # 강한 상승 모멘텀
 consecutive_n = 2
 
 # 이동평균 정규 배열
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20, 60]
-filter_type = 2  # 정규 배열
+filter_type = "RegularArrangement"  # 정규 배열
 consecutive_n = 3
 
 # 볼륨 동반 상승
@@ -1814,7 +1983,7 @@ consecutive_n = 3
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 5  # 상승과 함께 볼륨 증가
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 
 # 이치모쿠 완벽 정렬
@@ -1823,7 +1992,7 @@ type = "ICHIMOKU"
 tenkan_period = 9
 kijun_period = 26
 senkou_span_b_period = 52
-filter_type = 10  # 완벽 정렬
+filter_type = "PerfectAlignment"  # 완벽 정렬
 consecutive_n = 1
 ```
 
@@ -1835,7 +2004,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 5  # 50 상향 돌파
+filter_type = "CrossAbove50"  # 50 상향 돌파
 consecutive_n = 1
 
 # MACD 상향돌파
@@ -1844,7 +2013,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 2  # 시그널 상향돌파
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
 consecutive_n = 1
 
 # 볼린저 밴드 중간밴드 위
@@ -1852,14 +2021,14 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 4  # 중간밴드 위
+filter_type = "AboveMiddleBand"  # 중간밴드 위
 consecutive_n = 2
 
 # VWAP 상향돌파
 [[filters]]
 type = "VWAP"
 period = 20
-filter_type = 3  # VWAP 상향돌파
+filter_type = "VWAPBreakoutUp"  # VWAP 상향돌파
 consecutive_n = 1
 ```
 
@@ -1872,7 +2041,7 @@ consecutive_n = 1
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 5  # ADX > 임계값 & -DI > +DI (강한 하락)
+filter_type = "StrongDowntrend"  # ADX > 임계값 & -DI > +DI (강한 하락)
 consecutive_n = 2
 
 # RSI 하락 모멘텀 확인
@@ -1881,14 +2050,14 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 15  # 강한 하락 모멘텀
+filter_type = "StrongFallingMomentum"  # 강한 하락 모멘텀
 consecutive_n = 2
 
 # 이동평균 역배열
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20, 60]
-filter_type = 4  # 첫번째 MA < 마지막 MA
+filter_type = "FirstMABelowLastMA"  # 첫번째 MA < 마지막 MA
 consecutive_n = 3
 
 # 볼륨 동반 하락
@@ -1896,7 +2065,7 @@ consecutive_n = 3
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 6  # 하락과 함께 볼륨 증가
+filter_type = "BearishWithIncreasedVolume"  # 하락과 함께 볼륨 증가
 consecutive_n = 1
 
 # 이치모쿠 완벽 역배열
@@ -1905,7 +2074,7 @@ type = "ICHIMOKU"
 tenkan_period = 9
 kijun_period = 26
 senkou_span_b_period = 52
-filter_type = 11  # 완벽 역배열
+filter_type = "PerfectReverseAlignment"  # 완벽 역배열
 consecutive_n = 1
 ```
 
@@ -1917,7 +2086,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 6  # 50 하향 돌파
+filter_type = "CrossBelow50"  # 50 하향 돌파
 consecutive_n = 1
 
 # MACD 하향돌파
@@ -1926,7 +2095,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 3  # 시그널 하향돌파
+filter_type = "SignalCrossBelow"  # 시그널 하향돌파
 consecutive_n = 1
 
 # 볼린저 밴드 중간밴드 아래
@@ -1934,14 +2103,14 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 5  # 중간밴드 아래
+filter_type = "BelowMiddleBand"  # 중간밴드 아래
 consecutive_n = 2
 
 # VWAP 하향돌파
 [[filters]]
 type = "VWAP"
 period = 20
-filter_type = 4  # VWAP 하향돌파
+filter_type = "VWAPBreakdown"  # VWAP 하향돌파
 consecutive_n = 1
 ```
 
@@ -1954,7 +2123,7 @@ consecutive_n = 1
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 0  # ADX < 임계값 (약한 추세)
+filter_type = "BelowThreshold"  # ADX < 임계값 (약한 추세)
 consecutive_n = 3
 
 # RSI 중립 범위
@@ -1963,7 +2132,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 2  # 정상 범위
+filter_type = "NormalRange"  # 정상 범위
 consecutive_n = 2
 
 # 볼린저 밴드 내부
@@ -1971,14 +2140,14 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 2  # 밴드 내부
+filter_type = "InsideBand"  # 밴드 내부
 consecutive_n = 3
 
 # VWAP 균형 상태
 [[filters]]
 type = "VWAP"
 period = 20
-filter_type = 2  # 가격 ≈ VWAP
+filter_type = "PriceNearVWAP"  # 가격 ≈ VWAP
 consecutive_n = 2
 
 # 저변동성 확인
@@ -1986,7 +2155,7 @@ consecutive_n = 2
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 4  # 낮은 변동성
+filter_type = "LowVolatility"  # 낮은 변동성
 consecutive_n = 2
 ```
 
@@ -1997,7 +2166,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 10  # 스퀴즈 상태
+filter_type = "SqueezeState"  # 스퀴즈 상태
 consecutive_n = 3
 
 # 스퀴즈 돌파
@@ -2005,7 +2174,7 @@ consecutive_n = 3
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 8  # 스퀴즈 돌파
+filter_type = "SqueezeBreakout"  # 스퀴즈 돌파
 consecutive_n = 1
 
 # 볼륨 급등
@@ -2013,7 +2182,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 2  # 볼륨 급등
+filter_type = "VolumeSurge"  # 볼륨 급등
 consecutive_n = 1
 
 # 변동성 확대
@@ -2021,7 +2190,7 @@ consecutive_n = 1
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
 consecutive_n = 1
 ```
 
@@ -2032,7 +2201,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 20  # 상단밴드 터치 후 하락
+filter_type = "UpperBandTouch"  # 상단밴드 터치 후 하락
 consecutive_n = 1
 
 # 상단밴드 하향돌파
@@ -2040,7 +2209,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 13  # 상단밴드 하향돌파
+filter_type = "BreakThroughUpperBand"  # 상단밴드 하향돌파
 consecutive_n = 1
 
 # 볼륨 급등
@@ -2048,7 +2217,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 2  # 볼륨 급등
+filter_type = "VolumeSurge"  # 볼륨 급등
 consecutive_n = 1
 
 # 변동성 확대
@@ -2056,7 +2225,7 @@ consecutive_n = 1
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
 consecutive_n = 1
 ```
 
@@ -2136,6 +2305,14 @@ consecutive_n = 1
 
 상승장에서는 **추세 추종 신호**가 효과적입니다:
 
+#### 기울기 기반 추세 확인 신호
+| 필터 | 타입 | enum 이름 | 설명 | 사용 시기 |
+|------|------|----------|------|----------|
+| **Slope** | 0 | `"Upward"` | 상승 기울기 | 추세 방향 확인 |
+| **Slope** | 6 | `"StrongUpward"` | 강한 상승 기울기 | 강한 추세 확인 |
+| **Slope** | 4 | `"Accelerating"` | 가속도 (단기 > 장기) | 추세 강화 확인 |
+| **Slope** | 8 | `"HighRSquared"` | 높은 R² 값 | 선형 추세 신뢰도 높음 |
+
 #### 강한 추세 신호 (신호 강도: 5)
 | 필터 | 타입 | 설명 | 사용 시기 |
 |------|------|------|----------|
@@ -2177,6 +2354,9 @@ consecutive_n = 1
 | **Momentum** | 0 | 강한 양의 모멘텀 | 상승 모멘텀 |
 | **Momentum** | 2 | 가속하는 모멘텀 | 모멘텀 가속 |
 | **Momentum** | 7 | 불리시 다이버전스 | 상승 전환 |
+| **Slope** | 0 | `"Upward"` | 상승 기울기 | 추세 방향 확인 |
+| **Slope** | 6 | `"StrongUpward"` | 강한 상승 기울기 | 강한 추세 확인 |
+| **Slope** | 4 | `"Accelerating"` | 가속도 (단기 > 장기) | 추세 강화 확인 |
 
 ---
 
@@ -2190,7 +2370,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 1  # 과매도
+filter_type = "Oversold"  # 과매도
 consecutive_n = 2
 
 # 볼린저 밴드 하단 상향돌파
@@ -2198,7 +2378,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 7  # 하단밴드 상향돌파
+filter_type = "BreakThroughLowerBand"  # 하단밴드 상향돌파
 consecutive_n = 1
 
 # MACD 시그널 상향돌파
@@ -2207,7 +2387,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 2  # 시그널 상향돌파
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
 consecutive_n = 1
 ```
 
@@ -2218,7 +2398,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 10  # 스퀴즈 상태
+filter_type = "SqueezeState"  # 스퀴즈 상태
 consecutive_n = 3
 
 # 스퀴즈 돌파
@@ -2226,7 +2406,7 @@ consecutive_n = 3
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 8  # 스퀴즈 돌파
+filter_type = "SqueezeBreakout"  # 스퀴즈 돌파
 consecutive_n = 1
 
 # 볼륨 급등 확인
@@ -2234,7 +2414,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 2  # 볼륨 급등
+filter_type = "VolumeSurge"  # 볼륨 급등
 consecutive_n = 1
 
 # 변동성 확대 확인
@@ -2242,7 +2422,7 @@ consecutive_n = 1
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
 consecutive_n = 1
 ```
 
@@ -2254,7 +2434,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 5  # 50 상향 돌파
+filter_type = "CrossAbove50"  # 50 상향 돌파
 consecutive_n = 1
 
 # MACD 상승 추세
@@ -2263,14 +2443,14 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 0  # MACD > 시그널
+filter_type = "MacdAboveSignal"  # MACD > 시그널
 consecutive_n = 2
 
 # 이동평균 정규 배열
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20, 60]
-filter_type = 2  # 정규 배열
+filter_type = "RegularArrangement"  # 정규 배열
 consecutive_n = 3
 
 # 볼륨 동반 상승
@@ -2278,7 +2458,7 @@ consecutive_n = 3
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 5  # 상승과 함께 볼륨 증가
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -2313,6 +2493,17 @@ consecutive_n = 1
 - **손절**: 돌파 실패 시
 - **익절**: 추세 지속 시
 - **포지션**: 중간 포지션 (3-7%)
+
+### 📊 **기울기 분석 전략**
+- **목표**: 지표의 기울기를 통한 추세 방향 및 강도 확인
+- **진입**: 상승 기울기 확인 후 진입
+- **손절**: 하락 기울기 전환 시
+- **익절**: 감속도 확인 시
+- **포지션**: 중간 포지션 (3-7%)
+- **특징**: 
+  - 다양한 지표 타입 지원 (종가, 고가, 저가, MA, RSI, MACD 등)
+  - 선형 회귀를 통한 신뢰도 높은 추세 분석
+  - 가속도/감속도 분석으로 추세 강도 파악
 
 ---
 
@@ -2356,7 +2547,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 5  # 50 상향 돌파
+filter_type = "CrossAbove50"  # 50 상향 돌파
 consecutive_n = 1
 
 # MACD 상향돌파
@@ -2365,7 +2556,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 2  # 시그널 상향돌파
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
 consecutive_n = 1
 ```
 
@@ -2377,7 +2568,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 1  # 과매도
+filter_type = "Oversold"  # 과매도
 consecutive_n = 2
 
 # 볼린저 밴드 하단 돌파
@@ -2385,7 +2576,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 7  # 하단밴드 상향돌파
+filter_type = "BreakThroughLowerBand"  # 하단밴드 상향돌파
 consecutive_n = 1
 ```
 
@@ -2395,7 +2586,7 @@ consecutive_n = 1
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20]
-filter_type = 5  # 골든 크로스
+filter_type = "GoldenCross"  # 골든 크로스
 consecutive_n = 1
 
 # 볼륨 증가
@@ -2403,7 +2594,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 5  # 상승과 함께 볼륨 증가
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -2417,7 +2608,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 6  # 50 하향 돌파
+filter_type = "CrossBelow50"  # 50 하향 돌파
 consecutive_n = 1
 
 # MACD 하향돌파
@@ -2426,7 +2617,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 3  # 시그널 하향돌파
+filter_type = "SignalCrossBelow"  # 시그널 하향돌파
 consecutive_n = 1
 ```
 
@@ -2438,7 +2629,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 0  # 과매수
+filter_type = "Overbought"  # 과매수
 consecutive_n = 2
 
 # 볼린저 밴드 상단 돌파
@@ -2446,7 +2637,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 13  # 상단밴드 하향돌파
+filter_type = "BreakThroughUpperBand"  # 상단밴드 하향돌파
 consecutive_n = 1
 ```
 
@@ -2456,7 +2647,7 @@ consecutive_n = 1
 [[filters]]
 type = "MOVING_AVERAGE"
 periods = [5, 20]
-filter_type = 4  # 첫번째 MA < 마지막 MA
+filter_type = "FirstMABelowLastMA"  # 첫번째 MA < 마지막 MA
 consecutive_n = 1
 
 # 볼륨 증가
@@ -2464,7 +2655,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 1.5
-filter_type = 6  # 하락과 함께 볼륨 증가
+filter_type = "BearishWithIncreasedVolume"  # 하락과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -2478,7 +2669,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 2  # 정상 범위
+filter_type = "NormalRange"  # 정상 범위
 consecutive_n = 2
 
 # 볼린저 밴드 내부
@@ -2486,7 +2677,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 2  # 밴드 내부
+filter_type = "InsideBand"  # 밴드 내부
 consecutive_n = 2
 ```
 
@@ -2497,7 +2688,7 @@ consecutive_n = 2
 type = "ADX"
 period = 14
 threshold = 25.0
-filter_type = 0  # ADX < 임계값
+filter_type = "BelowThreshold"  # ADX < 임계값
 consecutive_n = 2
 
 # 저변동성
@@ -2505,7 +2696,7 @@ consecutive_n = 2
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 4  # 낮은 변동성
+filter_type = "LowVolatility"  # 낮은 변동성
 consecutive_n = 2
 ```
 
@@ -2518,7 +2709,7 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 10  # 스퀴즈 상태
+filter_type = "SqueezeState"  # 스퀴즈 상태
 consecutive_n = 3
 
 # 스퀴즈 돌파
@@ -2526,7 +2717,7 @@ consecutive_n = 3
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 8  # 스퀴즈 돌파
+filter_type = "SqueezeBreakout"  # 스퀴즈 돌파
 consecutive_n = 1
 ```
 
@@ -2537,7 +2728,7 @@ consecutive_n = 1
 type = "VOLUME"
 period = 20
 threshold = 2.0
-filter_type = 2  # 볼륨 급등
+filter_type = "VolumeSurge"  # 볼륨 급등
 consecutive_n = 1
 
 # 변동성 확대
@@ -2545,7 +2736,47 @@ consecutive_n = 1
 type = "ATR"
 period = 14
 threshold = 0.01
-filter_type = 1  # 변동성 확장
+filter_type = "VolatilityExpanding"  # 변동성 확장
+consecutive_n = 1
+```
+
+#### 📈 기울기 + MACD (추세 확인)
+```toml
+# 종가 상승 기울기
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+use_linear_regression = true
+
+# MACD 상향돌파
+[[filters]]
+type = "MACD"
+fast_period = 12
+slow_period = 26
+signal_period = 9
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
+consecutive_n = 1
+```
+
+#### 📈 고가 기울기 + 볼륨 (돌파 확인)
+```toml
+# 고가 상승 기울기 (돌파 확인)
+[[filters]]
+type = "SLOPE"
+indicator_type = "HighPrice"
+period = 10
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+
+# 볼륨 증가
+[[filters]]
+type = "VOLUME"
+period = 20
+threshold = 1.5
+filter_type = "BullishWithIncreasedVolume"  # 상승과 함께 볼륨 증가
 consecutive_n = 1
 ```
 
@@ -2561,7 +2792,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 1  # 과매도
+filter_type = "Oversold"  # 과매도
 consecutive_n = 2
 ```
 
@@ -2572,7 +2803,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 2  # 시그널 상향돌파
+filter_type = "SignalCrossAbove"  # 시그널 상향돌파
 consecutive_n = 1
 ```
 
@@ -2582,7 +2813,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 7  # 하단밴드 상향돌파
+filter_type = "BreakThroughLowerBand"  # 하단밴드 상향돌파
 consecutive_n = 1
 ```
 
@@ -2594,7 +2825,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 0  # 과매수
+filter_type = "Overbought"  # 과매수
 consecutive_n = 2
 ```
 
@@ -2605,7 +2836,7 @@ type = "MACD"
 fast_period = 12
 slow_period = 26
 signal_period = 9
-filter_type = 3  # 시그널 하향돌파
+filter_type = "SignalCrossBelow"  # 시그널 하향돌파
 consecutive_n = 1
 ```
 
@@ -2615,7 +2846,7 @@ consecutive_n = 1
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 13  # 상단밴드 하향돌파
+filter_type = "BreakThroughUpperBand"  # 상단밴드 하향돌파
 consecutive_n = 1
 ```
 
@@ -2627,7 +2858,7 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = 2  # 정상 범위
+filter_type = "NormalRange"  # 정상 범위
 consecutive_n = 2
 ```
 
@@ -2637,8 +2868,18 @@ consecutive_n = 2
 type = "BOLLINGER_BAND"
 period = 20
 dev_mult = 2.0
-filter_type = 2  # 밴드 내부
+filter_type = "InsideBand"  # 밴드 내부
 consecutive_n = 2
+```
+
+```toml
+# 종가 횡보 기울기 (중립 상태)
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "Sideways"  # 횡보
+consecutive_n = 3
 ```
 
 ---
@@ -2668,3 +2909,151 @@ consecutive_n = 2
 - **중급자**: 2개 조합 활용
 - **고급자**: 복합 조합 활용
 - **실시간**: 간단 조합으로 빠른 대응
+
+---
+
+## 🎯 Slope 필터 활용 가이드
+
+### 📊 **지표 타입별 활용**
+
+#### 종가 기울기 (ClosePrice)
+- **용도**: 전체 가격 추세 방향 확인
+- **사용 시기**: 기본 추세 분석
+- **예시**: 상승장에서 지속적인 상승 기울기 확인
+
+#### 고가 기울기 (HighPrice)
+- **용도**: 상단 돌파 및 저항선 테스트 확인
+- **사용 시기**: 돌파 전략, 저항선 돌파 확인
+- **예시**: 고가가 상승 기울기를 보이면 돌파 가능성 높음
+
+#### 저가 기울기 (LowPrice)
+- **용도**: 하단 지지 및 지지선 테스트 확인
+- **사용 시기**: 반등 전략, 지지선 확인
+- **예시**: 저가가 하락 기울기를 보이면 하락 지속 가능성 높음
+
+#### 이동평균 기울기 (MovingAverage)
+- **용도**: 이동평균선의 추세 방향 확인
+- **사용 시기**: 추세 추종 전략
+- **예시**: EMA(20)의 상승 기울기로 추세 확인
+
+#### RSI 기울기
+- **용도**: 모멘텀의 변화 추적
+- **사용 시기**: 모멘텀 전환 확인
+- **예시**: RSI 상승 기울기로 모멘텀 강화 확인
+
+#### MACD 기울기
+- **용도**: MACD 라인/시그널/히스토그램의 추세 확인
+- **사용 시기**: 추세 및 모멘텀 분석
+- **예시**: MACD 라인 상승 기울기로 상승 추세 확인
+
+### 🔍 **분석 방법 선택**
+
+#### 단순 차이 기반 (use_linear_regression = false)
+- **장점**: 빠른 계산, 직관적
+- **단점**: 노이즈에 민감
+- **사용**: 빠른 추세 확인이 필요한 경우
+
+#### 선형 회귀 기반 (use_linear_regression = true)
+- **장점**: 노이즈 필터링, 신뢰도 높음 (R² 제공)
+- **단점**: 계산 비용 높음
+- **사용**: 정확한 추세 분석이 필요한 경우
+
+### 📈 **실전 활용 예시**
+
+#### 상승 추세 확인 조합
+```toml
+# 종가 상승 기울기
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+use_linear_regression = true
+
+# 이동평균 상승 기울기
+[[filters]]
+type = "SLOPE"
+indicator_type = { MovingAverage = { ma_type = "EMA", period = 20 } }
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+use_linear_regression = true
+
+# RSI 상승 기울기
+[[filters]]
+type = "SLOPE"
+indicator_type = { RSI = { period = 14 } }
+period = 20
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+```
+
+#### 추세 강화 확인
+```toml
+# 가속도 확인 (단기 기울기가 장기보다 강함)
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "Accelerating"  # 가속도
+consecutive_n = 1
+short_period = 10
+use_linear_regression = true
+```
+
+#### 높은 신뢰도 추세 확인
+```toml
+# 높은 R² 값으로 선형 추세 확인
+[[filters]]
+type = "SLOPE"
+indicator_type = "ClosePrice"
+period = 20
+filter_type = "HighRSquared"  # 높은 R² 값
+consecutive_n = 1
+use_linear_regression = true
+r_squared_threshold = 0.8
+```
+
+#### 돌파 확인 (고가 기울기)
+```toml
+# 고가 상승 기울기로 돌파 확인
+[[filters]]
+type = "SLOPE"
+indicator_type = "HighPrice"
+period = 10
+filter_type = "Upward"  # 상승 기울기
+consecutive_n = 2
+```
+
+#### 지지 확인 (저가 기울기)
+```toml
+# 저가 하락 기울기로 하락 지속 확인
+[[filters]]
+type = "SLOPE"
+indicator_type = "LowPrice"
+period = 10
+filter_type = "Downward"  # 하락 기울기
+consecutive_n = 2
+```
+
+### ⚠️ **주의사항**
+
+1. **기간 설정**: 
+   - 짧은 기간(5-10): 빠른 변화 포착, 노이즈 민감
+   - 긴 기간(20-50): 안정적 추세 확인, 반응 느림
+
+2. **선형 회귀 사용**:
+   - 정확한 분석이 필요할 때만 사용
+   - 대부분의 경우 단순 차이로 충분
+
+3. **지표 타입 선택**:
+   - 종가: 기본 추세 분석
+   - 고가/저가: 돌파/지지 확인
+   - 기술적 지표: 해당 지표의 추세 확인
+
+4. **가속도/감속도 분석**:
+   - 단기 기간은 period의 절반 정도 권장
+   - 같은 방향의 기울기만 의미 있음
+
+---

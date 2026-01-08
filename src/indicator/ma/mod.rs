@@ -32,7 +32,7 @@ pub trait MA: Display + Send + Debug {
 /// 이동평균 계산 방식
 ///
 /// 시스템에서 지원하는 이동평균 유형을 정의합니다.
-#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MAType {
     /// 지수이동평균 (Exponential Moving Average)
     /// 최근 데이터에 더 큰 가중치를 부여합니다.
