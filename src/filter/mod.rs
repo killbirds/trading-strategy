@@ -2716,7 +2716,7 @@ impl_filter_type_deserialize!(SlopeFilterType, SlopeFilterTypeVisitor, "Slope");
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlopeParams {
     /// 분석할 지표 타입 설정
-    pub indicator_type: crate::analyzer::IndicatorTypeConfig,
+    pub indicator_type: crate::analyzer::IndicatorType,
     /// 분석 기간 (기본값: 20)
     pub period: usize,
     /// 필터 유형
@@ -2743,7 +2743,7 @@ pub struct SlopeParams {
 impl Default for SlopeParams {
     fn default() -> Self {
         Self {
-            indicator_type: crate::analyzer::IndicatorTypeConfig::ClosePrice,
+            indicator_type: crate::analyzer::IndicatorType::ClosePrice,
             period: 20,
             filter_type: SlopeFilterType::Upward,
             consecutive_n: 1,

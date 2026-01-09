@@ -4,7 +4,6 @@ use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
-use std::marker::PhantomData;
 use trading_chart::Candle;
 
 /// 기울기 분석 결과
@@ -83,9 +82,10 @@ impl SlopeAnalysis {
     }
 }
 
-/// 직렬화 가능한 지표 타입 설정
+/// 분석할 지표 타입
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum IndicatorTypeConfig {
+#[serde(tag = "type")]
+pub enum IndicatorType {
     /// 종가
     ClosePrice,
     /// 고가
@@ -93,144 +93,37 @@ pub enum IndicatorTypeConfig {
     /// 저가
     LowPrice,
     /// 이동평균 (MA)
-    MovingAverage { ma_type: MAType, period: usize },
-    /// RSI
-    RSI { period: usize },
-    /// MACD
-    MACD {
-        fast_period: usize,
-        slow_period: usize,
-        signal_period: usize,
-    },
-    /// MACD 라인
-    MACDLine {
-        fast_period: usize,
-        slow_period: usize,
-        signal_period: usize,
-    },
-    /// MACD 시그널 라인
-    MACDSignalLine {
-        fast_period: usize,
-        slow_period: usize,
-        signal_period: usize,
-    },
-    /// MACD 히스토그램
-    MACDHistogram {
-        fast_period: usize,
-        slow_period: usize,
-        signal_period: usize,
-    },
-}
-
-impl IndicatorTypeConfig {
-    /// IndicatorType으로 변환
-    pub fn to_indicator_type<C: Candle>(&self) -> IndicatorType<C> {
-        match self {
-            IndicatorTypeConfig::ClosePrice => IndicatorType::ClosePrice(PhantomData),
-            IndicatorTypeConfig::HighPrice => IndicatorType::HighPrice(PhantomData),
-            IndicatorTypeConfig::LowPrice => IndicatorType::LowPrice(PhantomData),
-            IndicatorTypeConfig::MovingAverage { ma_type, period } => {
-                IndicatorType::MovingAverage {
-                    ma_type: *ma_type,
-                    period: *period,
-                    _phantom: PhantomData,
-                }
-            }
-            IndicatorTypeConfig::RSI { period } => IndicatorType::RSI {
-                period: *period,
-                _phantom: PhantomData,
-            },
-            IndicatorTypeConfig::MACD {
-                fast_period,
-                slow_period,
-                signal_period,
-            } => IndicatorType::MACD {
-                fast_period: *fast_period,
-                slow_period: *slow_period,
-                signal_period: *signal_period,
-                _phantom: PhantomData,
-            },
-            IndicatorTypeConfig::MACDLine {
-                fast_period,
-                slow_period,
-                signal_period,
-            } => IndicatorType::MACDLine {
-                fast_period: *fast_period,
-                slow_period: *slow_period,
-                signal_period: *signal_period,
-                _phantom: PhantomData,
-            },
-            IndicatorTypeConfig::MACDSignalLine {
-                fast_period,
-                slow_period,
-                signal_period,
-            } => IndicatorType::MACDSignalLine {
-                fast_period: *fast_period,
-                slow_period: *slow_period,
-                signal_period: *signal_period,
-                _phantom: PhantomData,
-            },
-            IndicatorTypeConfig::MACDHistogram {
-                fast_period,
-                slow_period,
-                signal_period,
-            } => IndicatorType::MACDHistogram {
-                fast_period: *fast_period,
-                slow_period: *slow_period,
-                signal_period: *signal_period,
-                _phantom: PhantomData,
-            },
-        }
-    }
-}
-
-/// 분석할 지표 타입
-#[derive(Debug)]
-pub enum IndicatorType<C: Candle> {
-    /// 종가
-    ClosePrice(PhantomData<C>),
-    /// 고가
-    HighPrice(PhantomData<C>),
-    /// 저가
-    LowPrice(PhantomData<C>),
-    /// 이동평균 (MA)
     MovingAverage {
         ma_type: MAType,
         period: usize,
-        _phantom: PhantomData<C>,
     },
     /// RSI
     RSI {
         period: usize,
-        _phantom: PhantomData<C>,
     },
     /// MACD
     MACD {
         fast_period: usize,
         slow_period: usize,
         signal_period: usize,
-        _phantom: PhantomData<C>,
     },
     /// MACD 라인
     MACDLine {
         fast_period: usize,
         slow_period: usize,
         signal_period: usize,
-        _phantom: PhantomData<C>,
     },
     /// MACD 시그널 라인
     MACDSignalLine {
         fast_period: usize,
         slow_period: usize,
         signal_period: usize,
-        _phantom: PhantomData<C>,
     },
     /// MACD 히스토그램
     MACDHistogram {
         fast_period: usize,
         slow_period: usize,
         signal_period: usize,
-        _phantom: PhantomData<C>,
     },
 }
 
@@ -271,7 +164,7 @@ enum StoredAnalyzer<C: Candle> {
 #[derive(Debug)]
 pub struct SlopeAnalyzer<C: Candle> {
     /// 지표 타입
-    indicator_type: IndicatorType<C>,
+    indicator_type: IndicatorType,
     /// 저장된 analyzer (재사용을 위해)
     analyzer: StoredAnalyzer<C>,
     /// 분석 데이터 히스토리 (최신 데이터가 인덱스 0)
@@ -288,24 +181,24 @@ impl<C: Candle> Display for SlopeAnalyzer<C> {
 }
 
 impl<C: Candle + 'static> SlopeAnalyzer<C> {
-    /// IndicatorTypeConfig로부터 기울기 분석기 생성
-    pub fn from_config(storage: &CandleStore<C>, config: &IndicatorTypeConfig) -> Self {
-        Self::new(storage, config.to_indicator_type())
+    /// IndicatorType으로부터 기울기 분석기 생성
+    pub fn from_config(storage: &CandleStore<C>, config: &IndicatorType) -> Self {
+        Self::new(storage, config.clone())
     }
 
     /// 종가 기반 기울기 분석기 생성
     pub fn for_close_price(storage: &CandleStore<C>) -> Self {
-        Self::new(storage, IndicatorType::ClosePrice(PhantomData))
+        Self::new(storage, IndicatorType::ClosePrice)
     }
 
     /// 고가 기반 기울기 분석기 생성
     pub fn for_high_price(storage: &CandleStore<C>) -> Self {
-        Self::new(storage, IndicatorType::HighPrice(PhantomData))
+        Self::new(storage, IndicatorType::HighPrice)
     }
 
     /// 저가 기반 기울기 분석기 생성
     pub fn for_low_price(storage: &CandleStore<C>) -> Self {
-        Self::new(storage, IndicatorType::LowPrice(PhantomData))
+        Self::new(storage, IndicatorType::LowPrice)
     }
 
     /// 이동평균 기반 기울기 분석기 생성
@@ -315,7 +208,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
             IndicatorType::MovingAverage {
                 ma_type,
                 period,
-                _phantom: PhantomData,
             },
         )
     }
@@ -326,7 +218,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
             storage,
             IndicatorType::RSI {
                 period,
-                _phantom: PhantomData,
             },
         )
     }
@@ -344,7 +235,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                _phantom: PhantomData,
             },
         )
     }
@@ -362,7 +252,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                _phantom: PhantomData,
             },
         )
     }
@@ -380,7 +269,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                _phantom: PhantomData,
             },
         )
     }
@@ -398,13 +286,12 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                _phantom: PhantomData,
             },
         )
     }
 
     /// 새 기울기 분석기 생성 (내부 메서드)
-    fn new(storage: &CandleStore<C>, indicator_type: IndicatorType<C>) -> Self {
+    fn new(storage: &CandleStore<C>, indicator_type: IndicatorType) -> Self {
         let mut analyzer = SlopeAnalyzer {
             indicator_type,
             analyzer: StoredAnalyzer::None,
@@ -417,21 +304,21 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
     /// 저장소에서 초기화
     fn init_from_storage(&mut self, storage: &CandleStore<C>) {
         match &self.indicator_type {
-            IndicatorType::ClosePrice(_) => {
+            IndicatorType::ClosePrice => {
                 for candle in storage.items() {
                     let value = candle.close_price();
                     self.items
                         .push(SlopeAnalyzerData::new(candle.clone(), value));
                 }
             }
-            IndicatorType::HighPrice(_) => {
+            IndicatorType::HighPrice => {
                 for candle in storage.items() {
                     let value = candle.high_price();
                     self.items
                         .push(SlopeAnalyzerData::new(candle.clone(), value));
                 }
             }
-            IndicatorType::LowPrice(_) => {
+            IndicatorType::LowPrice => {
                 for candle in storage.items() {
                     let value = candle.low_price();
                     self.items
@@ -439,7 +326,7 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 }
             }
             IndicatorType::MovingAverage {
-                ma_type, period, ..
+                ma_type, period
             } => {
                 let ma_analyzer = MAAnalyzer::new(ma_type, &[*period], storage);
                 for data in ma_analyzer.items.iter() {
@@ -449,7 +336,7 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 }
                 self.analyzer = StoredAnalyzer::MAAnalyzer(ma_analyzer);
             }
-            IndicatorType::RSI { period, .. } => {
+            IndicatorType::RSI { period } => {
                 let rsi_analyzer = RSIAnalyzer::new(*period, &MAType::SMA, &[], storage);
                 for data in rsi_analyzer.items.iter() {
                     let value = data.rsi.value();
@@ -462,7 +349,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                ..
             } => {
                 let macd_analyzer =
                     MACDAnalyzer::new(*fast_period, *slow_period, *signal_period, storage);
@@ -477,7 +363,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                ..
             } => {
                 let macd_analyzer =
                     MACDAnalyzer::new(*fast_period, *slow_period, *signal_period, storage);
@@ -492,7 +377,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                ..
             } => {
                 let macd_analyzer =
                     MACDAnalyzer::new(*fast_period, *slow_period, *signal_period, storage);
@@ -507,7 +391,6 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 fast_period,
                 slow_period,
                 signal_period,
-                ..
             } => {
                 let macd_analyzer =
                     MACDAnalyzer::new(*fast_period, *slow_period, *signal_period, storage);
@@ -826,9 +709,9 @@ impl<C: Candle + 'static + Clone> AnalyzerOps<SlopeAnalyzerData<C>, C> for Slope
     fn next_data(&mut self, candle: C) -> SlopeAnalyzerData<C> {
         let value = match &mut self.analyzer {
             StoredAnalyzer::None => match &self.indicator_type {
-                IndicatorType::ClosePrice(_) => candle.close_price(),
-                IndicatorType::HighPrice(_) => candle.high_price(),
-                IndicatorType::LowPrice(_) => candle.low_price(),
+                IndicatorType::ClosePrice => candle.close_price(),
+                IndicatorType::HighPrice => candle.high_price(),
+                IndicatorType::LowPrice => candle.low_price(),
                 _ => 0.0,
             },
             StoredAnalyzer::MAAnalyzer(ma_analyzer) => {

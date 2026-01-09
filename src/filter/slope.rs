@@ -246,7 +246,7 @@ mod tests {
     fn test_slope_upward() {
         let candles = create_test_candles();
         let params = SlopeParams {
-            indicator_type: crate::analyzer::IndicatorTypeConfig::ClosePrice,
+            indicator_type: crate::analyzer::IndicatorType::ClosePrice,
             period: 10,
             filter_type: SlopeFilterType::Upward,
             consecutive_n: 1,
@@ -276,7 +276,7 @@ mod tests {
         }
 
         let params = SlopeParams {
-            indicator_type: crate::analyzer::IndicatorTypeConfig::ClosePrice,
+            indicator_type: crate::analyzer::IndicatorType::ClosePrice,
             period: 10,
             filter_type: SlopeFilterType::Downward,
             consecutive_n: 1,
@@ -293,7 +293,7 @@ mod tests {
     fn test_insufficient_candles() {
         let candles = vec![TestCandle::new(100.0, 105.0, 98.0, 103.0, 1000.0)];
         let params = SlopeParams {
-            indicator_type: crate::analyzer::IndicatorTypeConfig::ClosePrice,
+            indicator_type: crate::analyzer::IndicatorType::ClosePrice,
             period: 10,
             filter_type: SlopeFilterType::Upward,
             consecutive_n: 1,

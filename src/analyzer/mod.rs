@@ -74,7 +74,7 @@ pub use signal_strength_analyzer::{
     SignalStrengthAnalyzerData, SignalStrengthLevel,
 };
 pub use slope_analyzer::{
-    IndicatorTypeConfig, SlopeAnalysis, SlopeAnalyzer, SlopeAnalyzerData, SlopeDirection,
+    IndicatorType, SlopeAnalysis, SlopeAnalyzer, SlopeAnalyzerData, SlopeDirection,
 };
 pub use supertrend_analyzer::{SuperTrendAnalyzer, SuperTrendAnalyzerData};
 pub use support_resistance_analyzer::{

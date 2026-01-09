@@ -928,7 +928,7 @@ consecutive_n = 2
 
 #### 파라미터
 ```toml
-indicator_type = "close_price"  # 분석할 지표 타입
+indicator_type = { type = "ClosePrice" }  # 분석할 지표 타입
 period = 20                      # 분석 기간 (기본값: 20)
 filter_type = "Upward"           # 필터 타입 (enum 이름: "Upward", "Downward", "Sideways", "StrengthAboveThreshold", "Accelerating", "Decelerating", "StrongUpward", "StrongDownward", "HighRSquared")
 consecutive_n = 1                # 연속 캔들 수 (기본값: 1)
@@ -943,19 +943,19 @@ short_period = 10                # 단기 기간 (가속도/감속도 분석용,
 
 #### 지표 타입 (indicator_type)
 
-지표 타입은 `IndicatorTypeConfig` enum을 사용합니다:
+지표 타입은 `IndicatorType` enum을 사용하며, `type` 필드로 variant를 구분합니다:
 
 | 지표 타입 | 설명 | 예시 |
 |----------|------|------|
-| `ClosePrice` | 종가 기울기 | `indicator_type = "ClosePrice"` |
-| `HighPrice` | 고가 기울기 | `indicator_type = "HighPrice"` |
-| `LowPrice` | 저가 기울기 | `indicator_type = "LowPrice"` |
-| `MovingAverage` | 이동평균 기울기 | `indicator_type = { ma_type = "EMA", period = 20 }` |
-| `RSI` | RSI 기울기 | `indicator_type = { period = 14 }` |
-| `MACD` | MACD 라인 기울기 | `indicator_type = { fast_period = 12, slow_period = 26, signal_period = 9 }` |
-| `MACDLine` | MACD 라인 기울기 | 동일 |
-| `MACDSignalLine` | MACD 시그널 라인 기울기 | 동일 |
-| `MACDHistogram` | MACD 히스토그램 기울기 | 동일 |
+| `ClosePrice` | 종가 기울기 | `indicator_type = { type = "ClosePrice" }` |
+| `HighPrice` | 고가 기울기 | `indicator_type = { type = "HighPrice" }` |
+| `LowPrice` | 저가 기울기 | `indicator_type = { type = "LowPrice" }` |
+| `MovingAverage` | 이동평균 기울기 | `indicator_type = { type = "MovingAverage", ma_type = "EMA", period = 20 }` |
+| `RSI` | RSI 기울기 | `indicator_type = { type = "RSI", period = 14 }` |
+| `MACD` | MACD 라인 기울기 | `indicator_type = { type = "MACD", fast_period = 12, slow_period = 26, signal_period = 9 }` |
+| `MACDLine` | MACD 라인 기울기 | `indicator_type = { type = "MACDLine", fast_period = 12, slow_period = 26, signal_period = 9 }` |
+| `MACDSignalLine` | MACD 시그널 라인 기울기 | `indicator_type = { type = "MACDSignalLine", fast_period = 12, slow_period = 26, signal_period = 9 }` |
+| `MACDHistogram` | MACD 히스토그램 기울기 | `indicator_type = { type = "MACDHistogram", fast_period = 12, slow_period = 26, signal_period = 9 }` |
 
 #### 필터 타입 (총 9개)
 
@@ -990,7 +990,7 @@ short_period = 10                # 단기 기간 (가속도/감속도 분석용,
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -1001,7 +1001,7 @@ use_linear_regression = false
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = { MovingAverage = { ma_type = "EMA", period = 20 } }
+indicator_type = { type = "MovingAverage", ma_type = "EMA", period = 20 }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -1012,7 +1012,7 @@ use_linear_regression = true  # 선형 회귀 사용
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = { RSI = { period = 14 } }
+indicator_type = { type = "RSI", period = 14 }
 period = 20
 filter_type = "StrongUpward"  # 강한 상승 기울기
 consecutive_n = 2
@@ -1023,7 +1023,7 @@ strength_threshold = 0.02  # 기울기 강도 0.02 이상
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = { MACDLine = { fast_period = 12, slow_period = 26, signal_period = 9 } }
+indicator_type = { type = "MACDLine", fast_period = 12, slow_period = 26, signal_period = 9 }
 period = 20
 filter_type = "Accelerating"  # 가속도
 consecutive_n = 1
@@ -1035,7 +1035,7 @@ use_linear_regression = true
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = "HighPrice"
+indicator_type = { type = "HighPrice" }
 period = 10
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -1045,7 +1045,7 @@ consecutive_n = 2
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = "LowPrice"
+indicator_type = { type = "LowPrice" }
 period = 10
 filter_type = "Downward"  # 하락 기울기
 consecutive_n = 2
@@ -1055,7 +1055,7 @@ consecutive_n = 2
 ```toml
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "HighRSquared"  # 높은 R² 값
 consecutive_n = 1
@@ -2745,7 +2745,7 @@ consecutive_n = 1
 # 종가 상승 기울기
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -2766,7 +2766,7 @@ consecutive_n = 1
 # 고가 상승 기울기 (돌파 확인)
 [[filters]]
 type = "SLOPE"
-indicator_type = "HighPrice"
+indicator_type = { type = "HighPrice" }
 period = 10
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -2876,7 +2876,7 @@ consecutive_n = 2
 # 종가 횡보 기울기 (중립 상태)
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "Sideways"  # 횡보
 consecutive_n = 3
@@ -2965,7 +2965,7 @@ consecutive_n = 3
 # 종가 상승 기울기
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -2974,7 +2974,7 @@ use_linear_regression = true
 # 이동평균 상승 기울기
 [[filters]]
 type = "SLOPE"
-indicator_type = { MovingAverage = { ma_type = "EMA", period = 20 } }
+indicator_type = { type = "MovingAverage", ma_type = "EMA", period = 20 }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -2983,7 +2983,7 @@ use_linear_regression = true
 # RSI 상승 기울기
 [[filters]]
 type = "SLOPE"
-indicator_type = { RSI = { period = 14 } }
+indicator_type = { type = "RSI", period = 14 }
 period = 20
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -2994,7 +2994,7 @@ consecutive_n = 2
 # 가속도 확인 (단기 기울기가 장기보다 강함)
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "Accelerating"  # 가속도
 consecutive_n = 1
@@ -3007,7 +3007,7 @@ use_linear_regression = true
 # 높은 R² 값으로 선형 추세 확인
 [[filters]]
 type = "SLOPE"
-indicator_type = "ClosePrice"
+indicator_type = { type = "ClosePrice" }
 period = 20
 filter_type = "HighRSquared"  # 높은 R² 값
 consecutive_n = 1
@@ -3020,7 +3020,7 @@ r_squared_threshold = 0.8
 # 고가 상승 기울기로 돌파 확인
 [[filters]]
 type = "SLOPE"
-indicator_type = "HighPrice"
+indicator_type = { type = "HighPrice" }
 period = 10
 filter_type = "Upward"  # 상승 기울기
 consecutive_n = 2
@@ -3031,7 +3031,7 @@ consecutive_n = 2
 # 저가 하락 기울기로 하락 지속 확인
 [[filters]]
 type = "SLOPE"
-indicator_type = "LowPrice"
+indicator_type = { type = "LowPrice" }
 period = 10
 filter_type = "Downward"  # 하락 기울기
 consecutive_n = 2
