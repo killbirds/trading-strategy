@@ -440,12 +440,13 @@ impl IchimokusBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -453,7 +454,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -461,7 +462,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -635,7 +636,7 @@ mod tests {
         let mut candles = Vec::new();
         for i in 0..30 {
             candles.push(TestCandle {
-                timestamp: Utc::now().timestamp() + i as i64,
+                timestamp: 1 + i as i64,
                 open: 100.0 + i as f64,
                 high: 105.0 + i as f64,
                 low: 95.0 + i as f64,
@@ -690,7 +691,7 @@ mod tests {
         // 간단한 상승 추세 데이터
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -698,7 +699,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -706,7 +707,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -714,7 +715,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 3,
+                timestamp: 1 + 3,
                 open: 115.0,
                 high: 125.0,
                 low: 105.0,

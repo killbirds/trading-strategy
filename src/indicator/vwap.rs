@@ -363,12 +363,13 @@ impl VWAPsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -376,7 +377,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -384,7 +385,7 @@ mod tests {
                 volume: 2000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -589,7 +590,7 @@ mod tests {
         let mut builder = VWAPBuilder::<TestCandle>::new(VWAPParams::new(2));
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -597,7 +598,7 @@ mod tests {
                 volume: 1000.0, // 작은 거래량
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -635,7 +636,7 @@ mod tests {
         // VWAP = sum(typical_price * volume) / sum(volume)
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 95.0,
@@ -643,7 +644,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 102.0,
                 high: 108.0,
                 low: 100.0,
@@ -676,7 +677,7 @@ mod tests {
         // 거래량이 다른 두 캔들
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 10.0,
                 high: 12.0,
                 low: 8.0,
@@ -684,7 +685,7 @@ mod tests {
                 volume: 100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 11.0,
                 high: 14.0,
                 low: 10.0,

@@ -324,12 +324,13 @@ impl RSIsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -337,7 +338,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -345,7 +346,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -448,7 +449,7 @@ mod tests {
 
         for i in 0..10 {
             candles.push(TestCandle {
-                timestamp: Utc::now().timestamp() + i as i64,
+                timestamp: 1 + i as i64,
                 open: base_price + i as f64,
                 high: base_price + i as f64 + 1.0,
                 low: base_price + i as f64 - 0.5,
@@ -471,7 +472,7 @@ mod tests {
 
         for i in 0..10 {
             candles.push(TestCandle {
-                timestamp: Utc::now().timestamp() + i as i64,
+                timestamp: 1 + i as i64,
                 open: base_price - i as f64,
                 high: base_price - i as f64 + 0.5,
                 low: base_price - i as f64 - 1.0,
@@ -511,7 +512,7 @@ mod tests {
         let mut builder = RSIBuilder::<TestCandle>::new(2);
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 95.0,
@@ -519,7 +520,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 102.0,
                 high: 107.0,
                 low: 97.0,
@@ -527,7 +528,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 105.0,
                 high: 110.0,
                 low: 100.0,
@@ -555,7 +556,7 @@ mod tests {
     fn test_rsi_insufficient_data() {
         let mut builder = RSIBuilder::<TestCandle>::new(14);
         let candles = vec![TestCandle {
-            timestamp: Utc::now().timestamp(),
+            timestamp: 1,
             open: 100.0,
             high: 105.0,
             low: 95.0,
@@ -577,7 +578,7 @@ mod tests {
         // - RS = 2.0/0.0 = inf, RSI = 100.0
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 102.0,
                 low: 99.0,
@@ -585,7 +586,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 100.0,
                 high: 103.0,
                 low: 99.0,
@@ -593,7 +594,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 102.0,
                 high: 105.0,
                 low: 101.0,
@@ -601,7 +602,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 3,
+                timestamp: 1 + 3,
                 open: 104.0,
                 high: 107.0,
                 low: 103.0,
@@ -609,7 +610,7 @@ mod tests {
                 volume: 1300.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 4,
+                timestamp: 1 + 4,
                 open: 106.0,
                 high: 109.0,
                 low: 105.0,
@@ -639,7 +640,7 @@ mod tests {
         // - RS = 0.0/2.0 = 0.0, RSI = 100 - 100/(1+0) = 0.0
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 97.0,
@@ -647,7 +648,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 100.0,
                 high: 99.0,
                 low: 97.0,
@@ -655,7 +656,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 98.0,
                 high: 97.0,
                 low: 95.0,
@@ -663,7 +664,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 3,
+                timestamp: 1 + 3,
                 open: 96.0,
                 high: 95.0,
                 low: 93.0,
@@ -671,7 +672,7 @@ mod tests {
                 volume: 1300.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 4,
+                timestamp: 1 + 4,
                 open: 94.0,
                 high: 93.0,
                 low: 91.0,

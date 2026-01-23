@@ -319,12 +319,13 @@ impl ADXsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -332,7 +333,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -340,7 +341,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -390,7 +391,7 @@ mod tests {
         // 상승 추세 데이터 (period + 1 = 3개 필요, 더 현실적인 가격 변동)
         let up_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 99.0,
@@ -398,7 +399,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 104.0,
                 high: 110.0,
                 low: 103.0,
@@ -406,7 +407,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 109.0,
                 high: 115.0,
                 low: 108.0,
@@ -423,7 +424,7 @@ mod tests {
         // 하락 추세 데이터 (period + 1 = 3개 필요, 더 현실적인 가격 변동)
         let down_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 114.0,
                 high: 115.0,
                 low: 109.0,
@@ -431,7 +432,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 110.0,
                 high: 111.0,
                 low: 104.0,
@@ -439,7 +440,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 105.0,
                 high: 106.0,
                 low: 99.0,
@@ -504,7 +505,7 @@ mod tests {
         // +DI가 -DI보다 큰 상승 추세
         let up_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 99.0,
@@ -512,7 +513,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 104.0,
                 high: 110.0,
                 low: 103.0,
@@ -520,7 +521,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 109.0,
                 high: 115.0,
                 low: 108.0,
@@ -542,7 +543,7 @@ mod tests {
         // 강한 추세 데이터 (큰 가격 변동)
         let strong_trend_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -550,7 +551,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 105.0,
                 high: 120.0,
                 low: 100.0,
@@ -558,7 +559,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 115.0,
                 high: 130.0,
                 low: 110.0,
@@ -579,7 +580,7 @@ mod tests {
         // 약한 추세 데이터 (작은 가격 변동, 횡보)
         let weak_trend_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -587,7 +588,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -595,7 +596,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -677,7 +678,7 @@ mod tests {
         // 강한 상승 추세 데이터
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 99.0,
@@ -685,7 +686,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 104.0,
                 high: 110.0,
                 low: 103.0,
@@ -693,7 +694,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 109.0,
                 high: 115.0,
                 low: 108.0,
@@ -701,7 +702,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 3,
+                timestamp: 1 + 3,
                 open: 114.0,
                 high: 120.0,
                 low: 113.0,
@@ -747,7 +748,7 @@ mod tests {
         // 하락 추세 데이터
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 120.0,
                 high: 121.0,
                 low: 115.0,
@@ -755,7 +756,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 116.0,
                 high: 117.0,
                 low: 110.0,
@@ -763,7 +764,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 111.0,
                 high: 112.0,
                 low: 105.0,

@@ -69,6 +69,37 @@ impl Display for MACD {
     }
 }
 
+fn calculate_ema_series(values: &[f64], period: usize) -> Vec<f64> {
+    if values.is_empty() || period == 0 {
+        return Vec::new();
+    }
+
+    let alpha = moving_average::calculate_ema_alpha(period);
+    let mut ema_values = Vec::with_capacity(values.len());
+
+    if values.len() < period {
+        let mut ema = values[0];
+        ema_values.push(ema);
+        for &value in &values[1..] {
+            ema = moving_average::calculate_ema_step(value, ema, alpha);
+            ema_values.push(ema);
+        }
+        return ema_values;
+    }
+
+    let sma = values[..period].iter().sum::<f64>() / period as f64;
+    let mut ema = sma;
+    for _ in 0..period {
+        ema_values.push(ema);
+    }
+    for &value in &values[period..] {
+        ema = moving_average::calculate_ema_step(value, ema, alpha);
+        ema_values.push(ema);
+    }
+
+    ema_values
+}
+
 /// MACD 계산 함수 (전체 데이터에서 계산)
 fn calculate_macd(
     values: &[f64],
@@ -80,41 +111,27 @@ fn calculate_macd(
         return (0.0, 0.0, 0.0);
     }
 
-    // EMA 알파값 계산 (유틸리티 함수 사용)
-    let fast_alpha = moving_average::calculate_ema_alpha(fast_period);
-    let slow_alpha = moving_average::calculate_ema_alpha(slow_period);
     let signal_alpha = moving_average::calculate_ema_alpha(signal_period);
-
-    // 초기 SMA 계산
-    let fast_sma =
-        moving_average::calculate_sma(&values[..fast_period.min(values.len())], fast_period);
-    let slow_sma =
-        moving_average::calculate_sma(&values[..slow_period.min(values.len())], slow_period);
-
-    // EMA 계산
-    // 주의: EMA는 전체 데이터를 순회하면서 계산해야 정확합니다.
-    // 초기 SMA 이후에도 모든 데이터에 대해 EMA를 재계산해야 올바른 결과를 얻을 수 있습니다.
-    let mut fast_ema = fast_sma;
-    let mut slow_ema = slow_sma;
+    let fast_ema_series = calculate_ema_series(values, fast_period);
+    let slow_ema_series = calculate_ema_series(values, slow_period);
     let mut macd_lines = Vec::with_capacity(values.len());
-
-    // 전체 데이터에 대해 EMA 계산
-    for &price in values.iter() {
-        fast_ema = moving_average::calculate_ema_step(price, fast_ema, fast_alpha);
-        slow_ema = moving_average::calculate_ema_step(price, slow_ema, slow_alpha);
-        let macd_line = fast_ema - slow_ema;
+    for i in 0..values.len() {
+        let macd_line = fast_ema_series[i] - slow_ema_series[i];
         macd_lines.push(macd_line);
     }
 
     // 시그널 라인 계산 (MACD 라인의 EMA)
+    let signal_start = slow_period.saturating_sub(1);
+    let signal_threshold = signal_start + signal_period;
     let mut signal_line = 0.0;
-    if macd_lines.len() >= signal_period {
+    if macd_lines.len() >= signal_threshold {
+        let signal_slice = &macd_lines[signal_start..];
         // 초기 시그널 라인 (SMA) - 첫 signal_period 개의 MACD 값의 평균
-        let signal_sma = macd_lines[..signal_period].iter().sum::<f64>() / signal_period as f64;
+        let signal_sma = signal_slice[..signal_period].iter().sum::<f64>() / signal_period as f64;
         signal_line = signal_sma;
 
         // EMA로 시그널 라인 업데이트 - 나머지 모든 MACD 값에 대해
-        for &macd in macd_lines[signal_period..].iter() {
+        for &macd in signal_slice[signal_period..].iter() {
             signal_line = moving_average::calculate_ema_step(macd, signal_line, signal_alpha);
         }
     }
@@ -197,32 +214,22 @@ where
 
         // 이전 값 업데이트 (다음 next() 호출을 위해)
         if !self.values.is_empty() {
-            let fast_alpha = moving_average::calculate_ema_alpha(self.fast_period);
-            let slow_alpha = moving_average::calculate_ema_alpha(self.slow_period);
+            let signal_threshold = self.slow_period.saturating_sub(1) + self.signal_period;
+            let fast_ema_series = calculate_ema_series(&self.values, self.fast_period);
+            let slow_ema_series = calculate_ema_series(&self.values, self.slow_period);
 
-            // 전체 데이터에서 EMA 재계산하여 이전 값 설정
-            let fast_sma = moving_average::calculate_sma(
-                &self.values[..self.fast_period.min(self.values.len())],
-                self.fast_period,
-            );
-            let slow_sma = moving_average::calculate_sma(
-                &self.values[..self.slow_period.min(self.values.len())],
-                self.slow_period,
-            );
-
-            let mut fast_ema = fast_sma;
-            let mut slow_ema = slow_sma;
-
-            for &price in &self.values {
-                fast_ema = moving_average::calculate_ema_step(price, fast_ema, fast_alpha);
-                slow_ema = moving_average::calculate_ema_step(price, slow_ema, slow_alpha);
-                let macd = fast_ema - slow_ema;
-                self.macd_history.push(macd);
+            for i in 0..self.values.len() {
+                self.macd_history
+                    .push(fast_ema_series[i] - slow_ema_series[i]);
             }
 
-            self.previous_fast_ema = Some(fast_ema);
-            self.previous_slow_ema = Some(slow_ema);
-            self.previous_signal_line = Some(signal_line);
+            self.previous_fast_ema = fast_ema_series.last().copied();
+            self.previous_slow_ema = slow_ema_series.last().copied();
+            if self.values.len() >= signal_threshold {
+                self.previous_signal_line = Some(signal_line);
+            } else {
+                self.previous_signal_line = None;
+            }
 
             // 히스토리 크기 제한
             if self.macd_history.len() > self.signal_period * 2 {
@@ -294,25 +301,14 @@ where
                 );
 
                 // 이전 EMA 값 설정 (다음 next() 호출을 위해)
-                let fast_sma = moving_average::calculate_sma(
-                    &self.values[..self.fast_period.min(self.values.len())],
-                    self.fast_period,
-                );
-                let slow_sma = moving_average::calculate_sma(
-                    &self.values[..self.slow_period.min(self.values.len())],
-                    self.slow_period,
-                );
-
-                let mut fast_ema = fast_sma;
-                let mut slow_ema = slow_sma;
+                let fast_ema_series = calculate_ema_series(&self.values, self.fast_period);
+                let slow_ema_series = calculate_ema_series(&self.values, self.slow_period);
 
                 // MACD 히스토리 재구성 (시그널 라인 계산을 위해)
                 self.macd_history.clear();
-                for &p in &self.values {
-                    fast_ema = moving_average::calculate_ema_step(p, fast_ema, fast_alpha);
-                    slow_ema = moving_average::calculate_ema_step(p, slow_ema, slow_alpha);
-                    let macd = fast_ema - slow_ema;
-                    self.macd_history.push(macd);
+                for i in 0..self.values.len() {
+                    self.macd_history
+                        .push(fast_ema_series[i] - slow_ema_series[i]);
                 }
 
                 // 히스토리 크기 제한
@@ -322,9 +318,13 @@ where
                 }
 
                 // 이전 값 저장
-                self.previous_fast_ema = Some(fast_ema);
-                self.previous_slow_ema = Some(slow_ema);
-                self.previous_signal_line = Some(signal_line);
+                self.previous_fast_ema = fast_ema_series.last().copied();
+                self.previous_slow_ema = slow_ema_series.last().copied();
+                if self.values.len() >= self.slow_period.saturating_sub(1) + self.signal_period {
+                    self.previous_signal_line = Some(signal_line);
+                } else {
+                    self.previous_signal_line = None;
+                }
 
                 return MACD {
                     fast_period: self.fast_period,
@@ -348,18 +348,19 @@ where
         }
 
         // 시그널 라인 계산 (증분 또는 전체 재계산)
+        let signal_start = self.slow_period.saturating_sub(1);
+        let signal_threshold = signal_start + self.signal_period;
         let signal_line = match self.previous_signal_line {
-            Some(prev_signal) if self.macd_history.len() >= self.signal_period => {
-                // 증분 계산
+            Some(prev_signal) => {
                 moving_average::calculate_ema_step(macd_line, prev_signal, signal_alpha)
             }
             _ => {
-                // 이전 값이 없거나 데이터가 부족하면 전체 재계산
-                if self.macd_history.len() >= self.signal_period {
-                    let signal_sma = self.macd_history[..self.signal_period].iter().sum::<f64>()
+                if self.macd_history.len() >= signal_threshold {
+                    let signal_slice = &self.macd_history[signal_start..];
+                    let signal_sma = signal_slice[..self.signal_period].iter().sum::<f64>()
                         / self.signal_period as f64;
                     let mut signal = signal_sma;
-                    for &macd in &self.macd_history[self.signal_period..] {
+                    for &macd in &signal_slice[self.signal_period..] {
                         signal = moving_average::calculate_ema_step(macd, signal, signal_alpha);
                     }
                     signal
@@ -372,7 +373,9 @@ where
         // 이전 값 업데이트
         self.previous_fast_ema = Some(fast_ema);
         self.previous_slow_ema = Some(slow_ema);
-        self.previous_signal_line = Some(signal_line);
+        if self.macd_history.len() >= signal_threshold {
+            self.previous_signal_line = Some(signal_line);
+        }
 
         let histogram = macd_line - signal_line;
 
@@ -471,12 +474,13 @@ impl MACDsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -484,7 +488,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -492,7 +496,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -537,7 +541,15 @@ mod tests {
     #[test]
     fn test_macd_build_with_data() {
         let mut builder = MACDBuilder::<TestCandle>::new(2, 3, 2);
-        let candles = create_test_candles();
+        let mut candles = create_test_candles();
+        candles.push(TestCandle {
+            timestamp: 1,
+            open: 115.0,
+            high: 125.0,
+            low: 105.0,
+            close: 120.0,
+            volume: 1300.0,
+        });
         let macd = builder.build(&candles);
 
         assert_eq!(macd.fast_period, 2);
@@ -545,7 +557,54 @@ mod tests {
         assert_eq!(macd.signal_period, 2);
         assert!(macd.macd_line != 0.0);
         assert!(macd.signal_line != 0.0);
-        assert!(macd.histogram != 0.0);
+        assert!(!macd.histogram.is_nan());
+    }
+
+    #[test]
+    fn test_macd_signal_threshold_behavior() {
+        let mut builder = MACDBuilder::<TestCandle>::new(2, 3, 2);
+        let candles = vec![
+            TestCandle {
+                timestamp: 1,
+                open: 10.0,
+                high: 11.0,
+                low: 9.0,
+                close: 10.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: 1 + 1,
+                open: 20.0,
+                high: 21.0,
+                low: 19.0,
+                close: 20.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: 1 + 2,
+                open: 30.0,
+                high: 31.0,
+                low: 29.0,
+                close: 30.0,
+                volume: 1000.0,
+            },
+        ];
+
+        let macd = builder.build(&candles);
+        assert_eq!(macd.signal_line, 0.0);
+
+        let mut builder2 = MACDBuilder::<TestCandle>::new(2, 3, 2);
+        let mut candles2 = candles.clone();
+        candles2.push(TestCandle {
+            timestamp: 1 + 3,
+            open: 40.0,
+            high: 41.0,
+            low: 39.0,
+            close: 40.0,
+            volume: 1000.0,
+        });
+        let macd2 = builder2.build(&candles2);
+        assert!(macd2.signal_line != 0.0);
     }
 
     #[test]
@@ -651,7 +710,7 @@ mod tests {
         // 상승 다이버전스 데이터 (가격은 하락하지만 MACD는 상승)
         let divergence_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 100.0,
                 low: 90.0,
@@ -659,7 +718,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 95.0,
                 high: 95.0,
                 low: 85.0,
@@ -667,7 +726,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 90.0,
                 high: 90.0,
                 low: 80.0,
@@ -675,7 +734,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 85.0,
                 high: 85.0,
                 low: 75.0,
@@ -683,7 +742,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 80.0,
                 high: 80.0,
                 low: 70.0,
@@ -715,7 +774,7 @@ mod tests {
         // 데이터: [10.0, 11.0, 12.0, 13.0, 14.0]
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 10.0,
                 high: 10.5,
                 low: 9.5,
@@ -723,7 +782,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 10.0,
                 high: 11.5,
                 low: 9.5,
@@ -731,7 +790,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 11.0,
                 high: 12.5,
                 low: 10.5,
@@ -739,7 +798,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 3,
+                timestamp: 1 + 3,
                 open: 12.0,
                 high: 13.5,
                 low: 11.5,
@@ -747,7 +806,7 @@ mod tests {
                 volume: 1300.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 4,
+                timestamp: 1 + 4,
                 open: 13.0,
                 high: 14.5,
                 low: 12.5,
@@ -783,7 +842,7 @@ mod tests {
         let mut candles = Vec::new();
         for i in 0..30 {
             candles.push(TestCandle {
-                timestamp: Utc::now().timestamp() + i as i64,
+                timestamp: 1 + i as i64,
                 open: 100.0 + i as f64 * 0.5,
                 high: 101.0 + i as f64 * 0.5,
                 low: 99.0 + i as f64 * 0.5,

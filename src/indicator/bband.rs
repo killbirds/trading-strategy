@@ -367,12 +367,13 @@ where
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -380,7 +381,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -388,7 +389,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -396,7 +397,7 @@ mod tests {
                 volume: 1200.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 3,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -404,7 +405,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 4,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -412,7 +413,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 5,
                 open: 100.0,
                 high: 120.0,
                 low: 80.0,
@@ -420,7 +421,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 6,
                 open: 110.0,
                 high: 130.0,
                 low: 90.0,
@@ -549,7 +550,7 @@ mod tests {
         // 낮은 변동성 데이터
         let low_vol_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -557,7 +558,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 101.0,
                 low: 99.0,
@@ -573,7 +574,7 @@ mod tests {
         // 높은 변동성 데이터
         let high_vol_candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 120.0,
                 low: 80.0,
@@ -581,7 +582,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 110.0,
                 high: 130.0,
                 low: 90.0,
@@ -618,7 +619,7 @@ mod tests {
         // lower = 11.0 - 2.0 * 0.816 ≈ 9.367
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 10.0,
                 high: 10.5,
                 low: 9.5,
@@ -626,7 +627,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 10.0,
                 high: 11.5,
                 low: 9.5,
@@ -634,7 +635,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 11.0,
                 high: 12.5,
                 low: 10.5,
@@ -688,7 +689,7 @@ mod tests {
         // lower = 11.0 - 2.0 * 1.0 = 9.0
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 10.0,
                 high: 10.5,
                 low: 9.5,
@@ -696,7 +697,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 10.0,
                 high: 12.5,
                 low: 9.5,

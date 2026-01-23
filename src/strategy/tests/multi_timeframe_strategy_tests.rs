@@ -1,10 +1,10 @@
+use crate::model::Signal;
+use crate::strategy::Strategy;
 use crate::strategy::multi_timeframe_strategy::MultiTimeframeStrategy;
 use crate::strategy::tests::common::{
     backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_storage,
     create_uptrend_candles,
 };
-use crate::strategy::Strategy;
-use crate::model::Signal;
 use std::collections::HashMap;
 use trading_chart::CandleInterval;
 

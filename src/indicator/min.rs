@@ -140,13 +140,15 @@ impl MINsBuilderFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::candle_store::CandleStore;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -154,7 +156,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 85.0,
@@ -162,7 +164,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 80.0,
@@ -216,11 +218,12 @@ mod tests {
     #[test]
     fn test_min_trend() {
         let mut builder = MINBuilder::<TestCandle>::new(2);
+        let base = 1;
 
         // 하락 추세 데이터
         let down_candles = [
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 110.0,
                 high: 110.0,
                 low: 100.0,
@@ -228,7 +231,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 100.0,
                 high: 100.0,
                 low: 90.0,
@@ -245,11 +248,12 @@ mod tests {
     #[test]
     fn test_min_consolidation() {
         let mut builder = MINBuilder::<TestCandle>::new(2);
+        let base = 1;
 
         // 횡보장 데이터
         let consolidation_candles = [
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -257,7 +261,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -303,13 +307,52 @@ mod tests {
     }
 
     #[test]
+    fn test_min_build_from_storage_consistency() {
+        let candles = vec![
+            TestCandle {
+                timestamp: 1,
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: 2,
+                open: 105.0,
+                high: 115.0,
+                low: 85.0,
+                close: 110.0,
+                volume: 1100.0,
+            },
+            TestCandle {
+                timestamp: 3,
+                open: 110.0,
+                high: 120.0,
+                low: 80.0,
+                close: 115.0,
+                volume: 1200.0,
+            },
+        ];
+        let storage = CandleStore::new(candles, 100, false);
+
+        let mut builder1 = MINBuilder::<TestCandle>::new(2);
+        let from_storage = builder1.build_from_storage(&storage);
+
+        let mut builder2 = MINBuilder::<TestCandle>::new(2);
+        let from_data = builder2.build(&storage.get_ascending_items());
+
+        assert_eq!(from_storage.min, from_data.min);
+    }
+
+    #[test]
     fn test_min_known_values_accuracy() {
         // 알려진 MIN 계산 결과와 비교
         // period=2인 경우 간단한 계산으로 검증
         // 최소값 = min(최근 period개의 low)
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 95.0,
@@ -317,7 +360,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 90.0,
@@ -325,7 +368,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 85.0,
@@ -353,7 +396,7 @@ mod tests {
         // period=2인 경우 정확한 계산 검증
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 105.0,
                 low: 98.0,
@@ -361,7 +404,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 102.0,
                 high: 108.0,
                 low: 96.0,

@@ -128,12 +128,12 @@ impl MAsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 115.0,
                 low: 95.0,
@@ -141,7 +141,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 110.0,
                 high: 125.0,
                 low: 105.0,
@@ -149,7 +149,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 120.0,
                 high: 125.0,
                 low: 110.0,
@@ -278,7 +278,7 @@ mod tests {
         let _mas = builder.build(&candles);
 
         let new_candle = TestCandle {
-            timestamp: Utc::now().timestamp(),
+            timestamp: 1,
             open: 115.0,
             high: 130.0,
             low: 115.0,

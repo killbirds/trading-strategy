@@ -312,13 +312,15 @@ impl VolumesBuilderFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::candle_store::CandleStore;
     use crate::tests::TestCandle;
-    use chrono::Utc;
+    
 
     fn create_test_candles() -> Vec<TestCandle> {
+        let base = 1;
         vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -326,7 +328,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -334,7 +336,7 @@ mod tests {
                 volume: 1100.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: base + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -376,6 +378,46 @@ mod tests {
         assert_eq!(volume.average_volume, 1100.0); // (1000 + 1100 + 1200) / 3
         assert_eq!(volume.current_volume, 1200.0); // 마지막 캔들의 거래량
         assert!(volume.volume_ratio > 1.0); // 현재 거래량이 평균보다 높음
+    }
+
+    #[test]
+    fn test_volume_build_from_storage_consistency() {
+        let candles = vec![
+            TestCandle {
+                timestamp: 1,
+                open: 100.0,
+                high: 110.0,
+                low: 90.0,
+                close: 105.0,
+                volume: 1000.0,
+            },
+            TestCandle {
+                timestamp: 2,
+                open: 105.0,
+                high: 115.0,
+                low: 95.0,
+                close: 110.0,
+                volume: 2000.0,
+            },
+            TestCandle {
+                timestamp: 3,
+                open: 110.0,
+                high: 120.0,
+                low: 100.0,
+                close: 115.0,
+                volume: 1500.0,
+            },
+        ];
+        let storage = CandleStore::new(candles, 100, false);
+
+        let mut builder1 = VolumeBuilder::<TestCandle>::new(3);
+        let from_storage = builder1.build_from_storage(&storage);
+
+        let mut builder2 = VolumeBuilder::<TestCandle>::new(3);
+        let from_data = builder2.build(&storage.get_ascending_items());
+
+        assert!((from_storage.average_volume - from_data.average_volume).abs() < 0.0001);
+        assert_eq!(from_storage.current_volume, from_data.current_volume);
     }
 
     #[test]
@@ -495,7 +537,7 @@ mod tests {
         // 거래량 비율 = 현재 거래량 / 평균 거래량
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -503,7 +545,7 @@ mod tests {
                 volume: 1000.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
@@ -511,7 +553,7 @@ mod tests {
                 volume: 1500.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 2,
+                timestamp: 1 + 2,
                 open: 110.0,
                 high: 120.0,
                 low: 100.0,
@@ -554,7 +596,7 @@ mod tests {
         // period=2인 경우 정확한 계산 검증
         let candles = vec![
             TestCandle {
-                timestamp: Utc::now().timestamp(),
+                timestamp: 1,
                 open: 100.0,
                 high: 110.0,
                 low: 90.0,
@@ -562,7 +604,7 @@ mod tests {
                 volume: 500.0,
             },
             TestCandle {
-                timestamp: Utc::now().timestamp() + 1,
+                timestamp: 1 + 1,
                 open: 105.0,
                 high: 115.0,
                 low: 95.0,
