@@ -93,13 +93,12 @@ pub enum IndicatorType {
     /// 저가
     LowPrice,
     /// 이동평균 (MA)
-    MovingAverage {
-        ma_type: MAType,
-        period: usize,
-    },
+    MovingAverage { ma_type: MAType, period: usize },
     /// RSI
     RSI {
         period: usize,
+        ma_type: MAType,
+        ma_periods: Vec<usize>,
     },
     /// MACD
     MACD {
@@ -203,21 +202,22 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
 
     /// 이동평균 기반 기울기 분석기 생성
     pub fn for_ma(storage: &CandleStore<C>, ma_type: MAType, period: usize) -> Self {
-        Self::new(
-            storage,
-            IndicatorType::MovingAverage {
-                ma_type,
-                period,
-            },
-        )
+        Self::new(storage, IndicatorType::MovingAverage { ma_type, period })
     }
 
     /// RSI 기반 기울기 분석기 생성
-    pub fn for_rsi(storage: &CandleStore<C>, period: usize) -> Self {
+    pub fn for_rsi(
+        storage: &CandleStore<C>,
+        period: usize,
+        ma_type: MAType,
+        ma_periods: Vec<usize>,
+    ) -> Self {
         Self::new(
             storage,
             IndicatorType::RSI {
                 period,
+                ma_type,
+                ma_periods,
             },
         )
     }
@@ -325,9 +325,7 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                         .push(SlopeAnalyzerData::new(candle.clone(), value));
                 }
             }
-            IndicatorType::MovingAverage {
-                ma_type, period
-            } => {
+            IndicatorType::MovingAverage { ma_type, period } => {
                 let ma_analyzer = MAAnalyzer::new(ma_type, &[*period], storage);
                 for data in ma_analyzer.items.iter() {
                     let value = data.mas.get_by_key_index(0).get();
@@ -336,8 +334,12 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
                 }
                 self.analyzer = StoredAnalyzer::MAAnalyzer(ma_analyzer);
             }
-            IndicatorType::RSI { period } => {
-                let rsi_analyzer = RSIAnalyzer::new(*period, &MAType::SMA, &[], storage);
+            IndicatorType::RSI {
+                period,
+                ma_type,
+                ma_periods,
+            } => {
+                let rsi_analyzer = RSIAnalyzer::new(*period, ma_type, ma_periods, storage);
                 for data in rsi_analyzer.items.iter() {
                     let value = data.rsi.value();
                     self.items
