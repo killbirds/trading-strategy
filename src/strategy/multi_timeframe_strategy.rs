@@ -162,11 +162,6 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
                 continue;
             }
 
-            // 타임프레임별 저장소에 캔들 추가
-            if let Some(timeframe_storage) = self.timeframe_storages.get_mut(interval) {
-                timeframe_storage.add(candle.clone());
-            }
-
             // 각 타임프레임에 맞게 신호 생성
             let signal = if strategy.should_enter(candle) {
                 Signal::Enter
@@ -254,8 +249,12 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
     }
 
     fn should_enter(&self, _candle: &C) -> bool {
-        // 가중 평균 신호가 임계값보다 크면 매수
-        self.calculate_weighted_signal() >= self.confirmation_threshold
+        // 가중 평균 신호가 임계값보다 크면 매수(롱), 작으면 매도(숏)
+        if self.position() == PositionType::Long {
+            self.calculate_weighted_signal() >= self.confirmation_threshold
+        } else {
+            self.calculate_weighted_signal() <= -self.confirmation_threshold
+        }
     }
 
     fn should_exit(&self, _candle: &C) -> bool {
@@ -279,5 +278,16 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
 impl<C: Candle + 'static> std::fmt::Display for MultiTimeframeStrategy<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "멀티 타임프레임 전략 (기본: {})", self.base_strategy)
+    }
+}
+
+#[cfg(test)]
+impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
+    pub(crate) fn set_signal_for_test(&mut self, interval: CandleInterval, signal: Signal) {
+        self.signals.insert(interval, signal);
+    }
+
+    pub(crate) fn calculate_weighted_signal_for_test(&self) -> f64 {
+        self.calculate_weighted_signal()
     }
 }

@@ -3,7 +3,10 @@ use crate::strategy::tests::common::{
     backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_storage,
     create_uptrend_candles,
 };
+use crate::strategy::Strategy;
+use crate::model::Signal;
 use std::collections::HashMap;
+use trading_chart::CandleInterval;
 
 // 테스트용 설정 생성 함수
 fn create_multi_timeframe_config() -> HashMap<String, String> {
@@ -34,6 +37,15 @@ fn create_multi_timeframe_config() -> HashMap<String, String> {
     config.insert("weights".to_string(), "0.2,0.3,0.3,0.2".to_string());
     config.insert("confirmation_threshold".to_string(), "0.6".to_string());
 
+    config
+}
+
+fn create_short_multi_timeframe_config() -> HashMap<String, String> {
+    let mut config = create_multi_timeframe_config();
+    config.insert("base_strategy".to_string(), "rsi_short".to_string());
+    config.insert("timeframes".to_string(), "1m,5m".to_string());
+    config.insert("weights".to_string(), "0.5,0.5".to_string());
+    config.insert("confirmation_threshold".to_string(), "0.6".to_string());
     config
 }
 
@@ -142,4 +154,25 @@ fn test_multi_timeframe_strategy_with_different_weights() {
     println!("단기 타임프레임 중시 결과: {result:?}");
     println!("총 수익률: {}", result.total_profit_percentage);
     println!("승률: {}", result.win_rate);
+}
+
+#[test]
+fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
+    let candles = create_uptrend_candles(10, 100.0, 1.0);
+    let storage = create_test_storage(candles);
+    let config = create_short_multi_timeframe_config();
+
+    let mut strategy = MultiTimeframeStrategy::new_with_config(&storage, Some(config)).unwrap();
+
+    // 숏 전략은 매도(Exit) 신호 합산이 임계값 이하이면 진입해야 한다.
+    strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Exit);
+    strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Exit);
+    assert!(strategy.calculate_weighted_signal_for_test() <= -0.6);
+    assert!(strategy.should_enter(&storage.items()[0]));
+
+    // 숏 전략은 매수(Enter) 신호 합산이 임계값 이상이면 청산해야 한다.
+    strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Enter);
+    strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Enter);
+    assert!(strategy.calculate_weighted_signal_for_test() >= 0.6);
+    assert!(strategy.should_exit(&storage.items()[0]));
 }
