@@ -522,7 +522,7 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
         }
 
         // 최근 스윙 포인트들만 유지 (최대 10개)
-        swing_points.sort_by(|a, b| b.index.cmp(&a.index));
+        swing_points.sort_by(|a, b| a.index.cmp(&b.index));
         swing_points.truncate(10);
 
         swing_points

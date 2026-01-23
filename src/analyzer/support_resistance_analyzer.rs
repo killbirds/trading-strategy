@@ -286,7 +286,8 @@ impl<C: Candle + 'static> SupportResistanceAnalyzer<C> {
         total_candles: usize,
     ) -> f64 {
         let touch_score = (touch_count as f64 - 1.0) * 0.2;
-        let recency_score = 1.0 - (total_candles - last_touch_index) as f64 / total_candles as f64;
+        let recency_denominator = total_candles.saturating_sub(1).max(1) as f64;
+        let recency_score = 1.0 - (last_touch_index as f64 / recency_denominator);
         (touch_score + recency_score * 0.5).min(1.0)
     }
 

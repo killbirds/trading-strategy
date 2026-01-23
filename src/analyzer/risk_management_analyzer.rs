@@ -776,6 +776,9 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<RiskManagementAnalyzerData<C>, C>
             recent_candles.push(item.candle.clone());
         }
 
+        // 지표 계산은 과거 -> 최신 순서를 전제로 함
+        recent_candles.reverse();
+
         // 분석 수행
         let atr = self.calculate_atr(&recent_candles);
         let volatility_percentage = self.calculate_volatility(&recent_candles);
