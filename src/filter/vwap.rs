@@ -1,8 +1,8 @@
+use super::Result;
 use super::{VWAPFilterType, VWAPParams, utils};
 use crate::analyzer::vwap_analyzer::VWAPAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::vwap::VWAPParams as IndicatorVWAPParams;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 VWAP 필터 적용

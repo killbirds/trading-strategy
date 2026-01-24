@@ -1,9 +1,9 @@
+use super::Result;
 use super::{ThreeRSIFilterType, ThreeRSIParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::three_rsi_analyzer::ThreeRSIAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// ThreeRSI 필터 함수
@@ -13,17 +13,7 @@ pub(crate) fn filter_three_rsi<C: Candle + 'static>(
     candle_store: &CandleStore<C>,
     ma_type: MAType,
 ) -> Result<bool> {
-    ThreeRSIFilter::check_filter(
-        symbol,
-        candle_store,
-        &params.rsi_periods,
-        ma_type,
-        params.ma_period,
-        params.adx_period,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    ThreeRSIFilter::check_filter(symbol, candle_store, params, ma_type)
 }
 
 /// ThreeRSI 필터 구조체
@@ -34,14 +24,15 @@ impl ThreeRSIFilter {
     pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        rsi_periods: &[usize],
+        params: &ThreeRSIParams,
         ma_type: MAType,
-        ma_period: usize,
-        adx_period: usize,
-        filter_type: ThreeRSIFilterType,
-        consecutive_n: usize,
-        p: usize,
     ) -> Result<bool> {
+        let rsi_periods = &params.rsi_periods;
+        let ma_period = params.ma_period;
+        let adx_period = params.adx_period;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
         // 파라미터 검증
         for rsi_period in rsi_periods {
             utils::validate_period(*rsi_period, "ThreeRSI rsi_period")?;
@@ -272,17 +263,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::AllRSILessThan50,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::AllRSILessThan50,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
     }
 
@@ -332,17 +322,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            5,
-            14,
-            ThreeRSIFilterType::AllRSILessThan50,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 5,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::AllRSILessThan50,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
     }
 
@@ -392,17 +381,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::RSIExtremeOversold,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::RSIExtremeOversold,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_oversold = result.unwrap();
@@ -455,17 +443,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::RSIExtremeOverbought,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::RSIExtremeOverbought,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_overbought = result.unwrap();
@@ -518,17 +505,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::RSIStableRange,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::RSIStableRange,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_stable_range = result.unwrap();
@@ -581,17 +567,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::RSIBullishRange,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::RSIBullishRange,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bullish_range = result.unwrap();
@@ -644,17 +629,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ThreeRSIFilter::check_filter(
-            "TEST",
-            &candle_store,
-            &[7, 14, 21],
-            MAType::SMA,
-            20,
-            14,
-            ThreeRSIFilterType::RSIBearishRange,
-            1,
-            0,
-        );
+        let params = ThreeRSIParams {
+            rsi_periods: vec![7, 14, 21],
+            ma_type: "SMA".to_string(),
+            ma_period: 20,
+            adx_period: 14,
+            filter_type: ThreeRSIFilterType::RSIBearishRange,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bearish_range = result.unwrap();

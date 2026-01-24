@@ -1,8 +1,8 @@
+use super::Result;
 use super::{MACDFilterType, MACDParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::macd_analyzer::MACDAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 MACD 필터 적용

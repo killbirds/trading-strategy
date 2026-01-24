@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use chrono::{DateTime, Utc};
 use trading_chart::Candle;
 use trading_chart::CandleInterval;

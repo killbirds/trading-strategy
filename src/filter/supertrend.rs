@@ -1,7 +1,7 @@
+use super::Result;
 use super::{SuperTrendFilterType, SuperTrendParams, utils};
 use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// SuperTrend 필터 함수

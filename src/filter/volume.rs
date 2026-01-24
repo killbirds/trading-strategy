@@ -1,8 +1,8 @@
+use super::Result;
 use super::{VolumeFilterType, VolumeParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::volume_analyzer::VolumeAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// Volume 필터 함수
@@ -11,16 +11,7 @@ pub(crate) fn filter_volume<C: Candle + 'static>(
     params: &VolumeParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    VolumeFilter::check_filter(
-        symbol,
-        candle_store,
-        params.period,
-        params.threshold,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-        params.stable_min_threshold,
-    )
+    VolumeFilter::check_filter(symbol, candle_store, params)
 }
 
 /// Volume 필터 구조체
@@ -31,13 +22,14 @@ impl VolumeFilter {
     pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        period: usize,
-        threshold: f64,
-        filter_type: VolumeFilterType,
-        consecutive_n: usize,
-        p: usize,
-        stable_min_threshold: f64,
+        params: &VolumeParams,
     ) -> Result<bool> {
+        let period = params.period;
+        let threshold = params.threshold;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
+        let stable_min_threshold = params.stable_min_threshold;
         // 파라미터 검증
         utils::validate_period(period, "Volume")?;
 
@@ -238,7 +230,15 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = VolumeFilter::check_filter("TEST", &candle_store, 3, 1.5, 0.into(), 1, 0, 0.1);
+        let params = VolumeParams {
+            period: 3,
+            threshold: 1.5,
+            filter_type: 0.into(),
+            consecutive_n: 1,
+            p: 0,
+            stable_min_threshold: 0.1,
+        };
+        let result = VolumeFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }

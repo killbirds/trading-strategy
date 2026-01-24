@@ -1,9 +1,9 @@
+use super::Result;
 use super::{IchimokuFilterType, IchimokuParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::ichimoku_analyzer::IchimokuAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ichimoku::IchimokuParams as IndicatorIchimokuParams;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 이치모쿠 계산 결과 구조체

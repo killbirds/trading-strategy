@@ -5,11 +5,18 @@ use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use serde::Deserialize;
 use serde_json;
+use thiserror::Error;
 use trading_chart::Candle;
 
 // analyzer에서 RSIAnalyzer 관련 구조체 가져오기
 pub use crate::analyzer::rsi_analyzer::{RSIAnalyzer, RSIAnalyzerData};
 pub type CopysStrategyContext<C> = crate::analyzer::rsi_analyzer::RSIAnalyzer<C>;
+
+#[derive(Debug, Error)]
+pub enum CopysContextError {
+    #[error("CopyS 컨텍스트 생성 실패")]
+    ContextCreation,
+}
 
 /// Copys 전략 공통 설정 기본 구조체
 #[derive(Debug, Deserialize, Clone)]
@@ -216,7 +223,7 @@ pub fn create_strategy_context_for_filter<C: Candle + 'static>(
     ma_type: &MAType,
     ma_periods: &[usize],
     candles: &[C],
-) -> anyhow::Result<RSIAnalyzer<C>> {
+) -> Result<RSIAnalyzer<C>, CopysContextError> {
     // CandleStore를 직접 사용하지 않아 임시 저장소 사용
     let storage = CandleStore::<C>::new(Vec::new(), 1000, false);
     let mut analyzer = RSIAnalyzer::new(rsi_period, ma_type, ma_periods, &storage);
@@ -236,7 +243,7 @@ pub fn create_strategy_context_for_filter_with_store<C: Candle + 'static>(
     ma_type: &MAType,
     ma_periods: &[usize],
     candle_store: &CandleStore<C>,
-) -> anyhow::Result<RSIAnalyzer<C>> {
+) -> Result<RSIAnalyzer<C>, CopysContextError> {
     // CandleStore를 재사용하여 RSIAnalyzer 생성
     // init_from_storage가 이미 호출되었으므로 추가 작업 불필요
     let analyzer = RSIAnalyzer::new(rsi_period, ma_type, ma_periods, candle_store);

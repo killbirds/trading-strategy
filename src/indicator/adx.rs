@@ -319,7 +319,6 @@ impl ADXsBuilderFactory {
 mod tests {
     use super::*;
     use crate::tests::TestCandle;
-    
 
     fn create_test_candles() -> Vec<TestCandle> {
         let base = 1;

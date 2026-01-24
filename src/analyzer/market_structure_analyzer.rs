@@ -126,20 +126,36 @@ pub struct MarketStructureAnalyzerData<C: Candle> {
     pub recent_swing_low: Option<f64>,
 }
 
+#[derive(Debug)]
+pub struct MarketStructureAnalyzerDataParams {
+    pub market_structure: MarketStructure,
+    pub structure_change: StructureChange,
+    pub fair_value_gaps: Vec<FairValueGap>,
+    pub order_blocks: Vec<OrderBlock>,
+    pub liquidity_pools: Vec<LiquidityPool>,
+    pub market_flow_strength: f64,
+    pub imbalance_degree: f64,
+    pub recent_swing_high: Option<f64>,
+    pub recent_swing_low: Option<f64>,
+}
+
 impl<C: Candle> MarketStructureAnalyzerData<C> {
     /// 새 분석기 데이터 생성
     pub fn new(
         candle: C,
-        market_structure: MarketStructure,
-        structure_change: StructureChange,
-        fair_value_gaps: Vec<FairValueGap>,
-        order_blocks: Vec<OrderBlock>,
-        liquidity_pools: Vec<LiquidityPool>,
-        market_flow_strength: f64,
-        imbalance_degree: f64,
-        recent_swing_high: Option<f64>,
-        recent_swing_low: Option<f64>,
+        params: MarketStructureAnalyzerDataParams,
     ) -> MarketStructureAnalyzerData<C> {
+        let MarketStructureAnalyzerDataParams {
+            market_structure,
+            structure_change,
+            fair_value_gaps,
+            order_blocks,
+            liquidity_pools,
+            market_flow_strength,
+            imbalance_degree,
+            recent_swing_high,
+            recent_swing_low,
+        } = params;
         MarketStructureAnalyzerData {
             candle,
             market_structure,
@@ -817,15 +833,17 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<MarketStructureAnalyzerData<C>, C>
 
         MarketStructureAnalyzerData::new(
             candle,
-            market_structure,
-            structure_change,
-            fair_value_gaps,
-            order_blocks,
-            liquidity_pools,
-            market_flow_strength,
-            imbalance_degree,
-            recent_swing_high,
-            recent_swing_low,
+            MarketStructureAnalyzerDataParams {
+                market_structure,
+                structure_change,
+                fair_value_gaps,
+                order_blocks,
+                liquidity_pools,
+                market_flow_strength,
+                imbalance_degree,
+                recent_swing_high,
+                recent_swing_low,
+            },
         )
     }
 

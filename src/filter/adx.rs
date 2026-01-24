@@ -1,7 +1,6 @@
-use super::{ADXFilterType, ADXParams, utils};
+use super::{ADXFilterType, ADXParams, FilterError, Result, utils};
 use crate::analyzer::adx_analyzer::ADXAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 ADX 필터 적용
@@ -21,9 +20,7 @@ pub(crate) fn filter_adx<C: Candle + 'static>(
     // 파라미터 유효성 검증
     utils::validate_period(params.period, "ADX")?;
     if !(0.0..=100.0).contains(&params.threshold) {
-        return Err(anyhow::anyhow!(
-            "ADX 파라미터 오류: threshold는 0에서 100 사이여야 합니다"
-        ));
+        return Err(FilterError::InvalidAdxThreshold);
     }
 
     // 필터링할 코인 식별

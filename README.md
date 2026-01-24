@@ -78,7 +78,7 @@ cargo build --release
 - `serde`: 직렬화/역직렬화
 - `toml`: TOML 설정 파일 파싱
 - `serde_json`: JSON 설정 파일 파싱
-- `anyhow`: 에러 처리
+- `thiserror`: 에러 처리
 
 ## 사용 방법
 

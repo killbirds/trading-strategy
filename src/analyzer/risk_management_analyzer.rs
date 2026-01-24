@@ -89,23 +89,42 @@ pub struct RiskManagementAnalyzerData<C: Candle> {
     pub recommended_target_distance: f64,
 }
 
+#[derive(Debug)]
+pub struct RiskManagementAnalyzerDataParams {
+    pub risk_level: RiskLevel,
+    pub atr: f64,
+    pub volatility_percentage: f64,
+    pub daily_volatility: f64,
+    pub weekly_volatility: f64,
+    pub max_drawdown: f64,
+    pub sharpe_ratio: f64,
+    pub volatility_index: f64,
+    pub risk_adjusted_return: f64,
+    pub optimal_position_size: f64,
+    pub recommended_stop_distance: f64,
+    pub recommended_target_distance: f64,
+}
+
 impl<C: Candle> RiskManagementAnalyzerData<C> {
     /// 새 분석기 데이터 생성
     pub fn new(
         candle: C,
-        risk_level: RiskLevel,
-        atr: f64,
-        volatility_percentage: f64,
-        daily_volatility: f64,
-        weekly_volatility: f64,
-        max_drawdown: f64,
-        sharpe_ratio: f64,
-        volatility_index: f64,
-        risk_adjusted_return: f64,
-        optimal_position_size: f64,
-        recommended_stop_distance: f64,
-        recommended_target_distance: f64,
+        params: RiskManagementAnalyzerDataParams,
     ) -> RiskManagementAnalyzerData<C> {
+        let RiskManagementAnalyzerDataParams {
+            risk_level,
+            atr,
+            volatility_percentage,
+            daily_volatility,
+            weekly_volatility,
+            max_drawdown,
+            sharpe_ratio,
+            volatility_index,
+            risk_adjusted_return,
+            optimal_position_size,
+            recommended_stop_distance,
+            recommended_target_distance,
+        } = params;
         RiskManagementAnalyzerData {
             candle,
             risk_level,
@@ -796,18 +815,20 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<RiskManagementAnalyzerData<C>, C>
 
         RiskManagementAnalyzerData::new(
             candle,
-            risk_level,
-            atr,
-            volatility_percentage,
-            daily_volatility,
-            weekly_volatility,
-            max_drawdown,
-            sharpe_ratio,
-            volatility_index,
-            risk_adjusted_return,
-            optimal_position_size,
-            recommended_stop_distance,
-            recommended_target_distance,
+            RiskManagementAnalyzerDataParams {
+                risk_level,
+                atr,
+                volatility_percentage,
+                daily_volatility,
+                weekly_volatility,
+                max_drawdown,
+                sharpe_ratio,
+                volatility_index,
+                risk_adjusted_return,
+                optimal_position_size,
+                recommended_stop_distance,
+                recommended_target_distance,
+            },
         )
     }
 

@@ -318,6 +318,17 @@ pub struct MomentumAnalyzer<C: Candle> {
     pub history_length: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MomentumAnalyzerParams {
+    pub rsi_period: usize,
+    pub stoch_period: usize,
+    pub williams_period: usize,
+    pub roc_period: usize,
+    pub cci_period: usize,
+    pub momentum_period: usize,
+    pub history_length: usize,
+}
+
 impl<C: Candle> Display for MomentumAnalyzer<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.items.first() {
@@ -329,16 +340,16 @@ impl<C: Candle> Display for MomentumAnalyzer<C> {
 
 impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
     /// 새 Momentum 분석기 생성
-    pub fn new(
-        storage: &CandleStore<C>,
-        rsi_period: usize,
-        stoch_period: usize,
-        williams_period: usize,
-        roc_period: usize,
-        cci_period: usize,
-        momentum_period: usize,
-        history_length: usize,
-    ) -> MomentumAnalyzer<C> {
+    pub fn new(storage: &CandleStore<C>, params: MomentumAnalyzerParams) -> MomentumAnalyzer<C> {
+        let MomentumAnalyzerParams {
+            rsi_period,
+            stoch_period,
+            williams_period,
+            roc_period,
+            cci_period,
+            momentum_period,
+            history_length,
+        } = params;
         let mut analyzer = MomentumAnalyzer {
             items: Vec::new(),
             rsi_period,
@@ -356,7 +367,18 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
 
     /// 기본 설정으로 분석기 생성
     pub fn default(storage: &CandleStore<C>) -> MomentumAnalyzer<C> {
-        Self::new(storage, 14, 14, 14, 10, 20, 10, 20)
+        Self::new(
+            storage,
+            MomentumAnalyzerParams {
+                rsi_period: 14,
+                stoch_period: 14,
+                williams_period: 14,
+                roc_period: 10,
+                cci_period: 20,
+                momentum_period: 10,
+                history_length: 20,
+            },
+        )
     }
 
     /// RSI 계산

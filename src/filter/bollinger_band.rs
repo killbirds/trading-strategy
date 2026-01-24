@@ -1,8 +1,8 @@
+use super::Result;
 use super::{BollingerBandFilterType, BollingerBandParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::bband_analyzer::BBandAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 볼린저 밴드 필터 적용

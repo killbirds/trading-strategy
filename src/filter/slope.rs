@@ -1,7 +1,7 @@
+use super::Result;
 use super::{SlopeFilterType, SlopeParams, utils};
 use crate::analyzer::slope_analyzer::SlopeAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 기울기 필터 적용

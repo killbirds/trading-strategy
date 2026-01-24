@@ -118,6 +118,29 @@ pub struct HybridAnalyzer<C: Candle + Clone> {
     pub items: Vec<HybridAnalyzerData<C>>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct EnhancedBuySignalParams {
+    pub n: usize,
+    pub m: usize,
+    pub rsi_lower: f64,
+    pub volatility: f64,
+    pub volume_factor: f64,
+    pub threshold: f64,
+    pub p: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EnhancedSellSignalParams {
+    pub n: usize,
+    pub m: usize,
+    pub rsi_upper: f64,
+    pub profit_percentage: f64,
+    pub volatility: f64,
+    pub volume_factor: f64,
+    pub threshold: f64,
+    pub p: usize,
+}
+
 impl<C: Candle + Clone> Display for HybridAnalyzer<C> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(first) = self.items.first() {
@@ -793,16 +816,16 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
     }
 
     /// 강화된 매수 신호 돌파 확인 (n개 연속 강화된 매수 신호, 이전 m개는 아님)
-    pub fn is_enhanced_buy_signal_confirmed(
-        &self,
-        n: usize,
-        m: usize,
-        rsi_lower: f64,
-        volatility: f64,
-        volume_factor: f64,
-        threshold: f64,
-        p: usize,
-    ) -> bool {
+    pub fn is_enhanced_buy_signal_confirmed(&self, params: EnhancedBuySignalParams) -> bool {
+        let EnhancedBuySignalParams {
+            n,
+            m,
+            rsi_lower,
+            volatility,
+            volume_factor,
+            threshold,
+            p,
+        } = params;
         self.is_break_through_by_satisfying(
             |_| {
                 self.calculate_enhanced_buy_signal_strength(rsi_lower, volatility, volume_factor)
@@ -815,17 +838,17 @@ impl<C: Candle + Clone + 'static> HybridAnalyzer<C> {
     }
 
     /// 강화된 매도 신호 돌파 확인 (n개 연속 강화된 매도 신호, 이전 m개는 아님)
-    pub fn is_enhanced_sell_signal_confirmed(
-        &self,
-        n: usize,
-        m: usize,
-        rsi_upper: f64,
-        profit_percentage: f64,
-        volatility: f64,
-        volume_factor: f64,
-        threshold: f64,
-        p: usize,
-    ) -> bool {
+    pub fn is_enhanced_sell_signal_confirmed(&self, params: EnhancedSellSignalParams) -> bool {
+        let EnhancedSellSignalParams {
+            n,
+            m,
+            rsi_upper,
+            profit_percentage,
+            volatility,
+            volume_factor,
+            threshold,
+            p,
+        } = params;
         self.is_break_through_by_satisfying(
             |_| {
                 self.calculate_enhanced_sell_signal_strength(

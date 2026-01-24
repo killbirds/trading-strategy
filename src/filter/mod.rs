@@ -1,15 +1,63 @@
-use anyhow::Result;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
+use thiserror::Error;
 use trading_chart::Candle;
+
+pub type Result<T> = std::result::Result<T, FilterError>;
+
+#[derive(Debug, Error)]
+pub enum FilterError {
+    #[error("{param_name} 파라미터 오류: period는 0보다 커야 합니다")]
+    InvalidPeriod { param_name: String },
+    #[error("ADX 파라미터 오류: threshold는 0에서 100 사이여야 합니다")]
+    InvalidAdxThreshold,
+    #[error("SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다")]
+    InvalidSupportResistanceMinTouchCount,
+    #[error("CandlePattern 파라미터 오류: pattern_history_length는 0보다 커야 합니다")]
+    InvalidCandlePatternHistoryLength,
+    #[error("알 수 없는 필터 타입: {input}")]
+    UnknownTechnicalFilterType { input: String },
+    #[error("알 수 없는 RSI 필터 타입: {input}")]
+    UnknownRsiFilterType { input: String },
+    #[error("알 수 없는 MACD 필터 타입: {input}")]
+    UnknownMacdFilterType { input: String },
+    #[error("알 수 없는 BollingerBand 필터 타입: {input}")]
+    UnknownBollingerBandFilterType { input: String },
+    #[error("알 수 없는 ADX 필터 타입: {input}")]
+    UnknownAdxFilterType { input: String },
+    #[error("알 수 없는 MovingAverage 필터 타입: {input}")]
+    UnknownMovingAverageFilterType { input: String },
+    #[error("알 수 없는 Ichimoku 필터 타입: {input}")]
+    UnknownIchimokuFilterType { input: String },
+    #[error("알 수 없는 VWAP 필터 타입: {input}")]
+    UnknownVwapFilterType { input: String },
+    #[error("알 수 없는 Copys 필터 타입: {input}")]
+    UnknownCopysFilterType { input: String },
+    #[error("알 수 없는 ATR 필터 타입: {input}")]
+    UnknownAtrFilterType { input: String },
+    #[error("알 수 없는 SuperTrend 필터 타입: {input}")]
+    UnknownSuperTrendFilterType { input: String },
+    #[error("알 수 없는 Volume 필터 타입: {input}")]
+    UnknownVolumeFilterType { input: String },
+    #[error("알 수 없는 ThreeRSI 필터 타입: {input}")]
+    UnknownThreeRsiFilterType { input: String },
+    #[error("알 수 없는 CandlePattern 필터 타입: {input}")]
+    UnknownCandlePatternFilterType { input: String },
+    #[error("알 수 없는 SupportResistance 필터 타입: {input}")]
+    UnknownSupportResistanceFilterType { input: String },
+    #[error("알 수 없는 Momentum 필터 타입: {input}")]
+    UnknownMomentumFilterType { input: String },
+    #[error("알 수 없는 Slope 필터 타입: {input}")]
+    UnknownSlopeFilterType { input: String },
+}
 
 // 공통 deserializer 매크로
 macro_rules! impl_filter_type_deserialize {
     ($type:ident, $visitor:ident, $name:literal) => {
         impl<'de> Deserialize<'de> for $type {
-            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {
@@ -22,21 +70,21 @@ macro_rules! impl_filter_type_deserialize {
                         formatter.write_str("정수 또는 문자열")
                     }
 
-                    fn visit_i64<E>(self, value: i64) -> Result<$type, E>
+                    fn visit_i64<E>(self, value: i64) -> std::result::Result<$type, E>
                     where
                         E: de::Error,
                     {
                         Ok($type::from(value as i32))
                     }
 
-                    fn visit_u64<E>(self, value: u64) -> Result<$type, E>
+                    fn visit_u64<E>(self, value: u64) -> std::result::Result<$type, E>
                     where
                         E: de::Error,
                     {
                         Ok($type::from(value as i32))
                     }
 
-                    fn visit_str<E>(self, value: &str) -> Result<$type, E>
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<$type, E>
                     where
                         E: de::Error,
                     {
@@ -71,6 +119,7 @@ mod vwap;
 
 /// 필터 공통 유틸리티 함수
 pub mod utils {
+    use super::{FilterError, Result};
     use crate::candle_store::CandleStore;
     use trading_chart::Candle;
 
@@ -81,12 +130,11 @@ pub mod utils {
     }
 
     /// 기본 파라미터 검증 (period > 0)
-    pub fn validate_period(period: usize, param_name: &str) -> anyhow::Result<()> {
+    pub fn validate_period(period: usize, param_name: &str) -> Result<()> {
         if period == 0 {
-            return Err(anyhow::anyhow!(
-                "{} 파라미터 오류: period는 0보다 커야 합니다",
-                param_name
-            ));
+            return Err(FilterError::InvalidPeriod {
+                param_name: param_name.to_string(),
+            });
         }
         Ok(())
     }
@@ -171,9 +219,9 @@ impl fmt::Display for TechnicalFilterType {
 }
 
 impl FromStr for TechnicalFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s.to_uppercase().as_str() {
             "RSI" => Ok(TechnicalFilterType::RSI),
             "MACD" => Ok(TechnicalFilterType::MACD),
@@ -191,7 +239,9 @@ impl FromStr for TechnicalFilterType {
             "SUPPORTRESISTANCE" => Ok(TechnicalFilterType::SupportResistance),
             "MOMENTUM" => Ok(TechnicalFilterType::Momentum),
             "SLOPE" => Ok(TechnicalFilterType::Slope),
-            _ => Err(anyhow::anyhow!("알 수 없는 필터 타입: {}", s)),
+            _ => Err(FilterError::UnknownTechnicalFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -271,9 +321,9 @@ impl From<RSIFilterType> for i32 {
 }
 
 impl FromStr for RSIFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "Overbought" => Ok(RSIFilterType::Overbought),
             "Oversold" => Ok(RSIFilterType::Oversold),
@@ -306,7 +356,9 @@ impl FromStr for RSIFilterType {
                 // 숫자로 파싱 시도
                 match s.parse::<i32>() {
                     Ok(num) => Ok(RSIFilterType::from(num)),
-                    Err(_) => Err(anyhow::anyhow!("알 수 없는 RSI 필터 타입: {}", s)),
+                    Err(_) => Err(FilterError::UnknownRsiFilterType {
+                        input: s.to_string(),
+                    }),
                 }
             }
         }
@@ -378,9 +430,9 @@ impl From<MACDFilterType> for i32 {
 }
 
 impl FromStr for MACDFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "MacdAboveSignal" => Ok(MACDFilterType::MacdAboveSignal),
             "MacdBelowSignal" => Ok(MACDFilterType::MacdBelowSignal),
@@ -405,7 +457,9 @@ impl FromStr for MACDFilterType {
             "Sideways" => Ok(MACDFilterType::Sideways),
             _ => match s.parse::<i32>() {
                 Ok(num) => Ok(MACDFilterType::from(num)),
-                Err(_) => Err(anyhow::anyhow!("알 수 없는 MACD 필터 타입: {}", s)),
+                Err(_) => Err(FilterError::UnknownMacdFilterType {
+                    input: s.to_string(),
+                }),
             },
         }
     }
@@ -496,9 +550,9 @@ impl From<BollingerBandFilterType> for i32 {
 }
 
 impl FromStr for BollingerBandFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "AboveUpperBand" => Ok(BollingerBandFilterType::AboveUpperBand),
             "BelowLowerBand" => Ok(BollingerBandFilterType::BelowLowerBand),
@@ -549,7 +603,9 @@ impl FromStr for BollingerBandFilterType {
             "HighVolatility" => Ok(BollingerBandFilterType::HighVolatility),
             _ => match s.parse::<i32>() {
                 Ok(num) => Ok(BollingerBandFilterType::from(num)),
-                Err(_) => Err(anyhow::anyhow!("알 수 없는 BollingerBand 필터 타입: {}", s)),
+                Err(_) => Err(FilterError::UnknownBollingerBandFilterType {
+                    input: s.to_string(),
+                }),
             },
         }
     }
@@ -644,9 +700,9 @@ impl From<ADXFilterType> for i32 {
 }
 
 impl FromStr for ADXFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("BelowThreshold", ADXFilterType::BelowThreshold),
             ("AboveThreshold", ADXFilterType::AboveThreshold),
@@ -692,7 +748,9 @@ impl FromStr for ADXFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(ADXFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 ADX 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownAdxFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -766,9 +824,9 @@ impl From<MovingAverageFilterType> for i32 {
 }
 
 impl FromStr for MovingAverageFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             (
                 "PriceAboveFirstMA",
@@ -836,7 +894,9 @@ impl FromStr for MovingAverageFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(MovingAverageFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 MovingAverage 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownMovingAverageFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -894,9 +954,9 @@ impl From<IchimokuFilterType> for i32 {
 }
 
 impl FromStr for IchimokuFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("PriceAboveCloud", IchimokuFilterType::PriceAboveCloud),
             ("PriceBelowCloud", IchimokuFilterType::PriceBelowCloud),
@@ -924,7 +984,9 @@ impl FromStr for IchimokuFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(IchimokuFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 Ichimoku 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownIchimokuFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -976,9 +1038,9 @@ impl From<VWAPFilterType> for i32 {
 }
 
 impl FromStr for VWAPFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("PriceAboveVWAP", VWAPFilterType::PriceAboveVWAP),
             ("PriceBelowVWAP", VWAPFilterType::PriceBelowVWAP),
@@ -1002,7 +1064,9 @@ impl FromStr for VWAPFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(VWAPFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 VWAP 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownVwapFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1062,9 +1126,9 @@ impl From<CopysFilterType> for i32 {
 }
 
 impl FromStr for CopysFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("BasicBuySignal", CopysFilterType::BasicBuySignal),
             ("BasicSellSignal", CopysFilterType::BasicSellSignal),
@@ -1098,7 +1162,9 @@ impl FromStr for CopysFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(CopysFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 Copys 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownCopysFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1140,9 +1206,9 @@ impl From<ATRFilterType> for i32 {
 }
 
 impl FromStr for ATRFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("AboveThreshold", ATRFilterType::AboveThreshold),
             ("VolatilityExpanding", ATRFilterType::VolatilityExpanding),
@@ -1164,7 +1230,9 @@ impl FromStr for ATRFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(ATRFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 ATR 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownAtrFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1210,9 +1278,9 @@ impl From<SuperTrendFilterType> for i32 {
 }
 
 impl FromStr for SuperTrendFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("AllUptrend", SuperTrendFilterType::AllUptrend),
             ("AllDowntrend", SuperTrendFilterType::AllDowntrend),
@@ -1245,7 +1313,9 @@ impl FromStr for SuperTrendFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(SuperTrendFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 SuperTrend 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownSuperTrendFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1319,9 +1389,9 @@ impl From<VolumeFilterType> for i32 {
 }
 
 impl FromStr for VolumeFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("VolumeAboveAverage", VolumeFilterType::VolumeAboveAverage),
             ("VolumeBelowAverage", VolumeFilterType::VolumeBelowAverage),
@@ -1381,7 +1451,9 @@ impl FromStr for VolumeFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(VolumeFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 Volume 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownVolumeFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1473,9 +1545,9 @@ impl From<ThreeRSIFilterType> for i32 {
 }
 
 impl FromStr for ThreeRSIFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             ("AllRSILessThan50", ThreeRSIFilterType::AllRSILessThan50),
             (
@@ -1540,7 +1612,9 @@ impl FromStr for ThreeRSIFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(ThreeRSIFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 ThreeRSI 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownThreeRsiFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1650,9 +1724,9 @@ impl From<CandlePatternFilterType> for i32 {
 }
 
 impl FromStr for CandlePatternFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             (
                 "StrongBullishPattern",
@@ -1790,7 +1864,9 @@ impl FromStr for CandlePatternFilterType {
         // 숫자로 파싱 시도
         match s.parse::<i32>() {
             Ok(num) => Ok(CandlePatternFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 CandlePattern 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownCandlePatternFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1842,9 +1918,9 @@ impl From<SupportResistanceFilterType> for i32 {
 }
 
 impl FromStr for SupportResistanceFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             (
                 "SupportBreakdown",
@@ -1887,10 +1963,9 @@ impl FromStr for SupportResistanceFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(SupportResistanceFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!(
-                "알 수 없는 SupportResistance 필터 타입: {}",
-                s
-            )),
+            Err(_) => Err(FilterError::UnknownSupportResistanceFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -1964,9 +2039,9 @@ impl From<MomentumFilterType> for i32 {
 }
 
 impl FromStr for MomentumFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         let variants = [
             (
                 "StrongPositiveMomentum",
@@ -2026,7 +2101,9 @@ impl FromStr for MomentumFilterType {
 
         match s.parse::<i32>() {
             Ok(num) => Ok(MomentumFilterType::from(num)),
-            Err(_) => Err(anyhow::anyhow!("알 수 없는 Momentum 필터 타입: {}", s)),
+            Err(_) => Err(FilterError::UnknownMomentumFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }
@@ -2692,9 +2769,9 @@ impl From<SlopeFilterType> for i32 {
 }
 
 impl FromStr for SlopeFilterType {
-    type Err = anyhow::Error;
+    type Err = FilterError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "Upward" => Ok(SlopeFilterType::Upward),
             "Downward" => Ok(SlopeFilterType::Downward),
@@ -2705,7 +2782,9 @@ impl FromStr for SlopeFilterType {
             "StrongUpward" => Ok(SlopeFilterType::StrongUpward),
             "StrongDownward" => Ok(SlopeFilterType::StrongDownward),
             "HighRSquared" => Ok(SlopeFilterType::HighRSquared),
-            _ => Err(anyhow::anyhow!("알 수 없는 Slope 필터 타입: {}", s)),
+            _ => Err(FilterError::UnknownSlopeFilterType {
+                input: s.to_string(),
+            }),
         }
     }
 }

@@ -1,7 +1,6 @@
-use super::{SupportResistanceFilterType, SupportResistanceParams, utils};
+use super::{FilterError, Result, SupportResistanceFilterType, SupportResistanceParams, utils};
 use crate::analyzer::support_resistance_analyzer::SupportResistanceAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// SupportResistance 필터 함수
@@ -10,17 +9,7 @@ pub(crate) fn filter_support_resistance<C: Candle + 'static>(
     params: &SupportResistanceParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    SupportResistanceFilter::check_filter(
-        symbol,
-        candle_store,
-        params.lookback_period,
-        params.touch_threshold,
-        params.min_touch_count,
-        params.threshold,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    SupportResistanceFilter::check_filter(symbol, candle_store, params)
 }
 
 /// SupportResistance 필터 구조체
@@ -31,20 +20,19 @@ impl SupportResistanceFilter {
     pub(crate) fn check_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        lookback_period: usize,
-        touch_threshold: f64,
-        min_touch_count: usize,
-        threshold: f64,
-        filter_type: SupportResistanceFilterType,
-        consecutive_n: usize,
-        p: usize,
+        params: &SupportResistanceParams,
     ) -> Result<bool> {
+        let lookback_period = params.lookback_period;
+        let touch_threshold = params.touch_threshold;
+        let min_touch_count = params.min_touch_count;
+        let threshold = params.threshold;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
         // 파라미터 검증
         utils::validate_period(lookback_period, "SupportResistance lookback_period")?;
         if min_touch_count == 0 {
-            return Err(anyhow::anyhow!(
-                "SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다"
-            ));
+            return Err(FilterError::InvalidSupportResistanceMinTouchCount);
         }
 
         // 경계 조건 체크
@@ -150,17 +138,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = SupportResistanceFilter::check_filter(
-            "TEST",
-            &candle_store,
-            3,
-            0.01,
-            2,
-            0.05,
-            0.into(),
-            1,
-            0,
-        );
+        let params = SupportResistanceParams {
+            lookback_period: 3,
+            touch_threshold: 0.01,
+            min_touch_count: 2,
+            threshold: 0.05,
+            filter_type: 0.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = SupportResistanceFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }

@@ -1,8 +1,7 @@
-use super::{CandlePatternFilterType, CandlePatternParams, utils};
+use super::{CandlePatternFilterType, CandlePatternParams, FilterError, Result, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::candle_pattern_analyzer::CandlePatternAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// CandlePattern 필터 함수
@@ -11,17 +10,7 @@ pub(crate) fn filter_candle_pattern<C: Candle + Clone + 'static>(
     params: &CandlePatternParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    CandlePatternFilter::check_filter(
-        symbol,
-        candle_store,
-        params.min_body_ratio,
-        params.min_shadow_ratio,
-        params.pattern_history_length,
-        params.threshold,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    CandlePatternFilter::check_filter(symbol, candle_store, params)
 }
 
 /// CandlePattern 필터 구조체
@@ -32,19 +21,18 @@ impl CandlePatternFilter {
     pub(crate) fn check_filter<C: Candle + Clone + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        min_body_ratio: f64,
-        min_shadow_ratio: f64,
-        pattern_history_length: usize,
-        threshold: f64,
-        filter_type: CandlePatternFilterType,
-        consecutive_n: usize,
-        p: usize,
+        params: &CandlePatternParams,
     ) -> Result<bool> {
+        let min_body_ratio = params.min_body_ratio;
+        let min_shadow_ratio = params.min_shadow_ratio;
+        let pattern_history_length = params.pattern_history_length;
+        let threshold = params.threshold;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
         // 파라미터 검증
         if pattern_history_length == 0 {
-            return Err(anyhow::anyhow!(
-                "CandlePattern 파라미터 오류: pattern_history_length는 0보다 커야 합니다"
-            ));
+            return Err(FilterError::InvalidCandlePatternHistoryLength);
         }
 
         // 경계 조건 체크
@@ -373,17 +361,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            0.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 0.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 
@@ -433,17 +420,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            11.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 11.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_hammer = result.unwrap();
         println!("해머 패턴 테스트 결과: {is_hammer}");
@@ -495,17 +481,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            12.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 12.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_shooting_star = result.unwrap();
         println!("샷팅 스타 패턴 테스트 결과: {is_shooting_star}");
@@ -557,17 +542,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            13.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 13.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_doji = result.unwrap();
         println!("도지 패턴 테스트 결과: {is_doji}");
@@ -619,17 +603,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            16.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 16.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_morning_star = result.unwrap();
         println!("모닝 스타 패턴 테스트 결과: {is_morning_star}");
@@ -681,17 +664,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            17.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 17.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_evening_star = result.unwrap();
         println!("이브닝 스타 패턴 테스트 결과: {is_evening_star}");
@@ -743,17 +725,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            18.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 18.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_engulfing = result.unwrap();
         println!("인걸핑 패턴 테스트 결과: {is_engulfing}");
@@ -805,17 +786,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            36.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 36.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_double_bottom = result.unwrap();
         println!("이중 바닥 패턴 테스트 결과: {is_double_bottom}");
@@ -867,17 +847,16 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = CandlePatternFilter::check_filter(
-            "TEST",
-            &candle_store,
-            0.3,
-            0.3,
-            5,
-            0.5,
-            37.into(),
-            1,
-            0,
-        );
+        let params = CandlePatternParams {
+            min_body_ratio: 0.3,
+            min_shadow_ratio: 0.3,
+            pattern_history_length: 5,
+            threshold: 0.5,
+            filter_type: 37.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_double_top = result.unwrap();
         println!("이중 천정 패턴 테스트 결과: {is_double_top}");

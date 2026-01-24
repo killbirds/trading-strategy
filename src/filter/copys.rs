@@ -1,4 +1,4 @@
-use anyhow::Result;
+use super::Result;
 use std::fmt;
 use trading_chart::Candle;
 

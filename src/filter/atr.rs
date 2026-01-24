@@ -1,7 +1,7 @@
+use super::Result;
 use super::{ATRFilterType, ATRParams, utils};
 use crate::analyzer::atr_analyzer::ATRAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// ATR 필터 함수

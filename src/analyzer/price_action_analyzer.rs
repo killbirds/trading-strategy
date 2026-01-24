@@ -94,21 +94,35 @@ pub struct PriceActionAnalyzerData<C: Candle> {
     pub lower_shadow_ratio: f64,
 }
 
+#[derive(Debug)]
+pub struct PriceActionAnalyzerDataParams {
+    pub candle_pattern: CandlePattern,
+    pub price_trend: PriceTrend,
+    pub swing_points: Vec<SwingPoint>,
+    pub avg_candle_size: f64,
+    pub current_candle_size: f64,
+    pub vwap: f64,
+    pub momentum: f64,
+    pub body_ratio: f64,
+    pub upper_shadow_ratio: f64,
+    pub lower_shadow_ratio: f64,
+}
+
 impl<C: Candle> PriceActionAnalyzerData<C> {
     /// 새 분석기 데이터 생성
-    pub fn new(
-        candle: C,
-        candle_pattern: CandlePattern,
-        price_trend: PriceTrend,
-        swing_points: Vec<SwingPoint>,
-        avg_candle_size: f64,
-        current_candle_size: f64,
-        vwap: f64,
-        momentum: f64,
-        body_ratio: f64,
-        upper_shadow_ratio: f64,
-        lower_shadow_ratio: f64,
-    ) -> PriceActionAnalyzerData<C> {
+    pub fn new(candle: C, params: PriceActionAnalyzerDataParams) -> PriceActionAnalyzerData<C> {
+        let PriceActionAnalyzerDataParams {
+            candle_pattern,
+            price_trend,
+            swing_points,
+            avg_candle_size,
+            current_candle_size,
+            vwap,
+            momentum,
+            body_ratio,
+            upper_shadow_ratio,
+            lower_shadow_ratio,
+        } = params;
         PriceActionAnalyzerData {
             candle,
             candle_pattern,
@@ -831,16 +845,18 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<PriceActionAnalyzerData<C>, C>
 
         PriceActionAnalyzerData::new(
             candle,
-            candle_pattern,
-            price_trend,
-            swing_points,
-            avg_candle_size,
-            current_candle_size,
-            vwap,
-            momentum,
-            body_ratio,
-            upper_shadow_ratio,
-            lower_shadow_ratio,
+            PriceActionAnalyzerDataParams {
+                candle_pattern,
+                price_trend,
+                swing_points,
+                avg_candle_size,
+                current_candle_size,
+                vwap,
+                momentum,
+                body_ratio,
+                upper_shadow_ratio,
+                lower_shadow_ratio,
+            },
         )
     }
 

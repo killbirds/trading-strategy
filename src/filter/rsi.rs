@@ -1,9 +1,9 @@
+use super::Result;
 use super::{RSIFilterType, RSIParams, utils};
 use crate::analyzer::AnalyzerOps;
 use crate::analyzer::rsi_analyzer::RSIAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// 개별 코인에 대한 RSI 필터 적용

@@ -1,8 +1,8 @@
+use super::Result;
 use super::{MomentumFilterType, MomentumParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::momentum_analyzer::MomentumAnalyzer;
 use crate::candle_store::CandleStore;
-use anyhow::Result;
 use trading_chart::Candle;
 
 /// Momentum 필터 함수
@@ -11,21 +11,7 @@ pub(crate) fn filter_momentum<C: Candle + Clone + 'static>(
     params: &MomentumParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    MomentumFilter::check_filter(
-        symbol,
-        candle_store,
-        params.rsi_period,
-        params.stoch_period,
-        params.williams_period,
-        params.roc_period,
-        params.cci_period,
-        params.momentum_period,
-        params.history_length,
-        params.threshold,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    MomentumFilter::check_filter(symbol, candle_store, params)
 }
 
 /// Momentum 필터 구조체
@@ -36,18 +22,19 @@ impl MomentumFilter {
     pub(crate) fn check_filter<C: Candle + Clone + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        rsi_period: usize,
-        stoch_period: usize,
-        williams_period: usize,
-        roc_period: usize,
-        cci_period: usize,
-        momentum_period: usize,
-        history_length: usize,
-        _threshold: f64,
-        filter_type: MomentumFilterType,
-        consecutive_n: usize,
-        p: usize,
+        params: &MomentumParams,
     ) -> Result<bool> {
+        let rsi_period = params.rsi_period;
+        let stoch_period = params.stoch_period;
+        let williams_period = params.williams_period;
+        let roc_period = params.roc_period;
+        let cci_period = params.cci_period;
+        let momentum_period = params.momentum_period;
+        let history_length = params.history_length;
+        let _threshold = params.threshold;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
         // 파라미터 검증
         utils::validate_period(rsi_period, "Momentum rsi_period")?;
         utils::validate_period(stoch_period, "Momentum stoch_period")?;
@@ -64,13 +51,15 @@ impl MomentumFilter {
         // analyzer는 이미 init_from_storage로 초기화되었으므로 추가 처리 불필요
         let analyzer = MomentumAnalyzer::new(
             candle_store,
-            rsi_period,
-            stoch_period,
-            williams_period,
-            roc_period,
-            cci_period,
-            momentum_period,
-            history_length,
+            crate::analyzer::momentum_analyzer::MomentumAnalyzerParams {
+                rsi_period,
+                stoch_period,
+                williams_period,
+                roc_period,
+                cci_period,
+                momentum_period,
+                history_length,
+            },
         );
 
         // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
@@ -204,21 +193,20 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = MomentumFilter::check_filter(
-            "TEST",
-            &candle_store,
-            14,
-            14,
-            14,
-            10,
-            20,
-            10,
-            5,
-            0.5,
-            0.into(),
-            1,
-            0,
-        );
+        let params = MomentumParams {
+            rsi_period: 14,
+            stoch_period: 14,
+            williams_period: 14,
+            roc_period: 10,
+            cci_period: 20,
+            momentum_period: 10,
+            history_length: 5,
+            threshold: 0.5,
+            filter_type: 0.into(),
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = MomentumFilter::check_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }
