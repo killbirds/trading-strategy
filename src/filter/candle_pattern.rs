@@ -10,7 +10,7 @@ pub(crate) fn filter_candle_pattern<C: Candle + Clone + 'static>(
     params: &CandlePatternParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    CandlePatternFilter::check_filter(symbol, candle_store, params)
+    CandlePatternFilter::matches_filter(symbol, candle_store, params)
 }
 
 /// CandlePattern 필터 구조체
@@ -18,7 +18,7 @@ pub struct CandlePatternFilter;
 
 impl CandlePatternFilter {
     /// CandlePattern 필터 확인
-    pub(crate) fn check_filter<C: Candle + Clone + 'static>(
+    pub(crate) fn matches_filter<C: Candle + Clone + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &CandlePatternParams,
@@ -370,7 +370,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 
@@ -429,7 +429,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_hammer = result.unwrap();
         println!("해머 패턴 테스트 결과: {is_hammer}");
@@ -490,7 +490,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_shooting_star = result.unwrap();
         println!("샷팅 스타 패턴 테스트 결과: {is_shooting_star}");
@@ -551,7 +551,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_doji = result.unwrap();
         println!("도지 패턴 테스트 결과: {is_doji}");
@@ -612,7 +612,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_morning_star = result.unwrap();
         println!("모닝 스타 패턴 테스트 결과: {is_morning_star}");
@@ -673,7 +673,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_evening_star = result.unwrap();
         println!("이브닝 스타 패턴 테스트 결과: {is_evening_star}");
@@ -734,7 +734,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_engulfing = result.unwrap();
         println!("인걸핑 패턴 테스트 결과: {is_engulfing}");
@@ -795,7 +795,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_double_bottom = result.unwrap();
         println!("이중 바닥 패턴 테스트 결과: {is_double_bottom}");
@@ -856,7 +856,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = CandlePatternFilter::check_filter("TEST", &candle_store, &params);
+        let result = CandlePatternFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
         let is_double_top = result.unwrap();
         println!("이중 천정 패턴 테스트 결과: {is_double_top}");

@@ -10,7 +10,7 @@ pub(crate) fn filter_supertrend<C: Candle + 'static>(
     params: &SuperTrendParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    SuperTrendFilter::check_filter(
+    SuperTrendFilter::matches_filter(
         symbol,
         candle_store,
         params.period,
@@ -26,7 +26,7 @@ pub struct SuperTrendFilter;
 
 impl SuperTrendFilter {
     /// SuperTrend 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
-    pub(crate) fn check_filter<C: Candle + 'static>(
+    pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         period: usize,
@@ -134,7 +134,8 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = SuperTrendFilter::check_filter("TEST", &candle_store, 2, 2.0, 0.into(), 1, 0);
+        let result =
+            SuperTrendFilter::matches_filter("TEST", &candle_store, 2, 2.0, 0.into(), 1, 0);
         assert!(result.is_ok());
     }
 }

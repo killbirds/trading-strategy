@@ -9,7 +9,7 @@ pub(crate) fn filter_support_resistance<C: Candle + 'static>(
     params: &SupportResistanceParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    SupportResistanceFilter::check_filter(symbol, candle_store, params)
+    SupportResistanceFilter::matches_filter(symbol, candle_store, params)
 }
 
 /// SupportResistance 필터 구조체
@@ -17,7 +17,7 @@ pub struct SupportResistanceFilter;
 
 impl SupportResistanceFilter {
     /// SupportResistance 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
-    pub(crate) fn check_filter<C: Candle + 'static>(
+    pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &SupportResistanceParams,
@@ -147,7 +147,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = SupportResistanceFilter::check_filter("TEST", &candle_store, &params);
+        let result = SupportResistanceFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }

@@ -13,7 +13,7 @@ pub(crate) fn filter_three_rsi<C: Candle + 'static>(
     candle_store: &CandleStore<C>,
     ma_type: MAType,
 ) -> Result<bool> {
-    ThreeRSIFilter::check_filter(symbol, candle_store, params, ma_type)
+    ThreeRSIFilter::matches_filter(symbol, candle_store, params, ma_type)
 }
 
 /// ThreeRSI 필터 구조체
@@ -21,7 +21,7 @@ pub struct ThreeRSIFilter;
 
 impl ThreeRSIFilter {
     /// ThreeRSI 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
-    pub(crate) fn check_filter<C: Candle + 'static>(
+    pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &ThreeRSIParams,
@@ -272,7 +272,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
     }
 
@@ -331,7 +331,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
     }
 
@@ -390,7 +390,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_oversold = result.unwrap();
@@ -452,7 +452,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_overbought = result.unwrap();
@@ -514,7 +514,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_stable_range = result.unwrap();
@@ -576,7 +576,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bullish_range = result.unwrap();
@@ -638,7 +638,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = ThreeRSIFilter::check_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bearish_range = result.unwrap();

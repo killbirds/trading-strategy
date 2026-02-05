@@ -2909,7 +2909,7 @@ impl TechnicalFilterConfig {
     }
 }
 
-// Filter functions are now pub(crate) and accessed through TechnicalFilter::check_filter
+// Filter functions are now pub(crate) and accessed through TechnicalFilter::matches_filter
 pub use ichimoku::IchimokuValues;
 
 /// 기술적 지표 필터링 적용
@@ -2917,18 +2917,18 @@ pub struct TechnicalFilter;
 
 impl TechnicalFilter {
     /// 개별 코인에 대한 기술적 필터 적용
-    pub fn check_filter<C: Candle + 'static>(
+    pub fn matches_filter<C: Candle + 'static>(
         symbol: &str,
         filter: &TechnicalFilterConfig,
         candles: &[C],
     ) -> Result<bool> {
-        // CandleStore를 생성하고 내부 check_filter 사용
+        // CandleStore를 생성하고 내부 matches_filter_internal 사용
         let candle_store = utils::create_candle_store(candles);
-        Self::check_filter_internal(symbol, filter, &candle_store)
+        Self::matches_filter_internal(symbol, filter, &candle_store)
     }
 
     /// 개별 코인에 여러 기술적 필터 적용
-    pub fn check_filters<C: Candle + 'static>(
+    pub fn matches_filters<C: Candle + 'static>(
         symbol: &str,
         filters: &[TechnicalFilterConfig],
         candles: &[C],
@@ -2944,7 +2944,7 @@ impl TechnicalFilter {
             );
 
             // 각 필터 적용 결과 확인 (CandleStore 재사용)
-            match Self::check_filter_internal(symbol, filter, &candle_store) {
+            match Self::matches_filter_internal(symbol, filter, &candle_store) {
                 Ok(true) => {
                     // 필터 통과, 다음 필터로 진행
                     log::debug!("코인 {} 필터 {} 통과", symbol, filter.filter_type());
@@ -2974,7 +2974,7 @@ impl TechnicalFilter {
     }
 
     /// 개별 코인에 대한 기술적 필터 적용 (내부 헬퍼 함수, CandleStore 재사용)
-    fn check_filter_internal<C: Candle + 'static>(
+    fn matches_filter_internal<C: Candle + 'static>(
         symbol: &str,
         filter: &TechnicalFilterConfig,
         candle_store: &crate::candle_store::CandleStore<C>,

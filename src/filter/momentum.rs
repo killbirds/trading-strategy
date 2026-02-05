@@ -11,7 +11,7 @@ pub(crate) fn filter_momentum<C: Candle + Clone + 'static>(
     params: &MomentumParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    MomentumFilter::check_filter(symbol, candle_store, params)
+    MomentumFilter::matches_filter(symbol, candle_store, params)
 }
 
 /// Momentum 필터 구조체
@@ -19,7 +19,7 @@ pub struct MomentumFilter;
 
 impl MomentumFilter {
     /// Momentum 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
-    pub(crate) fn check_filter<C: Candle + Clone + 'static>(
+    pub(crate) fn matches_filter<C: Candle + Clone + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &MomentumParams,
@@ -206,7 +206,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = MomentumFilter::check_filter("TEST", &candle_store, &params);
+        let result = MomentumFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }

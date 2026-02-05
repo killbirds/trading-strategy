@@ -10,7 +10,7 @@ pub(crate) fn filter_atr<C: Candle + 'static>(
     params: &ATRParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    ATRFilter::check_filter(
+    ATRFilter::matches_filter(
         symbol,
         candle_store,
         params.period,
@@ -26,7 +26,7 @@ pub struct ATRFilter;
 
 impl ATRFilter {
     /// ATR 필터 확인
-    pub(crate) fn check_filter<C: Candle + 'static>(
+    pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         period: usize,
@@ -136,7 +136,7 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ATRFilter::check_filter("TEST", &candle_store, 2, 5.0, 0.into(), 1, 0);
+        let result = ATRFilter::matches_filter("TEST", &candle_store, 2, 5.0, 0.into(), 1, 0);
         assert!(result.is_ok());
     }
 }

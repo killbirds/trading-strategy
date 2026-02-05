@@ -11,7 +11,7 @@ pub(crate) fn filter_volume<C: Candle + 'static>(
     params: &VolumeParams,
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
-    VolumeFilter::check_filter(symbol, candle_store, params)
+    VolumeFilter::matches_filter(symbol, candle_store, params)
 }
 
 /// Volume 필터 구조체
@@ -19,7 +19,7 @@ pub struct VolumeFilter;
 
 impl VolumeFilter {
     /// Volume 필터 확인 (내부 헬퍼 함수, CandleStore 재사용)
-    pub(crate) fn check_filter<C: Candle + 'static>(
+    pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &VolumeParams,
@@ -238,7 +238,7 @@ mod tests {
             p: 0,
             stable_min_threshold: 0.1,
         };
-        let result = VolumeFilter::check_filter("TEST", &candle_store, &params);
+        let result = VolumeFilter::matches_filter("TEST", &candle_store, &params);
         assert!(result.is_ok());
     }
 }
