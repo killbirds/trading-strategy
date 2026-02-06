@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -111,17 +111,31 @@ where
     /// # Panics
     /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(period: usize) -> Self {
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 RSI 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `period` - RSI 계산 기간 (일반적으로 14)
+    ///
+    /// # Returns
+    /// * `IndicatorResult<RSIBuilder>` - 새 RSI 빌더 인스턴스 또는 에러
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("RSI 기간은 0보다 커야 합니다");
+            return Err("RSI 기간은 0보다 커야 합니다".to_string());
         }
 
-        Self {
+        Ok(Self {
             period,
             values: Vec::with_capacity(period + 2),
             previous_avg_gain: None,
             previous_avg_loss: None,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 RSI 지표 생성
@@ -296,9 +310,29 @@ impl RSIsBuilderFactory {
     /// # Returns
     /// * `RSIsBuilder` - 여러 기간의 RSI 빌더
     pub fn build<C: Candle + 'static>(periods: &[usize]) -> RSIsBuilder<C> {
-        RSIsBuilder::new("rsis".to_owned(), periods, |period| {
+        match Self::build_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 여러 기간의 RSI 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `periods` - RSI 계산 기간 목록
+    ///
+    /// # Returns
+    /// * `IndicatorResult<RSIsBuilder>` - 여러 기간의 RSI 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<RSIsBuilder<C>> {
+        for period in periods {
+            RSIBuilder::<C>::new_checked(*period)?;
+        }
+
+        Ok(RSIsBuilder::new("rsis".to_owned(), periods, |period| {
             Box::new(RSIBuilder::<C>::new(*period))
-        })
+        }))
     }
 
     /// 기본 RSI 빌더 생성 (14 기간)

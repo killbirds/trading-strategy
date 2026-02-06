@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::cmp;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -203,21 +203,43 @@ where
     /// # Panics
     /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(tenkan_period: usize, kijun_period: usize, senkou_period: usize) -> Self {
+        match Self::new_checked(tenkan_period, kijun_period, senkou_period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 일목균형표 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `tenkan_period` - 전환선 기간 (기본값 9)
+    /// * `kijun_period` - 기준선 기간 (기본값 26)
+    /// * `senkou_period` - 선행스팬 기간 (기본값 52)
+    ///
+    /// # Returns
+    /// * `IndicatorResult<IchimokuBuilder>` - 새 일목균형표 빌더 또는 에러
+    pub fn new_checked(
+        tenkan_period: usize,
+        kijun_period: usize,
+        senkou_period: usize,
+    ) -> IndicatorResult<Self> {
         if tenkan_period == 0 || kijun_period == 0 || senkou_period == 0 {
-            panic!("일목균형표 기간은 0보다 커야 합니다");
+            return Err("일목균형표 기간은 0보다 커야 합니다".to_string());
         }
 
         if tenkan_period >= kijun_period || kijun_period >= senkou_period {
-            panic!("일목균형표 기간은 tenkan < kijun < senkou 조건을 만족해야 합니다");
+            return Err(
+                "일목균형표 기간은 tenkan < kijun < senkou 조건을 만족해야 합니다".to_string(),
+            );
         }
 
-        Self {
+        Ok(Self {
             tenkan_period,
             kijun_period,
             senkou_period,
             candles: Vec::with_capacity(senkou_period * 2),
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 일목균형표 지표 계산
@@ -412,13 +434,41 @@ impl IchimokusBuilderFactory {
     /// # Returns
     /// * `IchimokusBuilder` - 여러 일목균형표 빌더
     pub fn build<C: Candle + 'static>(params: &[IchimokuParams]) -> IchimokusBuilder<C> {
-        IchimokusBuilder::new("ichimokus".to_owned(), params, |param| {
-            Box::new(IchimokuBuilder::new(
+        match Self::build_checked(params) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 여러 일목균형표 매개변수 세트에 대한 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `params` - 일목균형표 매개변수 세트 목록
+    ///
+    /// # Returns
+    /// * `IndicatorResult<IchimokusBuilder>` - 여러 일목균형표 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        params: &[IchimokuParams],
+    ) -> IndicatorResult<IchimokusBuilder<C>> {
+        for param in params {
+            IchimokuBuilder::<C>::new_checked(
                 param.tenkan_period,
                 param.kijun_period,
                 param.senkou_period,
-            ))
-        })
+            )?;
+        }
+
+        Ok(IchimokusBuilder::new(
+            "ichimokus".to_owned(),
+            params,
+            |param| {
+                Box::new(IchimokuBuilder::new(
+                    param.tenkan_period,
+                    param.kijun_period,
+                    param.senkou_period,
+                ))
+            },
+        ))
     }
 
     /// 기본 일목균형표 매개변수로 빌더 생성 (9, 26, 52)

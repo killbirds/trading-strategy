@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
+use crate::indicator::{IndicatorResult, TABuilder};
 use crate::indicator::utils::moving_average;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
@@ -245,22 +245,37 @@ where
     /// # Panics
     /// * 유효하지 않은 매개변수가 제공되면 패닉 발생
     pub fn new(period: usize, multiplier: f64) -> Self {
+        match Self::new_checked(period, multiplier) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 볼린저 밴드 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `period` - 계산 기간 (일반적으로 20)
+    /// * `multiplier` - 표준편차 승수 (일반적으로 2.0)
+    ///
+    /// # Returns
+    /// * `IndicatorResult<BollingerBandsBuilder>` - 새 빌더 인스턴스 또는 에러
+    pub fn new_checked(period: usize, multiplier: f64) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("볼린저 밴드 기간은 0보다 커야 합니다");
+            return Err("볼린저 밴드 기간은 0보다 커야 합니다".to_string());
         }
 
         if multiplier <= 0.0 {
-            panic!("볼린저 밴드 승수는 0보다 커야 합니다");
+            return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
         }
 
         let indicator = BollingerBandsIndicator::new(period, multiplier);
 
-        Self {
+        Ok(Self {
             indicator,
             period,
             multiplier,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 볼린저 밴드 지표 생성

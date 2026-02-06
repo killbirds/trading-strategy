@@ -1,6 +1,6 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::utils::moving_average;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -159,15 +159,35 @@ where
     /// # Panics
     /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(fast_period: usize, slow_period: usize, signal_period: usize) -> Self {
+        match Self::new_checked(fast_period, slow_period, signal_period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 MACD 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `fast_period` - 빠른 EMA 기간 (기본값 12)
+    /// * `slow_period` - 느린 EMA 기간 (기본값 26)
+    /// * `signal_period` - 시그널 라인 기간 (기본값 9)
+    ///
+    /// # Returns
+    /// * `IndicatorResult<MACDBuilder>` - 새 빌더 인스턴스 또는 에러
+    pub fn new_checked(
+        fast_period: usize,
+        slow_period: usize,
+        signal_period: usize,
+    ) -> IndicatorResult<Self> {
         if fast_period == 0 || slow_period == 0 || signal_period == 0 {
-            panic!("MACD 기간은 0보다 커야 합니다");
+            return Err("MACD 기간은 0보다 커야 합니다".to_string());
         }
 
         if fast_period >= slow_period {
-            panic!("빠른 기간은 느린 기간보다 작아야 합니다");
+            return Err("빠른 기간은 느린 기간보다 작아야 합니다".to_string());
         }
 
-        Self {
+        Ok(Self {
             fast_period,
             slow_period,
             signal_period,
@@ -177,7 +197,7 @@ where
             previous_signal_line: None,
             macd_history: Vec::with_capacity(signal_period * 2),
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 MACD 지표 생성
@@ -446,13 +466,37 @@ impl MACDsBuilderFactory {
     /// # Returns
     /// * `MACDsBuilder` - 여러 MACD 빌더
     pub fn build<C: Candle + 'static>(params: &[MACDParams]) -> MACDsBuilder<C> {
-        MACDsBuilder::new("macds".to_owned(), params, |param| {
+        match Self::build_checked(params) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 여러 MACD 매개변수 조합에 대한 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `params` - MACD 매개변수 조합 목록
+    ///
+    /// # Returns
+    /// * `IndicatorResult<MACDsBuilder>` - 여러 MACD 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        params: &[MACDParams],
+    ) -> IndicatorResult<MACDsBuilder<C>> {
+        for param in params {
+            MACDBuilder::<C>::new_checked(
+                param.fast_period,
+                param.slow_period,
+                param.signal_period,
+            )?;
+        }
+
+        Ok(MACDsBuilder::new("macds".to_owned(), params, |param| {
             Box::new(MACDBuilder::new(
                 param.fast_period,
                 param.slow_period,
                 param.signal_period,
             ))
-        })
+        }))
     }
 
     /// 기본 MACD 매개변수로 빌더 생성 (12, 26, 9)
