@@ -27,6 +27,8 @@ use crate::candle_store::CandleStore;
 use std::fmt::Display;
 use trading_chart::Candle;
 
+pub type IndicatorResult<T> = std::result::Result<T, String>;
+
 /// 기술적 지표(TA)의 컬렉션을 관리하는 구조체
 ///
 /// 여러 기술적 지표를 키-값 쌍으로 저장하고 관리합니다.
@@ -130,6 +132,28 @@ where
     /// * `&Vec<K>` - 키 목록 참조
     pub fn keys(&self) -> &Vec<K> {
         &self.keys
+    }
+
+    /// 지정된 키에 해당하는 값 참조 반환
+    ///
+    /// # Arguments
+    /// * `key` - 검색할 키
+    ///
+    /// # Returns
+    /// * `&T` - 찾은 값 참조
+    pub fn get_checked(&self, key: &K) -> Option<&T> {
+        self.data.get(key)
+    }
+
+    /// 인덱스로 키를 찾고, 해당 키로 데이터를 가져옵니다. (안전한 버전)
+    ///
+    /// # Arguments
+    /// * `index` - 키를 찾을 인덱스
+    ///
+    /// # Returns
+    /// * `Option<&T>` - 해당 인덱스의 키로 찾은 데이터 참조
+    pub fn get_by_key_index_checked(&self, index: usize) -> Option<&T> {
+        self.keys.get(index).and_then(|key| self.data.get(key))
     }
 
     /// 지정된 키에 해당하는 값 참조 반환
