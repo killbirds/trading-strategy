@@ -1,7 +1,7 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
 use crate::indicator::utils::moving_average;
+use crate::indicator::{IndicatorResult, TABuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -95,16 +95,30 @@ where
     /// # Panics
     /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(period: usize) -> Self {
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 EMA 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `period` - EMA 계산 기간
+    ///
+    /// # Returns
+    /// * `IndicatorResult<EMABuilder>` - 새 빌더 인스턴스 또는 에러
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("EMA 기간은 0보다 커야 합니다");
+            return Err("EMA 기간은 0보다 커야 합니다".to_string());
         }
 
-        EMABuilder {
+        Ok(EMABuilder {
             period,
             values: Vec::with_capacity(period * 2),
             previous_ema: None,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 EMA 지표 생성

@@ -2,7 +2,7 @@ pub mod ema;
 pub mod sma;
 pub mod wma;
 
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use ema::EMABuilder;
 use serde::Deserialize;
 use serde::Serialize;
@@ -73,15 +73,35 @@ impl MABuilderFactory {
         ma_type: &MAType,
         period: usize,
     ) -> Box<dyn TABuilder<Box<dyn MA>, C>> {
+        match Self::build_checked(ma_type, period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 이동평균 유형과 기간에 따른 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `ma_type` - 이동평균 유형 (EMA, SMA, WMA)
+    /// * `period` - 이동평균 계산 기간
+    ///
+    /// # Returns
+    /// * `IndicatorResult<Box<dyn TABuilder<Box<dyn MA>>>>` - 이동평균 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        ma_type: &MAType,
+        period: usize,
+    ) -> IndicatorResult<Box<dyn TABuilder<Box<dyn MA>, C>>> {
         if period == 0 {
-            panic!("이동평균 기간은 0보다 커야 합니다");
+            return Err("이동평균 기간은 0보다 커야 합니다".to_string());
         }
 
-        match ma_type {
-            MAType::EMA => Box::new(EMABuilder::<C>::new(period)),
+        let builder: Box<dyn TABuilder<Box<dyn MA>, C>> = match ma_type {
+            MAType::EMA => Box::new(EMABuilder::<C>::new_checked(period)?),
             MAType::SMA => Box::new(SMABuilder::<C>::new(period)),
-            MAType::WMA => Box::new(WMABuilder::<C>::new(period)),
-        }
+            MAType::WMA => Box::new(WMABuilder::<C>::new_checked(period)?),
+        };
+
+        Ok(builder)
     }
 }
 
@@ -107,20 +127,44 @@ impl MAsBuilderFactory {
     /// # Panics
     /// * 빈 기간 목록이 제공되면 패닉 발생
     pub fn build<C: Candle + 'static>(ma_type: &MAType, periods: &[usize]) -> MAsBuilder<C> {
+        match Self::build_checked(ma_type, periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 여러 기간의 이동평균 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `ma_type` - 이동평균 유형 (EMA, SMA, WMA)
+    /// * `periods` - 이동평균 계산 기간 목록
+    ///
+    /// # Returns
+    /// * `IndicatorResult<MAsBuilder>` - 여러 기간의 이동평균 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        ma_type: &MAType,
+        periods: &[usize],
+    ) -> IndicatorResult<MAsBuilder<C>> {
         if periods.is_empty() {
-            panic!("이동평균 기간 목록이 비어 있습니다");
+            return Err("이동평균 기간 목록이 비어 있습니다".to_string());
         }
 
         // 기간이 오름차순으로 정렬되어 있는지 확인
         for i in 1..periods.len() {
             if periods[i] <= periods[i - 1] {
-                panic!("이동평균 기간은 오름차순으로 정렬되어야 합니다: {periods:?}");
+                return Err(format!(
+                    "이동평균 기간은 오름차순으로 정렬되어야 합니다: {periods:?}"
+                ));
             }
         }
 
-        MAsBuilder::new("mas".to_owned(), periods, |period| {
+        if periods.iter().any(|period| *period == 0) {
+            return Err("이동평균 기간은 0보다 커야 합니다".to_string());
+        }
+
+        Ok(MAsBuilder::new("mas".to_owned(), periods, |period| {
             MABuilderFactory::build::<C>(ma_type, *period)
-        })
+        }))
     }
 }
 

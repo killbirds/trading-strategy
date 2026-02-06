@@ -1,6 +1,6 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
+use crate::indicator::{IndicatorResult, TABuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -59,15 +59,29 @@ where
     /// # Panics
     /// * 유효하지 않은 기간이 제공되면 패닉 발생
     pub fn new(period: usize) -> Self {
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 WMA 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `period` - WMA 계산 기간
+    ///
+    /// # Returns
+    /// * `IndicatorResult<WMABuilder>` - 새 빌더 인스턴스 또는 에러
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("WMA 기간은 0보다 커야 합니다");
+            return Err("WMA 기간은 0보다 커야 합니다".to_string());
         }
 
-        Self {
+        Ok(Self {
             period,
             values: Vec::with_capacity(period * 2),
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 WMA 지표 생성
