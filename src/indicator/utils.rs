@@ -5,9 +5,9 @@ use crate::indicator::bband::{BollingerBands, BollingerBandsBuilder};
 use crate::indicator::ichimoku;
 use crate::indicator::ichimoku::IchimokusBuilderFactory;
 use crate::indicator::ma;
-use crate::indicator::ma::MA;
 use crate::indicator::ma::ema::EMABuilder;
 use crate::indicator::ma::sma::SMABuilder;
+use crate::indicator::ma::MA;
 use crate::indicator::macd;
 use crate::indicator::macd::{MACDParams, MACDsBuilderFactory};
 use crate::indicator::max;
@@ -18,7 +18,7 @@ use crate::indicator::rsi;
 use crate::indicator::rsi::{RSIBuilder, RSIsBuilderFactory};
 use crate::indicator::volume;
 use crate::indicator::volume::VolumesBuilderFactory;
-use crate::indicator::{TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TAs, TAsBuilder};
 use trading_chart::Candle;
 
 /// 공통 이동평균 계산 함수들
@@ -126,27 +126,62 @@ mod factories {
     pub fn build_sma_builders<C: Candle + 'static>(
         periods: &[usize],
     ) -> TAsBuilder<usize, Box<dyn ma::MA>, C> {
-        TAsBuilder::new("smas".to_owned(), periods, |period| {
+        match build_sma_builders_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_sma_builders_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<TAsBuilder<usize, Box<dyn ma::MA>, C>> {
+        Ok(TAsBuilder::new("smas".to_owned(), periods, |period| {
             Box::new(SMABuilder::<C>::new(*period))
-        })
+        }))
     }
 
     /// 지수이동평균 빌더 생성
     pub fn build_ema_builders<C: Candle + 'static>(
         periods: &[usize],
     ) -> TAsBuilder<usize, Box<dyn ma::MA>, C> {
-        TAsBuilder::new("emas".to_owned(), periods, |period| {
+        match build_ema_builders_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_ema_builders_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<TAsBuilder<usize, Box<dyn ma::MA>, C>> {
+        for period in periods {
+            EMABuilder::<C>::new_checked(*period)?;
+        }
+
+        Ok(TAsBuilder::new("emas".to_owned(), periods, |period| {
             Box::new(EMABuilder::<C>::new(*period))
-        })
+        }))
     }
 
     /// 볼린저밴드 빌더 생성
     pub fn build_bband_builders<C: Candle + 'static>(
         periods: &[usize],
     ) -> TAsBuilder<usize, BollingerBands, C> {
-        TAsBuilder::new("bbands".to_owned(), periods, |period| {
+        match build_bband_builders_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_bband_builders_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<TAsBuilder<usize, BollingerBands, C>> {
+        for period in periods {
+            BollingerBandsBuilder::<C>::new_checked(*period, 2.0)?;
+        }
+
+        Ok(TAsBuilder::new("bbands".to_owned(), periods, |period| {
             Box::new(BollingerBandsBuilder::<C>::new(*period, 2.0))
-        })
+        }))
     }
 }
 
