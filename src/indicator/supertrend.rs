@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
+use crate::indicator::{IndicatorResult, TABuilder};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
@@ -157,22 +157,30 @@ pub struct SuperTrendBuilder<C: Candle> {
 impl<C: Candle> SuperTrendBuilder<C> {
     /// 새 슈퍼트렌드 빌더 생성
     pub fn new(period: usize, multiplier: f64) -> SuperTrendBuilder<C> {
+        match Self::new_checked(period, multiplier) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 슈퍼트렌드 빌더 생성 (검증 포함)
+    pub fn new_checked(period: usize, multiplier: f64) -> IndicatorResult<SuperTrendBuilder<C>> {
         if period == 0 {
-            panic!("슈퍼트렌드 기간은 0보다 커야 합니다");
+            return Err("슈퍼트렌드 기간은 0보다 커야 합니다".to_string());
         }
 
         if multiplier <= 0.0 || multiplier.is_nan() || multiplier.is_infinite() {
-            panic!("슈퍼트렌드 승수는 0보다 큰 유한한 값이어야 합니다");
+            return Err("슈퍼트렌드 승수는 0보다 큰 유한한 값이어야 합니다".to_string());
         }
 
-        SuperTrendBuilder {
+        Ok(SuperTrendBuilder {
             period,
             multiplier,
             atr_builder: ATRBuilder::new(period),
             previous_supertrend: None,
             previous_close: None,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 슈퍼트렌드 지표 생성
@@ -327,17 +335,34 @@ pub struct SuperTrendsBuilder<C: Candle> {
 impl<C: Candle> SuperTrendsBuilder<C> {
     /// 새 슈퍼트렌드 빌더 집합 생성
     pub fn new(periods: &[(usize, f64)]) -> SuperTrendsBuilder<C> {
+        match Self::new_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 슈퍼트렌드 빌더 집합 생성 (검증 포함)
+    pub fn new_checked(periods: &[(usize, f64)]) -> IndicatorResult<SuperTrendsBuilder<C>> {
         let mut builders = HashMap::new();
         for &(period, multiplier) in periods {
             if multiplier.is_nan() || multiplier.is_infinite() {
-                panic!("슈퍼트렌드 승수에 NaN 또는 무한대 값을 사용할 수 없습니다");
+                return Err("슈퍼트렌드 승수에 NaN 또는 무한대 값을 사용할 수 없습니다".to_string());
             }
+
+            if period == 0 {
+                return Err("슈퍼트렌드 기간은 0보다 커야 합니다".to_string());
+            }
+
+            if multiplier <= 0.0 {
+                return Err("슈퍼트렌드 승수는 0보다 큰 유한한 값이어야 합니다".to_string());
+            }
+
             builders.insert(
                 (period, F64Key(multiplier)),
                 SuperTrendBuilder::new(period, multiplier),
             );
         }
-        SuperTrendsBuilder { builders }
+        Ok(SuperTrendsBuilder { builders })
     }
 
     /// 다음 캔들 데이터로 모든 슈퍼트렌드 계산
@@ -358,6 +383,12 @@ impl SuperTrendsBuilderFactory {
     /// 새 슈퍼트렌드 빌더 생성
     pub fn build<C: Candle>(periods: &[(usize, f64)]) -> SuperTrendsBuilder<C> {
         SuperTrendsBuilder::new(periods)
+    }
+
+    pub fn build_checked<C: Candle>(
+        periods: &[(usize, f64)],
+    ) -> IndicatorResult<SuperTrendsBuilder<C>> {
+        SuperTrendsBuilder::new_checked(periods)
     }
 }
 

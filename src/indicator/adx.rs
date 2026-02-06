@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -18,12 +18,12 @@ struct AverageDirectionalMovementIndex {
 }
 
 impl AverageDirectionalMovementIndex {
-    fn new(period: usize) -> Self {
+    fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("ADX 기간은 0보다 커야 합니다");
+            return Err("ADX 기간은 0보다 커야 합니다".to_string());
         }
 
-        Self {
+        Ok(Self {
             period,
             high_values: Vec::with_capacity(period + 2),
             low_values: Vec::with_capacity(period + 2),
@@ -33,7 +33,7 @@ impl AverageDirectionalMovementIndex {
             previous_minus_dm: None,
             previous_adx: None,
             dx_values: Vec::with_capacity(period + 1),
-        }
+        })
     }
 
     fn next(&mut self, input: &impl Candle) -> (f64, f64, f64) {
@@ -247,11 +247,18 @@ where
     C: Candle,
 {
     pub fn new(period: usize) -> Self {
-        ADXBuilder {
-            period,
-            indicator: AverageDirectionalMovementIndex::new(period),
-            _phantom: PhantomData,
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
         }
+    }
+
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
+        Ok(ADXBuilder {
+            period,
+            indicator: AverageDirectionalMovementIndex::new_checked(period)?,
+            _phantom: PhantomData,
+        })
     }
 
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> ADX {
@@ -309,9 +316,22 @@ pub type ADXsBuilder<C> = TAsBuilder<usize, ADX, C>;
 pub struct ADXsBuilderFactory;
 impl ADXsBuilderFactory {
     pub fn build<C: Candle + 'static>(periods: &[usize]) -> ADXsBuilder<C> {
-        ADXsBuilder::new("adxs".to_owned(), periods, |period| {
+        match Self::build_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<ADXsBuilder<C>> {
+        for period in periods {
+            ADXBuilder::<C>::new_checked(*period)?;
+        }
+
+        Ok(ADXsBuilder::new("adxs".to_owned(), periods, |period| {
             Box::new(ADXBuilder::new(*period))
-        })
+        }))
     }
 }
 
