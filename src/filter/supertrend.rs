@@ -134,8 +134,15 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result =
-            SuperTrendFilter::matches_filter("TEST", &candle_store, 2, 2.0, 0.into(), 1, 0);
+        let result = SuperTrendFilter::matches_filter(
+            "TEST",
+            &candle_store,
+            2,
+            2.0,
+            SuperTrendFilterType::AllUptrend,
+            1,
+            0,
+        );
         assert!(result.is_ok());
     }
 }

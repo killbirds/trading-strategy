@@ -136,7 +136,15 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ATRFilter::matches_filter("TEST", &candle_store, 2, 5.0, 0.into(), 1, 0);
+        let result = ATRFilter::matches_filter(
+            "TEST",
+            &candle_store,
+            2,
+            5.0,
+            ATRFilterType::AboveThreshold,
+            1,
+            0,
+        );
         assert!(result.is_ok());
     }
 }

@@ -502,7 +502,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 0.into(),
+            filter_type: MovingAverageFilterType::PriceAboveFirstMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -519,7 +519,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 1.into(),
+            filter_type: MovingAverageFilterType::PriceAboveLastMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -536,7 +536,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 2.into(),
+            filter_type: MovingAverageFilterType::RegularArrangement,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -553,7 +553,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 3.into(),
+            filter_type: MovingAverageFilterType::FirstMAAboveLastMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -570,7 +570,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 4.into(),
+            filter_type: MovingAverageFilterType::FirstMABelowLastMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -587,7 +587,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 5.into(),
+            filter_type: MovingAverageFilterType::GoldenCross,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -604,7 +604,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 6.into(),
+            filter_type: MovingAverageFilterType::PriceBetweenMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -618,18 +618,8 @@ mod tests {
 
     #[test]
     fn test_invalid_filter_type() {
-        let candles = create_test_candles();
-        let params = MovingAverageParams {
-            periods: vec![5, 20],
-            filter_type: 99.into(), // 유효하지 않은 필터 타입
-            consecutive_n: 1,
-            p: 0,
-            ..Default::default()
-        };
-        let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
-        assert!(result.is_ok());
-        assert!(!result.unwrap()); // 유효하지 않은 필터 타입은 항상 false 반환
+        let result = "99".parse::<MovingAverageFilterType>();
+        assert!(result.is_err());
     }
 
     #[test]
@@ -640,8 +630,8 @@ mod tests {
         // 이 테스트는 단순히 캔들 데이터와 이동평균 필터가 제대로 작동하는지 확인
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 4.into(), // 첫번째 MA가 마지막 MA 아래에 있는 경우
-            consecutive_n: 1,      // 1개 조건만 확인
+            filter_type: MovingAverageFilterType::FirstMABelowLastMA, // 첫번째 MA가 마지막 MA 아래에 있는 경우
+            consecutive_n: 1,                                         // 1개 조건만 확인
             p: 0,
             ..Default::default()
         };
@@ -658,7 +648,7 @@ mod tests {
         let candles = vec![TestCandle::new(100.0, 105.0, 98.0, 103.0, 1000.0)]; // 캔들 데이터 부족
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 0.into(),
+            filter_type: MovingAverageFilterType::PriceAboveFirstMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -674,7 +664,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 10, 20],
-            filter_type: 2.into(),
+            filter_type: MovingAverageFilterType::RegularArrangement,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -691,7 +681,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![],
-            filter_type: 0.into(),
+            filter_type: MovingAverageFilterType::PriceAboveFirstMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -707,7 +697,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 0.into(),
+            filter_type: MovingAverageFilterType::PriceAboveFirstMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -724,7 +714,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 11.into(),
+            filter_type: MovingAverageFilterType::ReverseArrangement,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -741,7 +731,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 12.into(),
+            filter_type: MovingAverageFilterType::DeadCross,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -758,7 +748,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 13.into(),
+            filter_type: MovingAverageFilterType::MASideways,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -775,7 +765,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 14.into(),
+            filter_type: MovingAverageFilterType::StrongUptrend,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -792,7 +782,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![10],
-            filter_type: 15.into(),
+            filter_type: MovingAverageFilterType::StrongDowntrend,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -809,7 +799,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 16.into(),
+            filter_type: MovingAverageFilterType::PriceCrossingMA,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -826,7 +816,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 17.into(),
+            filter_type: MovingAverageFilterType::ConvergenceDivergence,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -843,7 +833,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 18.into(),
+            filter_type: MovingAverageFilterType::DivergenceConvergence,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -860,7 +850,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 19.into(),
+            filter_type: MovingAverageFilterType::ParallelMovement,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -877,7 +867,7 @@ mod tests {
         let candles = create_test_candles();
         let params = MovingAverageParams {
             periods: vec![5, 20],
-            filter_type: 20.into(),
+            filter_type: MovingAverageFilterType::NearCrossover,
             consecutive_n: 1,
             p: 0,
             ..Default::default()

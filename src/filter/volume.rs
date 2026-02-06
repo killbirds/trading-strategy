@@ -233,7 +233,7 @@ mod tests {
         let params = VolumeParams {
             period: 3,
             threshold: 1.5,
-            filter_type: 0.into(),
+            filter_type: VolumeFilterType::VolumeAboveAverage,
             consecutive_n: 1,
             p: 0,
             stable_min_threshold: 0.1,

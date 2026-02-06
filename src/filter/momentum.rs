@@ -202,7 +202,7 @@ mod tests {
             momentum_period: 10,
             history_length: 5,
             threshold: 0.5,
-            filter_type: 0.into(),
+            filter_type: MomentumFilterType::StrongPositiveMomentum,
             consecutive_n: 1,
             p: 0,
         };

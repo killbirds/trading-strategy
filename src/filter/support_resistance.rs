@@ -143,7 +143,7 @@ mod tests {
             touch_threshold: 0.01,
             min_touch_count: 2,
             threshold: 0.05,
-            filter_type: 0.into(),
+            filter_type: SupportResistanceFilterType::SupportBreakdown,
             consecutive_n: 1,
             p: 0,
         };

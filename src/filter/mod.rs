@@ -70,20 +70,6 @@ macro_rules! impl_filter_type_deserialize {
                         formatter.write_str("정수 또는 문자열")
                     }
 
-                    fn visit_i64<E>(self, value: i64) -> std::result::Result<$type, E>
-                    where
-                        E: de::Error,
-                    {
-                        Ok($type::from(value as i32))
-                    }
-
-                    fn visit_u64<E>(self, value: u64) -> std::result::Result<$type, E>
-                    where
-                        E: de::Error,
-                    {
-                        Ok($type::from(value as i32))
-                    }
-
                     fn visit_str<E>(self, value: &str) -> std::result::Result<$type, E>
                     where
                         E: de::Error,
@@ -94,6 +80,49 @@ macro_rules! impl_filter_type_deserialize {
                 }
 
                 deserializer.deserialize_any($visitor)
+            }
+        }
+    };
+}
+
+macro_rules! impl_filter_type_display {
+    ($($type:ty),+ $(,)?) => {
+        $(
+            impl fmt::Display for $type {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "{:?}", self)
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! impl_filter_type_fromstr {
+    ($type:ident, $error_variant:ident, parse_i32, [$($variant:ident),+ $(,)?]) => {
+        impl FromStr for $type {
+            type Err = FilterError;
+
+            fn from_str(s: &str) -> Result<Self> {
+                match s {
+                    $(stringify!($variant) => Ok($type::$variant),)+
+                    _ => Err(FilterError::$error_variant {
+                        input: s.to_string(),
+                    }),
+                }
+            }
+        }
+    };
+    ($type:ident, $error_variant:ident, no_parse_i32, [$($variant:ident),+ $(,)?]) => {
+        impl FromStr for $type {
+            type Err = FilterError;
+
+            fn from_str(s: &str) -> Result<Self> {
+                match s {
+                    $(stringify!($variant) => Ok($type::$variant),)+
+                    _ => Err(FilterError::$error_variant {
+                        input: s.to_string(),
+                    }),
+                }
             }
         }
     };
@@ -248,368 +277,204 @@ impl FromStr for TechnicalFilterType {
 
 /// RSI 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum RSIFilterType {
-    Overbought = 0,
-    Oversold = 1,
-    NormalRange = 2,
-    CrossAboveThreshold = 3,
-    CrossBelowThreshold = 4,
-    CrossAbove50 = 5,
-    CrossBelow50 = 6,
-    RisingTrend = 7,
-    FallingTrend = 8,
-    CrossAbove40 = 9,
-    CrossBelow60 = 10,
-    CrossAbove20 = 11,
-    CrossBelow80 = 12,
-    Sideways = 13,
-    StrongRisingMomentum = 14,
-    StrongFallingMomentum = 15,
-    NeutralRange = 16,
-    Above40 = 17,
-    Below60 = 18,
-    Above50 = 19,
-    Below50 = 20,
-    Divergence = 21,
-    Convergence = 22,
-    Stable = 25,
-    NeutralTrend = 28,
-    Bullish = 29,
-    Bearish = 30,
+    Overbought,
+    Oversold,
+    NormalRange,
+    CrossAboveThreshold,
+    CrossBelowThreshold,
+    CrossAbove50,
+    CrossBelow50,
+    RisingTrend,
+    FallingTrend,
+    CrossAbove40,
+    CrossBelow60,
+    CrossAbove20,
+    CrossBelow80,
+    Sideways,
+    StrongRisingMomentum,
+    StrongFallingMomentum,
+    NeutralRange,
+    Above40,
+    Below60,
+    Above50,
+    Below50,
+    Divergence,
+    Convergence,
+    Stable,
+    NeutralTrend,
+    Bullish,
+    Bearish,
 }
 
-impl From<i32> for RSIFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => RSIFilterType::Overbought,
-            1 => RSIFilterType::Oversold,
-            2 => RSIFilterType::NormalRange,
-            3 => RSIFilterType::CrossAboveThreshold,
-            4 => RSIFilterType::CrossBelowThreshold,
-            5 => RSIFilterType::CrossAbove50,
-            6 => RSIFilterType::CrossBelow50,
-            7 => RSIFilterType::RisingTrend,
-            8 => RSIFilterType::FallingTrend,
-            9 => RSIFilterType::CrossAbove40,
-            10 => RSIFilterType::CrossBelow60,
-            11 => RSIFilterType::CrossAbove20,
-            12 => RSIFilterType::CrossBelow80,
-            13 => RSIFilterType::Sideways,
-            14 => RSIFilterType::StrongRisingMomentum,
-            15 => RSIFilterType::StrongFallingMomentum,
-            16 => RSIFilterType::NeutralRange,
-            17 => RSIFilterType::Above40,
-            18 => RSIFilterType::Below60,
-            19 => RSIFilterType::Above50,
-            20 => RSIFilterType::Below50,
-            21 => RSIFilterType::Divergence,
-            22 => RSIFilterType::Convergence,
-            25 => RSIFilterType::Stable,
-            28 => RSIFilterType::NeutralTrend,
-            29 => RSIFilterType::Bullish,
-            30 => RSIFilterType::Bearish,
-            _ => RSIFilterType::Overbought,
-        }
-    }
-}
-
-impl From<RSIFilterType> for i32 {
-    fn from(value: RSIFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for RSIFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "Overbought" => Ok(RSIFilterType::Overbought),
-            "Oversold" => Ok(RSIFilterType::Oversold),
-            "NormalRange" => Ok(RSIFilterType::NormalRange),
-            "CrossAboveThreshold" => Ok(RSIFilterType::CrossAboveThreshold),
-            "CrossBelowThreshold" => Ok(RSIFilterType::CrossBelowThreshold),
-            "CrossAbove50" => Ok(RSIFilterType::CrossAbove50),
-            "CrossBelow50" => Ok(RSIFilterType::CrossBelow50),
-            "RisingTrend" => Ok(RSIFilterType::RisingTrend),
-            "FallingTrend" => Ok(RSIFilterType::FallingTrend),
-            "CrossAbove40" => Ok(RSIFilterType::CrossAbove40),
-            "CrossBelow60" => Ok(RSIFilterType::CrossBelow60),
-            "CrossAbove20" => Ok(RSIFilterType::CrossAbove20),
-            "CrossBelow80" => Ok(RSIFilterType::CrossBelow80),
-            "Sideways" => Ok(RSIFilterType::Sideways),
-            "StrongRisingMomentum" => Ok(RSIFilterType::StrongRisingMomentum),
-            "StrongFallingMomentum" => Ok(RSIFilterType::StrongFallingMomentum),
-            "NeutralRange" => Ok(RSIFilterType::NeutralRange),
-            "Above40" => Ok(RSIFilterType::Above40),
-            "Below60" => Ok(RSIFilterType::Below60),
-            "Above50" => Ok(RSIFilterType::Above50),
-            "Below50" => Ok(RSIFilterType::Below50),
-            "Divergence" => Ok(RSIFilterType::Divergence),
-            "Convergence" => Ok(RSIFilterType::Convergence),
-            "Stable" => Ok(RSIFilterType::Stable),
-            "NeutralTrend" => Ok(RSIFilterType::NeutralTrend),
-            "Bullish" => Ok(RSIFilterType::Bullish),
-            "Bearish" => Ok(RSIFilterType::Bearish),
-            _ => {
-                // 숫자로 파싱 시도
-                match s.parse::<i32>() {
-                    Ok(num) => Ok(RSIFilterType::from(num)),
-                    Err(_) => Err(FilterError::UnknownRsiFilterType {
-                        input: s.to_string(),
-                    }),
-                }
-            }
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    RSIFilterType,
+    UnknownRsiFilterType,
+    parse_i32,
+    [
+        Overbought,
+        Oversold,
+        NormalRange,
+        CrossAboveThreshold,
+        CrossBelowThreshold,
+        CrossAbove50,
+        CrossBelow50,
+        RisingTrend,
+        FallingTrend,
+        CrossAbove40,
+        CrossBelow60,
+        CrossAbove20,
+        CrossBelow80,
+        Sideways,
+        StrongRisingMomentum,
+        StrongFallingMomentum,
+        NeutralRange,
+        Above40,
+        Below60,
+        Above50,
+        Below50,
+        Divergence,
+        Convergence,
+        Stable,
+        NeutralTrend,
+        Bullish,
+        Bearish,
+    ]
+);
 
 impl_filter_type_deserialize!(RSIFilterType, RSIFilterTypeVisitor, "RSI");
 
 /// MACD 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum MACDFilterType {
-    MacdAboveSignal = 0,
-    MacdBelowSignal = 1,
-    SignalCrossAbove = 2,
-    SignalCrossBelow = 3,
-    HistogramAboveThreshold = 4,
-    HistogramBelowThreshold = 5,
-    ZeroLineCrossAbove = 6,
-    ZeroLineCrossBelow = 7,
-    HistogramNegativeTurn = 8,
-    HistogramPositiveTurn = 9,
-    StrongUptrend = 10,
-    StrongDowntrend = 11,
-    MacdRising = 12,
-    MacdFalling = 13,
-    HistogramExpanding = 14,
-    HistogramContracting = 15,
-    Divergence = 16,
-    Convergence = 17,
-    Overbought = 18,
-    Oversold = 19,
-    Sideways = 20,
+    MacdAboveSignal,
+    MacdBelowSignal,
+    SignalCrossAbove,
+    SignalCrossBelow,
+    HistogramAboveThreshold,
+    HistogramBelowThreshold,
+    ZeroLineCrossAbove,
+    ZeroLineCrossBelow,
+    HistogramNegativeTurn,
+    HistogramPositiveTurn,
+    StrongUptrend,
+    StrongDowntrend,
+    MacdRising,
+    MacdFalling,
+    HistogramExpanding,
+    HistogramContracting,
+    Divergence,
+    Convergence,
+    Overbought,
+    Oversold,
+    Sideways,
 }
 
-impl From<i32> for MACDFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => MACDFilterType::MacdAboveSignal,
-            1 => MACDFilterType::MacdBelowSignal,
-            2 => MACDFilterType::SignalCrossAbove,
-            3 => MACDFilterType::SignalCrossBelow,
-            4 => MACDFilterType::HistogramAboveThreshold,
-            5 => MACDFilterType::HistogramBelowThreshold,
-            6 => MACDFilterType::ZeroLineCrossAbove,
-            7 => MACDFilterType::ZeroLineCrossBelow,
-            8 => MACDFilterType::HistogramNegativeTurn,
-            9 => MACDFilterType::HistogramPositiveTurn,
-            10 => MACDFilterType::StrongUptrend,
-            11 => MACDFilterType::StrongDowntrend,
-            12 => MACDFilterType::MacdRising,
-            13 => MACDFilterType::MacdFalling,
-            14 => MACDFilterType::HistogramExpanding,
-            15 => MACDFilterType::HistogramContracting,
-            16 => MACDFilterType::Divergence,
-            17 => MACDFilterType::Convergence,
-            18 => MACDFilterType::Overbought,
-            19 => MACDFilterType::Oversold,
-            20 => MACDFilterType::Sideways,
-            _ => MACDFilterType::MacdAboveSignal,
-        }
-    }
-}
-
-impl From<MACDFilterType> for i32 {
-    fn from(value: MACDFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for MACDFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "MacdAboveSignal" => Ok(MACDFilterType::MacdAboveSignal),
-            "MacdBelowSignal" => Ok(MACDFilterType::MacdBelowSignal),
-            "SignalCrossAbove" => Ok(MACDFilterType::SignalCrossAbove),
-            "SignalCrossBelow" => Ok(MACDFilterType::SignalCrossBelow),
-            "HistogramAboveThreshold" => Ok(MACDFilterType::HistogramAboveThreshold),
-            "HistogramBelowThreshold" => Ok(MACDFilterType::HistogramBelowThreshold),
-            "ZeroLineCrossAbove" => Ok(MACDFilterType::ZeroLineCrossAbove),
-            "ZeroLineCrossBelow" => Ok(MACDFilterType::ZeroLineCrossBelow),
-            "HistogramNegativeTurn" => Ok(MACDFilterType::HistogramNegativeTurn),
-            "HistogramPositiveTurn" => Ok(MACDFilterType::HistogramPositiveTurn),
-            "StrongUptrend" => Ok(MACDFilterType::StrongUptrend),
-            "StrongDowntrend" => Ok(MACDFilterType::StrongDowntrend),
-            "MacdRising" => Ok(MACDFilterType::MacdRising),
-            "MacdFalling" => Ok(MACDFilterType::MacdFalling),
-            "HistogramExpanding" => Ok(MACDFilterType::HistogramExpanding),
-            "HistogramContracting" => Ok(MACDFilterType::HistogramContracting),
-            "Divergence" => Ok(MACDFilterType::Divergence),
-            "Convergence" => Ok(MACDFilterType::Convergence),
-            "Overbought" => Ok(MACDFilterType::Overbought),
-            "Oversold" => Ok(MACDFilterType::Oversold),
-            "Sideways" => Ok(MACDFilterType::Sideways),
-            _ => match s.parse::<i32>() {
-                Ok(num) => Ok(MACDFilterType::from(num)),
-                Err(_) => Err(FilterError::UnknownMacdFilterType {
-                    input: s.to_string(),
-                }),
-            },
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    MACDFilterType,
+    UnknownMacdFilterType,
+    parse_i32,
+    [
+        MacdAboveSignal,
+        MacdBelowSignal,
+        SignalCrossAbove,
+        SignalCrossBelow,
+        HistogramAboveThreshold,
+        HistogramBelowThreshold,
+        ZeroLineCrossAbove,
+        ZeroLineCrossBelow,
+        HistogramNegativeTurn,
+        HistogramPositiveTurn,
+        StrongUptrend,
+        StrongDowntrend,
+        MacdRising,
+        MacdFalling,
+        HistogramExpanding,
+        HistogramContracting,
+        Divergence,
+        Convergence,
+        Overbought,
+        Oversold,
+        Sideways,
+    ]
+);
 
 impl_filter_type_deserialize!(MACDFilterType, MACDFilterTypeVisitor, "MACD");
 
 /// 볼린저 밴드 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum BollingerBandFilterType {
-    AboveUpperBand = 0,
-    BelowLowerBand = 1,
-    InsideBand = 2,
-    OutsideBand = 3,
-    AboveMiddleBand = 4,
-    BelowMiddleBand = 5,
-    BandWidthSufficient = 6,
-    BreakThroughLowerBand = 7,
-    SqueezeBreakout = 8,
-    EnhancedSqueezeBreakout = 9,
-    SqueezeState = 10,
-    BandWidthNarrowing = 11,
-    SqueezeExpansionStart = 12,
-    BreakThroughUpperBand = 13,
-    BreakThroughLowerBandFromBelow = 14,
-    BandWidthExpanding = 15,
-    MiddleBandSideways = 16,
-    UpperBandSideways = 17,
-    LowerBandSideways = 18,
-    BandWidthSideways = 19,
-    UpperBandTouch = 20,
-    LowerBandTouch = 21,
-    BandWidthThresholdBreakthrough = 22,
-    PriceMovingToUpperFromMiddle = 23,
-    PriceMovingToLowerFromMiddle = 24,
-    BandConvergenceThenDivergence = 25,
-    BandDivergenceThenConvergence = 26,
-    PriceMovingToUpperWithinBand = 27,
-    PriceMovingToLowerWithinBand = 28,
-    LowVolatility = 29,
-    HighVolatility = 30,
+    AboveUpperBand,
+    BelowLowerBand,
+    InsideBand,
+    OutsideBand,
+    AboveMiddleBand,
+    BelowMiddleBand,
+    BandWidthSufficient,
+    BreakThroughLowerBand,
+    SqueezeBreakout,
+    EnhancedSqueezeBreakout,
+    SqueezeState,
+    BandWidthNarrowing,
+    SqueezeExpansionStart,
+    BreakThroughUpperBand,
+    BreakThroughLowerBandFromBelow,
+    BandWidthExpanding,
+    MiddleBandSideways,
+    UpperBandSideways,
+    LowerBandSideways,
+    BandWidthSideways,
+    UpperBandTouch,
+    LowerBandTouch,
+    BandWidthThresholdBreakthrough,
+    PriceMovingToUpperFromMiddle,
+    PriceMovingToLowerFromMiddle,
+    BandConvergenceThenDivergence,
+    BandDivergenceThenConvergence,
+    PriceMovingToUpperWithinBand,
+    PriceMovingToLowerWithinBand,
+    LowVolatility,
+    HighVolatility,
 }
 
-impl From<i32> for BollingerBandFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => BollingerBandFilterType::AboveUpperBand,
-            1 => BollingerBandFilterType::BelowLowerBand,
-            2 => BollingerBandFilterType::InsideBand,
-            3 => BollingerBandFilterType::OutsideBand,
-            4 => BollingerBandFilterType::AboveMiddleBand,
-            5 => BollingerBandFilterType::BelowMiddleBand,
-            6 => BollingerBandFilterType::BandWidthSufficient,
-            7 => BollingerBandFilterType::BreakThroughLowerBand,
-            8 => BollingerBandFilterType::SqueezeBreakout,
-            9 => BollingerBandFilterType::EnhancedSqueezeBreakout,
-            10 => BollingerBandFilterType::SqueezeState,
-            11 => BollingerBandFilterType::BandWidthNarrowing,
-            12 => BollingerBandFilterType::SqueezeExpansionStart,
-            13 => BollingerBandFilterType::BreakThroughUpperBand,
-            14 => BollingerBandFilterType::BreakThroughLowerBandFromBelow,
-            15 => BollingerBandFilterType::BandWidthExpanding,
-            16 => BollingerBandFilterType::MiddleBandSideways,
-            17 => BollingerBandFilterType::UpperBandSideways,
-            18 => BollingerBandFilterType::LowerBandSideways,
-            19 => BollingerBandFilterType::BandWidthSideways,
-            20 => BollingerBandFilterType::UpperBandTouch,
-            21 => BollingerBandFilterType::LowerBandTouch,
-            22 => BollingerBandFilterType::BandWidthThresholdBreakthrough,
-            23 => BollingerBandFilterType::PriceMovingToUpperFromMiddle,
-            24 => BollingerBandFilterType::PriceMovingToLowerFromMiddle,
-            25 => BollingerBandFilterType::BandConvergenceThenDivergence,
-            26 => BollingerBandFilterType::BandDivergenceThenConvergence,
-            27 => BollingerBandFilterType::PriceMovingToUpperWithinBand,
-            28 => BollingerBandFilterType::PriceMovingToLowerWithinBand,
-            29 => BollingerBandFilterType::LowVolatility,
-            30 => BollingerBandFilterType::HighVolatility,
-            _ => BollingerBandFilterType::AboveUpperBand,
-        }
-    }
-}
-
-impl From<BollingerBandFilterType> for i32 {
-    fn from(value: BollingerBandFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for BollingerBandFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "AboveUpperBand" => Ok(BollingerBandFilterType::AboveUpperBand),
-            "BelowLowerBand" => Ok(BollingerBandFilterType::BelowLowerBand),
-            "InsideBand" => Ok(BollingerBandFilterType::InsideBand),
-            "OutsideBand" => Ok(BollingerBandFilterType::OutsideBand),
-            "AboveMiddleBand" => Ok(BollingerBandFilterType::AboveMiddleBand),
-            "BelowMiddleBand" => Ok(BollingerBandFilterType::BelowMiddleBand),
-            "BandWidthSufficient" => Ok(BollingerBandFilterType::BandWidthSufficient),
-            "BreakThroughLowerBand" => Ok(BollingerBandFilterType::BreakThroughLowerBand),
-            "SqueezeBreakout" => Ok(BollingerBandFilterType::SqueezeBreakout),
-            "EnhancedSqueezeBreakout" => Ok(BollingerBandFilterType::EnhancedSqueezeBreakout),
-            "SqueezeState" => Ok(BollingerBandFilterType::SqueezeState),
-            "BandWidthNarrowing" => Ok(BollingerBandFilterType::BandWidthNarrowing),
-            "SqueezeExpansionStart" => Ok(BollingerBandFilterType::SqueezeExpansionStart),
-            "BreakThroughUpperBand" => Ok(BollingerBandFilterType::BreakThroughUpperBand),
-            "BreakThroughLowerBandFromBelow" => {
-                Ok(BollingerBandFilterType::BreakThroughLowerBandFromBelow)
-            }
-            "BandWidthExpanding" => Ok(BollingerBandFilterType::BandWidthExpanding),
-            "MiddleBandSideways" => Ok(BollingerBandFilterType::MiddleBandSideways),
-            "UpperBandSideways" => Ok(BollingerBandFilterType::UpperBandSideways),
-            "LowerBandSideways" => Ok(BollingerBandFilterType::LowerBandSideways),
-            "BandWidthSideways" => Ok(BollingerBandFilterType::BandWidthSideways),
-            "UpperBandTouch" => Ok(BollingerBandFilterType::UpperBandTouch),
-            "LowerBandTouch" => Ok(BollingerBandFilterType::LowerBandTouch),
-            "BandWidthThresholdBreakthrough" => {
-                Ok(BollingerBandFilterType::BandWidthThresholdBreakthrough)
-            }
-            "PriceMovingToUpperFromMiddle" => {
-                Ok(BollingerBandFilterType::PriceMovingToUpperFromMiddle)
-            }
-            "PriceMovingToLowerFromMiddle" => {
-                Ok(BollingerBandFilterType::PriceMovingToLowerFromMiddle)
-            }
-            "BandConvergenceThenDivergence" => {
-                Ok(BollingerBandFilterType::BandConvergenceThenDivergence)
-            }
-            "BandDivergenceThenConvergence" => {
-                Ok(BollingerBandFilterType::BandDivergenceThenConvergence)
-            }
-            "PriceMovingToUpperWithinBand" => {
-                Ok(BollingerBandFilterType::PriceMovingToUpperWithinBand)
-            }
-            "PriceMovingToLowerWithinBand" => {
-                Ok(BollingerBandFilterType::PriceMovingToLowerWithinBand)
-            }
-            "LowVolatility" => Ok(BollingerBandFilterType::LowVolatility),
-            "HighVolatility" => Ok(BollingerBandFilterType::HighVolatility),
-            _ => match s.parse::<i32>() {
-                Ok(num) => Ok(BollingerBandFilterType::from(num)),
-                Err(_) => Err(FilterError::UnknownBollingerBandFilterType {
-                    input: s.to_string(),
-                }),
-            },
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    BollingerBandFilterType,
+    UnknownBollingerBandFilterType,
+    parse_i32,
+    [
+        AboveUpperBand,
+        BelowLowerBand,
+        InsideBand,
+        OutsideBand,
+        AboveMiddleBand,
+        BelowMiddleBand,
+        BandWidthSufficient,
+        BreakThroughLowerBand,
+        SqueezeBreakout,
+        EnhancedSqueezeBreakout,
+        SqueezeState,
+        BandWidthNarrowing,
+        SqueezeExpansionStart,
+        BreakThroughUpperBand,
+        BreakThroughLowerBandFromBelow,
+        BandWidthExpanding,
+        MiddleBandSideways,
+        UpperBandSideways,
+        LowerBandSideways,
+        BandWidthSideways,
+        UpperBandTouch,
+        LowerBandTouch,
+        BandWidthThresholdBreakthrough,
+        PriceMovingToUpperFromMiddle,
+        PriceMovingToLowerFromMiddle,
+        BandConvergenceThenDivergence,
+        BandDivergenceThenConvergence,
+        PriceMovingToUpperWithinBand,
+        PriceMovingToLowerWithinBand,
+        LowVolatility,
+        HighVolatility,
+    ]
+);
 
 impl_filter_type_deserialize!(
     BollingerBandFilterType,
@@ -619,287 +484,139 @@ impl_filter_type_deserialize!(
 
 /// ADX 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum ADXFilterType {
-    BelowThreshold = 0,
-    AboveThreshold = 1,
-    PDIAboveMDI = 2,
-    MDIAbovePDI = 3,
-    StrongUptrend = 4,
-    StrongDowntrend = 5,
-    ADXRising = 6,
-    ADXFalling = 7,
-    DIGapExpanding = 8,
-    DIGapContracting = 9,
-    ExtremeHigh = 10,
-    ExtremeLow = 11,
-    MiddleLevel = 12,
-    PDICrossAboveMDI = 13,
-    MDICrossAbovePDI = 14,
-    Sideways = 15,
-    Surge = 16,
-    Crash = 17,
-    StrongDirectionality = 18,
-    WeakDirectionality = 19,
-    TrendStrengthHigherThanDirection = 20,
-    ADXHigherThanMDI = 21,
-    PDIHigherThanADX = 22,
-    MDIHigherThanADX = 23,
-    TrendReversalDown = 24,
-    TrendReversalUp = 25,
-    DICrossover = 26,
-    ExtremePDI = 27,
-    ExtremeMDI = 28,
-    Stable = 29,
-    Unstable = 30,
+    BelowThreshold,
+    AboveThreshold,
+    PDIAboveMDI,
+    MDIAbovePDI,
+    StrongUptrend,
+    StrongDowntrend,
+    ADXRising,
+    ADXFalling,
+    DIGapExpanding,
+    DIGapContracting,
+    ExtremeHigh,
+    ExtremeLow,
+    MiddleLevel,
+    PDICrossAboveMDI,
+    MDICrossAbovePDI,
+    Sideways,
+    Surge,
+    Crash,
+    StrongDirectionality,
+    WeakDirectionality,
+    TrendStrengthHigherThanDirection,
+    ADXHigherThanMDI,
+    PDIHigherThanADX,
+    MDIHigherThanADX,
+    TrendReversalDown,
+    TrendReversalUp,
+    DICrossover,
+    ExtremePDI,
+    ExtremeMDI,
+    Stable,
+    Unstable,
 }
 
-impl From<i32> for ADXFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => ADXFilterType::BelowThreshold,
-            1 => ADXFilterType::AboveThreshold,
-            2 => ADXFilterType::PDIAboveMDI,
-            3 => ADXFilterType::MDIAbovePDI,
-            4 => ADXFilterType::StrongUptrend,
-            5 => ADXFilterType::StrongDowntrend,
-            6 => ADXFilterType::ADXRising,
-            7 => ADXFilterType::ADXFalling,
-            8 => ADXFilterType::DIGapExpanding,
-            9 => ADXFilterType::DIGapContracting,
-            10 => ADXFilterType::ExtremeHigh,
-            11 => ADXFilterType::ExtremeLow,
-            12 => ADXFilterType::MiddleLevel,
-            13 => ADXFilterType::PDICrossAboveMDI,
-            14 => ADXFilterType::MDICrossAbovePDI,
-            15 => ADXFilterType::Sideways,
-            16 => ADXFilterType::Surge,
-            17 => ADXFilterType::Crash,
-            18 => ADXFilterType::StrongDirectionality,
-            19 => ADXFilterType::WeakDirectionality,
-            20 => ADXFilterType::TrendStrengthHigherThanDirection,
-            21 => ADXFilterType::ADXHigherThanMDI,
-            22 => ADXFilterType::PDIHigherThanADX,
-            23 => ADXFilterType::MDIHigherThanADX,
-            24 => ADXFilterType::TrendReversalDown,
-            25 => ADXFilterType::TrendReversalUp,
-            26 => ADXFilterType::DICrossover,
-            27 => ADXFilterType::ExtremePDI,
-            28 => ADXFilterType::ExtremeMDI,
-            29 => ADXFilterType::Stable,
-            30 => ADXFilterType::Unstable,
-            _ => ADXFilterType::BelowThreshold,
-        }
-    }
-}
-
-impl From<ADXFilterType> for i32 {
-    fn from(value: ADXFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for ADXFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("BelowThreshold", ADXFilterType::BelowThreshold),
-            ("AboveThreshold", ADXFilterType::AboveThreshold),
-            ("PDIAboveMDI", ADXFilterType::PDIAboveMDI),
-            ("MDIAbovePDI", ADXFilterType::MDIAbovePDI),
-            ("StrongUptrend", ADXFilterType::StrongUptrend),
-            ("StrongDowntrend", ADXFilterType::StrongDowntrend),
-            ("ADXRising", ADXFilterType::ADXRising),
-            ("ADXFalling", ADXFilterType::ADXFalling),
-            ("DIGapExpanding", ADXFilterType::DIGapExpanding),
-            ("DIGapContracting", ADXFilterType::DIGapContracting),
-            ("ExtremeHigh", ADXFilterType::ExtremeHigh),
-            ("ExtremeLow", ADXFilterType::ExtremeLow),
-            ("MiddleLevel", ADXFilterType::MiddleLevel),
-            ("PDICrossAboveMDI", ADXFilterType::PDICrossAboveMDI),
-            ("MDICrossAbovePDI", ADXFilterType::MDICrossAbovePDI),
-            ("Sideways", ADXFilterType::Sideways),
-            ("Surge", ADXFilterType::Surge),
-            ("Crash", ADXFilterType::Crash),
-            ("StrongDirectionality", ADXFilterType::StrongDirectionality),
-            ("WeakDirectionality", ADXFilterType::WeakDirectionality),
-            (
-                "TrendStrengthHigherThanDirection",
-                ADXFilterType::TrendStrengthHigherThanDirection,
-            ),
-            ("ADXHigherThanMDI", ADXFilterType::ADXHigherThanMDI),
-            ("PDIHigherThanADX", ADXFilterType::PDIHigherThanADX),
-            ("MDIHigherThanADX", ADXFilterType::MDIHigherThanADX),
-            ("TrendReversalDown", ADXFilterType::TrendReversalDown),
-            ("TrendReversalUp", ADXFilterType::TrendReversalUp),
-            ("DICrossover", ADXFilterType::DICrossover),
-            ("ExtremePDI", ADXFilterType::ExtremePDI),
-            ("ExtremeMDI", ADXFilterType::ExtremeMDI),
-            ("Stable", ADXFilterType::Stable),
-            ("Unstable", ADXFilterType::Unstable),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(ADXFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownAdxFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    ADXFilterType,
+    UnknownAdxFilterType,
+    parse_i32,
+    [
+        BelowThreshold,
+        AboveThreshold,
+        PDIAboveMDI,
+        MDIAbovePDI,
+        StrongUptrend,
+        StrongDowntrend,
+        ADXRising,
+        ADXFalling,
+        DIGapExpanding,
+        DIGapContracting,
+        ExtremeHigh,
+        ExtremeLow,
+        MiddleLevel,
+        PDICrossAboveMDI,
+        MDICrossAbovePDI,
+        Sideways,
+        Surge,
+        Crash,
+        StrongDirectionality,
+        WeakDirectionality,
+        TrendStrengthHigherThanDirection,
+        ADXHigherThanMDI,
+        PDIHigherThanADX,
+        MDIHigherThanADX,
+        TrendReversalDown,
+        TrendReversalUp,
+        DICrossover,
+        ExtremePDI,
+        ExtremeMDI,
+        Stable,
+        Unstable,
+    ]
+);
 
 impl_filter_type_deserialize!(ADXFilterType, ADXFilterTypeVisitor, "ADX");
 
 /// 이동평균선 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum MovingAverageFilterType {
-    PriceAboveFirstMA = 0,
-    PriceAboveLastMA = 1,
-    RegularArrangement = 2,
-    FirstMAAboveLastMA = 3,
-    FirstMABelowLastMA = 4,
-    GoldenCross = 5,
-    PriceBetweenMA = 6,
-    MAConvergence = 7,
-    MADivergence = 8,
-    AllMAAbove = 9,
-    AllMABelow = 10,
-    ReverseArrangement = 11,
-    DeadCross = 12,
-    MASideways = 13,
-    StrongUptrend = 14,
-    StrongDowntrend = 15,
-    PriceCrossingMA = 16,
-    ConvergenceDivergence = 17,
-    DivergenceConvergence = 18,
-    ParallelMovement = 19,
-    NearCrossover = 20,
-    PriceBelowFirstMA = 21,
-    PriceBelowLastMA = 22,
+    PriceAboveFirstMA,
+    PriceAboveLastMA,
+    RegularArrangement,
+    FirstMAAboveLastMA,
+    FirstMABelowLastMA,
+    GoldenCross,
+    PriceBetweenMA,
+    MAConvergence,
+    MADivergence,
+    AllMAAbove,
+    AllMABelow,
+    ReverseArrangement,
+    DeadCross,
+    MASideways,
+    StrongUptrend,
+    StrongDowntrend,
+    PriceCrossingMA,
+    ConvergenceDivergence,
+    DivergenceConvergence,
+    ParallelMovement,
+    NearCrossover,
+    PriceBelowFirstMA,
+    PriceBelowLastMA,
 }
 
-impl From<i32> for MovingAverageFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => MovingAverageFilterType::PriceAboveFirstMA,
-            1 => MovingAverageFilterType::PriceAboveLastMA,
-            2 => MovingAverageFilterType::RegularArrangement,
-            3 => MovingAverageFilterType::FirstMAAboveLastMA,
-            4 => MovingAverageFilterType::FirstMABelowLastMA,
-            5 => MovingAverageFilterType::GoldenCross,
-            6 => MovingAverageFilterType::PriceBetweenMA,
-            7 => MovingAverageFilterType::MAConvergence,
-            8 => MovingAverageFilterType::MADivergence,
-            9 => MovingAverageFilterType::AllMAAbove,
-            10 => MovingAverageFilterType::AllMABelow,
-            11 => MovingAverageFilterType::ReverseArrangement,
-            12 => MovingAverageFilterType::DeadCross,
-            13 => MovingAverageFilterType::MASideways,
-            14 => MovingAverageFilterType::StrongUptrend,
-            15 => MovingAverageFilterType::StrongDowntrend,
-            16 => MovingAverageFilterType::PriceCrossingMA,
-            17 => MovingAverageFilterType::ConvergenceDivergence,
-            18 => MovingAverageFilterType::DivergenceConvergence,
-            19 => MovingAverageFilterType::ParallelMovement,
-            20 => MovingAverageFilterType::NearCrossover,
-            21 => MovingAverageFilterType::PriceBelowFirstMA,
-            22 => MovingAverageFilterType::PriceBelowLastMA,
-            _ => MovingAverageFilterType::PriceAboveFirstMA,
-        }
-    }
-}
-
-impl From<MovingAverageFilterType> for i32 {
-    fn from(value: MovingAverageFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for MovingAverageFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            (
-                "PriceAboveFirstMA",
-                MovingAverageFilterType::PriceAboveFirstMA,
-            ),
-            (
-                "PriceAboveLastMA",
-                MovingAverageFilterType::PriceAboveLastMA,
-            ),
-            (
-                "RegularArrangement",
-                MovingAverageFilterType::RegularArrangement,
-            ),
-            (
-                "FirstMAAboveLastMA",
-                MovingAverageFilterType::FirstMAAboveLastMA,
-            ),
-            (
-                "FirstMABelowLastMA",
-                MovingAverageFilterType::FirstMABelowLastMA,
-            ),
-            ("GoldenCross", MovingAverageFilterType::GoldenCross),
-            ("PriceBetweenMA", MovingAverageFilterType::PriceBetweenMA),
-            ("MAConvergence", MovingAverageFilterType::MAConvergence),
-            ("MADivergence", MovingAverageFilterType::MADivergence),
-            ("AllMAAbove", MovingAverageFilterType::AllMAAbove),
-            ("AllMABelow", MovingAverageFilterType::AllMABelow),
-            (
-                "ReverseArrangement",
-                MovingAverageFilterType::ReverseArrangement,
-            ),
-            ("DeadCross", MovingAverageFilterType::DeadCross),
-            ("MASideways", MovingAverageFilterType::MASideways),
-            ("StrongUptrend", MovingAverageFilterType::StrongUptrend),
-            ("StrongDowntrend", MovingAverageFilterType::StrongDowntrend),
-            ("PriceCrossingMA", MovingAverageFilterType::PriceCrossingMA),
-            (
-                "ConvergenceDivergence",
-                MovingAverageFilterType::ConvergenceDivergence,
-            ),
-            (
-                "DivergenceConvergence",
-                MovingAverageFilterType::DivergenceConvergence,
-            ),
-            (
-                "ParallelMovement",
-                MovingAverageFilterType::ParallelMovement,
-            ),
-            ("NearCrossover", MovingAverageFilterType::NearCrossover),
-            (
-                "PriceBelowFirstMA",
-                MovingAverageFilterType::PriceBelowFirstMA,
-            ),
-            (
-                "PriceBelowLastMA",
-                MovingAverageFilterType::PriceBelowLastMA,
-            ),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(MovingAverageFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownMovingAverageFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    MovingAverageFilterType,
+    UnknownMovingAverageFilterType,
+    parse_i32,
+    [
+        PriceAboveFirstMA,
+        PriceAboveLastMA,
+        RegularArrangement,
+        FirstMAAboveLastMA,
+        FirstMABelowLastMA,
+        GoldenCross,
+        PriceBetweenMA,
+        MAConvergence,
+        MADivergence,
+        AllMAAbove,
+        AllMABelow,
+        ReverseArrangement,
+        DeadCross,
+        MASideways,
+        StrongUptrend,
+        StrongDowntrend,
+        PriceCrossingMA,
+        ConvergenceDivergence,
+        DivergenceConvergence,
+        ParallelMovement,
+        NearCrossover,
+        PriceBelowFirstMA,
+        PriceBelowLastMA,
+    ]
+);
 
 impl_filter_type_deserialize!(
     MovingAverageFilterType,
@@ -909,416 +626,190 @@ impl_filter_type_deserialize!(
 
 /// 이치모쿠 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum IchimokuFilterType {
-    PriceAboveCloud = 0,
-    PriceBelowCloud = 1,
-    TenkanAboveKijun = 2,
-    GoldenCross = 3,
-    DeadCross = 4,
-    CloudBreakoutUp = 5,
-    CloudBreakdown = 6,
-    BuySignal = 7,
-    SellSignal = 8,
-    CloudThickening = 9,
-    PerfectAlignment = 10,
-    PerfectReverseAlignment = 11,
-    StrongBuySignal = 12,
+    PriceAboveCloud,
+    PriceBelowCloud,
+    TenkanAboveKijun,
+    GoldenCross,
+    DeadCross,
+    CloudBreakoutUp,
+    CloudBreakdown,
+    BuySignal,
+    SellSignal,
+    CloudThickening,
+    PerfectAlignment,
+    PerfectReverseAlignment,
+    StrongBuySignal,
 }
 
-impl From<i32> for IchimokuFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => IchimokuFilterType::PriceAboveCloud,
-            1 => IchimokuFilterType::PriceBelowCloud,
-            2 => IchimokuFilterType::TenkanAboveKijun,
-            3 => IchimokuFilterType::GoldenCross,
-            4 => IchimokuFilterType::DeadCross,
-            5 => IchimokuFilterType::CloudBreakoutUp,
-            6 => IchimokuFilterType::CloudBreakdown,
-            7 => IchimokuFilterType::BuySignal,
-            8 => IchimokuFilterType::SellSignal,
-            9 => IchimokuFilterType::CloudThickening,
-            10 => IchimokuFilterType::PerfectAlignment,
-            11 => IchimokuFilterType::PerfectReverseAlignment,
-            12 => IchimokuFilterType::StrongBuySignal,
-            _ => IchimokuFilterType::PriceAboveCloud,
-        }
-    }
-}
-
-impl From<IchimokuFilterType> for i32 {
-    fn from(value: IchimokuFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for IchimokuFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("PriceAboveCloud", IchimokuFilterType::PriceAboveCloud),
-            ("PriceBelowCloud", IchimokuFilterType::PriceBelowCloud),
-            ("TenkanAboveKijun", IchimokuFilterType::TenkanAboveKijun),
-            ("GoldenCross", IchimokuFilterType::GoldenCross),
-            ("DeadCross", IchimokuFilterType::DeadCross),
-            ("CloudBreakoutUp", IchimokuFilterType::CloudBreakoutUp),
-            ("CloudBreakdown", IchimokuFilterType::CloudBreakdown),
-            ("BuySignal", IchimokuFilterType::BuySignal),
-            ("SellSignal", IchimokuFilterType::SellSignal),
-            ("CloudThickening", IchimokuFilterType::CloudThickening),
-            ("PerfectAlignment", IchimokuFilterType::PerfectAlignment),
-            (
-                "PerfectReverseAlignment",
-                IchimokuFilterType::PerfectReverseAlignment,
-            ),
-            ("StrongBuySignal", IchimokuFilterType::StrongBuySignal),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(IchimokuFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownIchimokuFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    IchimokuFilterType,
+    UnknownIchimokuFilterType,
+    parse_i32,
+    [
+        PriceAboveCloud,
+        PriceBelowCloud,
+        TenkanAboveKijun,
+        GoldenCross,
+        DeadCross,
+        CloudBreakoutUp,
+        CloudBreakdown,
+        BuySignal,
+        SellSignal,
+        CloudThickening,
+        PerfectAlignment,
+        PerfectReverseAlignment,
+        StrongBuySignal,
+    ]
+);
 
 impl_filter_type_deserialize!(IchimokuFilterType, IchimokuFilterTypeVisitor, "Ichimoku");
 
 /// VWAP 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum VWAPFilterType {
-    PriceAboveVWAP = 0,
-    PriceBelowVWAP = 1,
-    PriceNearVWAP = 2,
-    VWAPBreakoutUp = 3,
-    VWAPBreakdown = 4,
-    VWAPRebound = 5,
-    DivergingFromVWAP = 6,
-    ConvergingToVWAP = 7,
-    StrongUptrend = 8,
-    StrongDowntrend = 9,
-    TrendStrengthening = 10,
-    TrendWeakening = 11,
+    PriceAboveVWAP,
+    PriceBelowVWAP,
+    PriceNearVWAP,
+    VWAPBreakoutUp,
+    VWAPBreakdown,
+    VWAPRebound,
+    DivergingFromVWAP,
+    ConvergingToVWAP,
+    StrongUptrend,
+    StrongDowntrend,
+    TrendStrengthening,
+    TrendWeakening,
 }
 
-impl From<i32> for VWAPFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => VWAPFilterType::PriceAboveVWAP,
-            1 => VWAPFilterType::PriceBelowVWAP,
-            2 => VWAPFilterType::PriceNearVWAP,
-            3 => VWAPFilterType::VWAPBreakoutUp,
-            4 => VWAPFilterType::VWAPBreakdown,
-            5 => VWAPFilterType::VWAPRebound,
-            6 => VWAPFilterType::DivergingFromVWAP,
-            7 => VWAPFilterType::ConvergingToVWAP,
-            8 => VWAPFilterType::StrongUptrend,
-            9 => VWAPFilterType::StrongDowntrend,
-            10 => VWAPFilterType::TrendStrengthening,
-            11 => VWAPFilterType::TrendWeakening,
-            _ => VWAPFilterType::PriceAboveVWAP,
-        }
-    }
-}
-
-impl From<VWAPFilterType> for i32 {
-    fn from(value: VWAPFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for VWAPFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("PriceAboveVWAP", VWAPFilterType::PriceAboveVWAP),
-            ("PriceBelowVWAP", VWAPFilterType::PriceBelowVWAP),
-            ("PriceNearVWAP", VWAPFilterType::PriceNearVWAP),
-            ("VWAPBreakoutUp", VWAPFilterType::VWAPBreakoutUp),
-            ("VWAPBreakdown", VWAPFilterType::VWAPBreakdown),
-            ("VWAPRebound", VWAPFilterType::VWAPRebound),
-            ("DivergingFromVWAP", VWAPFilterType::DivergingFromVWAP),
-            ("ConvergingToVWAP", VWAPFilterType::ConvergingToVWAP),
-            ("StrongUptrend", VWAPFilterType::StrongUptrend),
-            ("StrongDowntrend", VWAPFilterType::StrongDowntrend),
-            ("TrendStrengthening", VWAPFilterType::TrendStrengthening),
-            ("TrendWeakening", VWAPFilterType::TrendWeakening),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(VWAPFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownVwapFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    VWAPFilterType,
+    UnknownVwapFilterType,
+    parse_i32,
+    [
+        PriceAboveVWAP,
+        PriceBelowVWAP,
+        PriceNearVWAP,
+        VWAPBreakoutUp,
+        VWAPBreakdown,
+        VWAPRebound,
+        DivergingFromVWAP,
+        ConvergingToVWAP,
+        StrongUptrend,
+        StrongDowntrend,
+        TrendStrengthening,
+        TrendWeakening,
+    ]
+);
 
 impl_filter_type_deserialize!(VWAPFilterType, VWAPFilterTypeVisitor, "VWAP");
 
 /// CopyS 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum CopysFilterType {
-    BasicBuySignal = 0,
-    BasicSellSignal = 1,
-    RSIOversold = 2,
-    RSIOverbought = 3,
-    BBandLowerTouch = 4,
-    BBandUpperTouch = 5,
-    MASupport = 6,
-    MAResistance = 7,
-    StrongBuySignal = 8,
-    StrongSellSignal = 9,
-    WeakBuySignal = 10,
-    WeakSellSignal = 11,
-    RSINeutral = 12,
-    BBandInside = 13,
-    MARegularArrangement = 14,
-    MAReverseArrangement = 15,
+    BasicBuySignal,
+    BasicSellSignal,
+    RSIOversold,
+    RSIOverbought,
+    BBandLowerTouch,
+    BBandUpperTouch,
+    MASupport,
+    MAResistance,
+    StrongBuySignal,
+    StrongSellSignal,
+    WeakBuySignal,
+    WeakSellSignal,
+    RSINeutral,
+    BBandInside,
+    MARegularArrangement,
+    MAReverseArrangement,
 }
 
-impl From<i32> for CopysFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => CopysFilterType::BasicBuySignal,
-            1 => CopysFilterType::BasicSellSignal,
-            2 => CopysFilterType::RSIOversold,
-            3 => CopysFilterType::RSIOverbought,
-            4 => CopysFilterType::BBandLowerTouch,
-            5 => CopysFilterType::BBandUpperTouch,
-            6 => CopysFilterType::MASupport,
-            7 => CopysFilterType::MAResistance,
-            8 => CopysFilterType::StrongBuySignal,
-            9 => CopysFilterType::StrongSellSignal,
-            10 => CopysFilterType::WeakBuySignal,
-            11 => CopysFilterType::WeakSellSignal,
-            12 => CopysFilterType::RSINeutral,
-            13 => CopysFilterType::BBandInside,
-            14 => CopysFilterType::MARegularArrangement,
-            15 => CopysFilterType::MAReverseArrangement,
-            _ => CopysFilterType::BasicBuySignal,
-        }
-    }
-}
-
-impl From<CopysFilterType> for i32 {
-    fn from(value: CopysFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for CopysFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("BasicBuySignal", CopysFilterType::BasicBuySignal),
-            ("BasicSellSignal", CopysFilterType::BasicSellSignal),
-            ("RSIOversold", CopysFilterType::RSIOversold),
-            ("RSIOverbought", CopysFilterType::RSIOverbought),
-            ("BBandLowerTouch", CopysFilterType::BBandLowerTouch),
-            ("BBandUpperTouch", CopysFilterType::BBandUpperTouch),
-            ("MASupport", CopysFilterType::MASupport),
-            ("MAResistance", CopysFilterType::MAResistance),
-            ("StrongBuySignal", CopysFilterType::StrongBuySignal),
-            ("StrongSellSignal", CopysFilterType::StrongSellSignal),
-            ("WeakBuySignal", CopysFilterType::WeakBuySignal),
-            ("WeakSellSignal", CopysFilterType::WeakSellSignal),
-            ("RSINeutral", CopysFilterType::RSINeutral),
-            ("BBandInside", CopysFilterType::BBandInside),
-            (
-                "MARegularArrangement",
-                CopysFilterType::MARegularArrangement,
-            ),
-            (
-                "MAReverseArrangement",
-                CopysFilterType::MAReverseArrangement,
-            ),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(CopysFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownCopysFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    CopysFilterType,
+    UnknownCopysFilterType,
+    parse_i32,
+    [
+        BasicBuySignal,
+        BasicSellSignal,
+        RSIOversold,
+        RSIOverbought,
+        BBandLowerTouch,
+        BBandUpperTouch,
+        MASupport,
+        MAResistance,
+        StrongBuySignal,
+        StrongSellSignal,
+        WeakBuySignal,
+        WeakSellSignal,
+        RSINeutral,
+        BBandInside,
+        MARegularArrangement,
+        MAReverseArrangement,
+    ]
+);
 
 impl_filter_type_deserialize!(CopysFilterType, CopysFilterTypeVisitor, "Copys");
 
 /// ATR 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum ATRFilterType {
-    AboveThreshold = 0,
-    VolatilityExpanding = 1,
-    VolatilityContracting = 2,
-    HighVolatility = 3,
-    LowVolatility = 4,
-    VolatilityIncreasing = 5,
-    VolatilityDecreasing = 6,
+    AboveThreshold,
+    VolatilityExpanding,
+    VolatilityContracting,
+    HighVolatility,
+    LowVolatility,
+    VolatilityIncreasing,
+    VolatilityDecreasing,
 }
 
-impl From<i32> for ATRFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => ATRFilterType::AboveThreshold,
-            1 => ATRFilterType::VolatilityExpanding,
-            2 => ATRFilterType::VolatilityContracting,
-            3 => ATRFilterType::HighVolatility,
-            4 => ATRFilterType::LowVolatility,
-            5 => ATRFilterType::VolatilityIncreasing,
-            6 => ATRFilterType::VolatilityDecreasing,
-            _ => ATRFilterType::AboveThreshold,
-        }
-    }
-}
-
-impl From<ATRFilterType> for i32 {
-    fn from(value: ATRFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for ATRFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("AboveThreshold", ATRFilterType::AboveThreshold),
-            ("VolatilityExpanding", ATRFilterType::VolatilityExpanding),
-            (
-                "VolatilityContracting",
-                ATRFilterType::VolatilityContracting,
-            ),
-            ("HighVolatility", ATRFilterType::HighVolatility),
-            ("LowVolatility", ATRFilterType::LowVolatility),
-            ("VolatilityIncreasing", ATRFilterType::VolatilityIncreasing),
-            ("VolatilityDecreasing", ATRFilterType::VolatilityDecreasing),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(ATRFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownAtrFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    ATRFilterType,
+    UnknownAtrFilterType,
+    parse_i32,
+    [
+        AboveThreshold,
+        VolatilityExpanding,
+        VolatilityContracting,
+        HighVolatility,
+        LowVolatility,
+        VolatilityIncreasing,
+        VolatilityDecreasing,
+    ]
+);
 
 impl_filter_type_deserialize!(ATRFilterType, ATRFilterTypeVisitor, "ATR");
 
 /// SuperTrend 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum SuperTrendFilterType {
-    AllUptrend = 0,
-    AllDowntrend = 1,
-    PriceAboveSupertrend = 2,
-    PriceBelowSupertrend = 3,
-    PriceCrossingAbove = 4,
-    PriceCrossingBelow = 5,
-    TrendChanged = 6,
-    Uptrend = 7,
-    Downtrend = 8,
+    AllUptrend,
+    AllDowntrend,
+    PriceAboveSupertrend,
+    PriceBelowSupertrend,
+    PriceCrossingAbove,
+    PriceCrossingBelow,
+    TrendChanged,
+    Uptrend,
+    Downtrend,
 }
 
-impl From<i32> for SuperTrendFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => SuperTrendFilterType::AllUptrend,
-            1 => SuperTrendFilterType::AllDowntrend,
-            2 => SuperTrendFilterType::PriceAboveSupertrend,
-            3 => SuperTrendFilterType::PriceBelowSupertrend,
-            4 => SuperTrendFilterType::PriceCrossingAbove,
-            5 => SuperTrendFilterType::PriceCrossingBelow,
-            6 => SuperTrendFilterType::TrendChanged,
-            7 => SuperTrendFilterType::Uptrend,
-            8 => SuperTrendFilterType::Downtrend,
-            _ => SuperTrendFilterType::AllUptrend,
-        }
-    }
-}
-
-impl From<SuperTrendFilterType> for i32 {
-    fn from(value: SuperTrendFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for SuperTrendFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("AllUptrend", SuperTrendFilterType::AllUptrend),
-            ("AllDowntrend", SuperTrendFilterType::AllDowntrend),
-            (
-                "PriceAboveSupertrend",
-                SuperTrendFilterType::PriceAboveSupertrend,
-            ),
-            (
-                "PriceBelowSupertrend",
-                SuperTrendFilterType::PriceBelowSupertrend,
-            ),
-            (
-                "PriceCrossingAbove",
-                SuperTrendFilterType::PriceCrossingAbove,
-            ),
-            (
-                "PriceCrossingBelow",
-                SuperTrendFilterType::PriceCrossingBelow,
-            ),
-            ("TrendChanged", SuperTrendFilterType::TrendChanged),
-            ("Uptrend", SuperTrendFilterType::Uptrend),
-            ("Downtrend", SuperTrendFilterType::Downtrend),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(SuperTrendFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownSuperTrendFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    SuperTrendFilterType,
+    UnknownSuperTrendFilterType,
+    parse_i32,
+    [
+        AllUptrend,
+        AllDowntrend,
+        PriceAboveSupertrend,
+        PriceBelowSupertrend,
+        PriceCrossingAbove,
+        PriceCrossingBelow,
+        TrendChanged,
+        Uptrend,
+        Downtrend,
+    ]
+);
 
 impl_filter_type_deserialize!(
     SuperTrendFilterType,
@@ -1328,548 +819,234 @@ impl_filter_type_deserialize!(
 
 /// Volume 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum VolumeFilterType {
-    VolumeAboveAverage = 0,
-    VolumeBelowAverage = 1,
-    VolumeSurge = 2,
-    VolumeDecline = 3,
-    VolumeSignificantlyAbove = 4,
-    BullishWithIncreasedVolume = 5,
-    BearishWithIncreasedVolume = 6,
-    IncreasingVolumeInUptrend = 7,
-    DecreasingVolumeInDowntrend = 8,
-    VolumeSharpDecline = 9,
-    VolumeStable = 10,
-    VolumeVolatile = 11,
-    BullishWithDecreasedVolume = 12,
-    BearishWithDecreasedVolume = 13,
-    VolumeDoubleAverage = 14,
-    VolumeHalfAverage = 15,
-    VolumeConsecutiveIncrease = 16,
-    VolumeConsecutiveDecrease = 17,
-    VolumeSideways = 18,
-    VolumeExtremelyHigh = 19,
-    VolumeExtremelyLow = 20,
+    VolumeAboveAverage,
+    VolumeBelowAverage,
+    VolumeSurge,
+    VolumeDecline,
+    VolumeSignificantlyAbove,
+    BullishWithIncreasedVolume,
+    BearishWithIncreasedVolume,
+    IncreasingVolumeInUptrend,
+    DecreasingVolumeInDowntrend,
+    VolumeSharpDecline,
+    VolumeStable,
+    VolumeVolatile,
+    BullishWithDecreasedVolume,
+    BearishWithDecreasedVolume,
+    VolumeDoubleAverage,
+    VolumeHalfAverage,
+    VolumeConsecutiveIncrease,
+    VolumeConsecutiveDecrease,
+    VolumeSideways,
+    VolumeExtremelyHigh,
+    VolumeExtremelyLow,
 }
 
-impl From<i32> for VolumeFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => VolumeFilterType::VolumeAboveAverage,
-            1 => VolumeFilterType::VolumeBelowAverage,
-            2 => VolumeFilterType::VolumeSurge,
-            3 => VolumeFilterType::VolumeDecline,
-            4 => VolumeFilterType::VolumeSignificantlyAbove,
-            5 => VolumeFilterType::BullishWithIncreasedVolume,
-            6 => VolumeFilterType::BearishWithIncreasedVolume,
-            7 => VolumeFilterType::IncreasingVolumeInUptrend,
-            8 => VolumeFilterType::DecreasingVolumeInDowntrend,
-            9 => VolumeFilterType::VolumeSharpDecline,
-            10 => VolumeFilterType::VolumeStable,
-            11 => VolumeFilterType::VolumeVolatile,
-            12 => VolumeFilterType::BullishWithDecreasedVolume,
-            13 => VolumeFilterType::BearishWithDecreasedVolume,
-            14 => VolumeFilterType::VolumeDoubleAverage,
-            15 => VolumeFilterType::VolumeHalfAverage,
-            16 => VolumeFilterType::VolumeConsecutiveIncrease,
-            17 => VolumeFilterType::VolumeConsecutiveDecrease,
-            18 => VolumeFilterType::VolumeSideways,
-            19 => VolumeFilterType::VolumeExtremelyHigh,
-            20 => VolumeFilterType::VolumeExtremelyLow,
-            _ => VolumeFilterType::VolumeAboveAverage,
-        }
-    }
-}
-
-impl From<VolumeFilterType> for i32 {
-    fn from(value: VolumeFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for VolumeFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("VolumeAboveAverage", VolumeFilterType::VolumeAboveAverage),
-            ("VolumeBelowAverage", VolumeFilterType::VolumeBelowAverage),
-            ("VolumeSurge", VolumeFilterType::VolumeSurge),
-            ("VolumeDecline", VolumeFilterType::VolumeDecline),
-            (
-                "VolumeSignificantlyAbove",
-                VolumeFilterType::VolumeSignificantlyAbove,
-            ),
-            (
-                "BullishWithIncreasedVolume",
-                VolumeFilterType::BullishWithIncreasedVolume,
-            ),
-            (
-                "BearishWithIncreasedVolume",
-                VolumeFilterType::BearishWithIncreasedVolume,
-            ),
-            (
-                "IncreasingVolumeInUptrend",
-                VolumeFilterType::IncreasingVolumeInUptrend,
-            ),
-            (
-                "DecreasingVolumeInDowntrend",
-                VolumeFilterType::DecreasingVolumeInDowntrend,
-            ),
-            ("VolumeSharpDecline", VolumeFilterType::VolumeSharpDecline),
-            ("VolumeStable", VolumeFilterType::VolumeStable),
-            ("VolumeVolatile", VolumeFilterType::VolumeVolatile),
-            (
-                "BullishWithDecreasedVolume",
-                VolumeFilterType::BullishWithDecreasedVolume,
-            ),
-            (
-                "BearishWithDecreasedVolume",
-                VolumeFilterType::BearishWithDecreasedVolume,
-            ),
-            ("VolumeDoubleAverage", VolumeFilterType::VolumeDoubleAverage),
-            ("VolumeHalfAverage", VolumeFilterType::VolumeHalfAverage),
-            (
-                "VolumeConsecutiveIncrease",
-                VolumeFilterType::VolumeConsecutiveIncrease,
-            ),
-            (
-                "VolumeConsecutiveDecrease",
-                VolumeFilterType::VolumeConsecutiveDecrease,
-            ),
-            ("VolumeSideways", VolumeFilterType::VolumeSideways),
-            ("VolumeExtremelyHigh", VolumeFilterType::VolumeExtremelyHigh),
-            ("VolumeExtremelyLow", VolumeFilterType::VolumeExtremelyLow),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(VolumeFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownVolumeFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    VolumeFilterType,
+    UnknownVolumeFilterType,
+    parse_i32,
+    [
+        VolumeAboveAverage,
+        VolumeBelowAverage,
+        VolumeSurge,
+        VolumeDecline,
+        VolumeSignificantlyAbove,
+        BullishWithIncreasedVolume,
+        BearishWithIncreasedVolume,
+        IncreasingVolumeInUptrend,
+        DecreasingVolumeInDowntrend,
+        VolumeSharpDecline,
+        VolumeStable,
+        VolumeVolatile,
+        BullishWithDecreasedVolume,
+        BearishWithDecreasedVolume,
+        VolumeDoubleAverage,
+        VolumeHalfAverage,
+        VolumeConsecutiveIncrease,
+        VolumeConsecutiveDecrease,
+        VolumeSideways,
+        VolumeExtremelyHigh,
+        VolumeExtremelyLow,
+    ]
+);
 
 impl_filter_type_deserialize!(VolumeFilterType, VolumeFilterTypeVisitor, "Volume");
 
 /// ThreeRSI 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum ThreeRSIFilterType {
-    AllRSILessThan50 = 0,
-    AllRSIGreaterThan50 = 1,
-    RSIReverseArrangement = 2,
-    RSIRegularArrangement = 3,
-    CandleLowBelowMA = 4,
-    CandleHighAboveMA = 5,
-    ADXGreaterThan20 = 6,
-    AllRSILessThan30 = 7,
-    AllRSIGreaterThan70 = 8,
-    RSIStableRange = 9,
-    RSIBullishRange = 10,
-    RSIBearishRange = 11,
-    RSIOverboughtRange = 12,
-    RSIOversoldRange = 13,
-    RSICrossAbove50 = 14,
-    RSICrossBelow50 = 15,
-    RSICrossAbove40 = 16,
-    RSICrossBelow60 = 17,
-    RSICrossAbove20 = 18,
-    RSICrossBelow80 = 19,
-    RSISideways = 20,
-    RSIBullishMomentum = 21,
-    RSIBearishMomentum = 22,
-    RSIDivergence = 23,
-    RSIConvergence = 24,
-    RSIDoubleBottom = 25,
-    RSIDoubleTop = 26,
-    RSIOverboughtReversal = 27,
-    RSIOversoldReversal = 28,
-    RSINeutralTrend = 29,
-    RSIExtremeOverbought = 30,
-    RSIExtremeOversold = 31,
+    AllRSILessThan50,
+    AllRSIGreaterThan50,
+    RSIReverseArrangement,
+    RSIRegularArrangement,
+    CandleLowBelowMA,
+    CandleHighAboveMA,
+    ADXGreaterThan20,
+    AllRSILessThan30,
+    AllRSIGreaterThan70,
+    RSIStableRange,
+    RSIBullishRange,
+    RSIBearishRange,
+    RSIOverboughtRange,
+    RSIOversoldRange,
+    RSICrossAbove50,
+    RSICrossBelow50,
+    RSICrossAbove40,
+    RSICrossBelow60,
+    RSICrossAbove20,
+    RSICrossBelow80,
+    RSISideways,
+    RSIBullishMomentum,
+    RSIBearishMomentum,
+    RSIDivergence,
+    RSIConvergence,
+    RSIDoubleBottom,
+    RSIDoubleTop,
+    RSIOverboughtReversal,
+    RSIOversoldReversal,
+    RSINeutralTrend,
+    RSIExtremeOverbought,
+    RSIExtremeOversold,
 }
 
-impl From<i32> for ThreeRSIFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => ThreeRSIFilterType::AllRSILessThan50,
-            1 => ThreeRSIFilterType::AllRSIGreaterThan50,
-            2 => ThreeRSIFilterType::RSIReverseArrangement,
-            3 => ThreeRSIFilterType::RSIRegularArrangement,
-            4 => ThreeRSIFilterType::CandleLowBelowMA,
-            5 => ThreeRSIFilterType::CandleHighAboveMA,
-            6 => ThreeRSIFilterType::ADXGreaterThan20,
-            7 => ThreeRSIFilterType::AllRSILessThan30,
-            8 => ThreeRSIFilterType::AllRSIGreaterThan70,
-            9 => ThreeRSIFilterType::RSIStableRange,
-            10 => ThreeRSIFilterType::RSIBullishRange,
-            11 => ThreeRSIFilterType::RSIBearishRange,
-            12 => ThreeRSIFilterType::RSIOverboughtRange,
-            13 => ThreeRSIFilterType::RSIOversoldRange,
-            14 => ThreeRSIFilterType::RSICrossAbove50,
-            15 => ThreeRSIFilterType::RSICrossBelow50,
-            16 => ThreeRSIFilterType::RSICrossAbove40,
-            17 => ThreeRSIFilterType::RSICrossBelow60,
-            18 => ThreeRSIFilterType::RSICrossAbove20,
-            19 => ThreeRSIFilterType::RSICrossBelow80,
-            20 => ThreeRSIFilterType::RSISideways,
-            21 => ThreeRSIFilterType::RSIBullishMomentum,
-            22 => ThreeRSIFilterType::RSIBearishMomentum,
-            23 => ThreeRSIFilterType::RSIDivergence,
-            24 => ThreeRSIFilterType::RSIConvergence,
-            25 => ThreeRSIFilterType::RSIDoubleBottom,
-            26 => ThreeRSIFilterType::RSIDoubleTop,
-            27 => ThreeRSIFilterType::RSIOverboughtReversal,
-            28 => ThreeRSIFilterType::RSIOversoldReversal,
-            29 => ThreeRSIFilterType::RSINeutralTrend,
-            30 => ThreeRSIFilterType::RSIExtremeOverbought,
-            31 => ThreeRSIFilterType::RSIExtremeOversold,
-            _ => ThreeRSIFilterType::AllRSILessThan50,
-        }
-    }
-}
-
-impl From<ThreeRSIFilterType> for i32 {
-    fn from(value: ThreeRSIFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for ThreeRSIFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            ("AllRSILessThan50", ThreeRSIFilterType::AllRSILessThan50),
-            (
-                "AllRSIGreaterThan50",
-                ThreeRSIFilterType::AllRSIGreaterThan50,
-            ),
-            (
-                "RSIReverseArrangement",
-                ThreeRSIFilterType::RSIReverseArrangement,
-            ),
-            (
-                "RSIRegularArrangement",
-                ThreeRSIFilterType::RSIRegularArrangement,
-            ),
-            ("CandleLowBelowMA", ThreeRSIFilterType::CandleLowBelowMA),
-            ("CandleHighAboveMA", ThreeRSIFilterType::CandleHighAboveMA),
-            ("ADXGreaterThan20", ThreeRSIFilterType::ADXGreaterThan20),
-            ("AllRSILessThan30", ThreeRSIFilterType::AllRSILessThan30),
-            (
-                "AllRSIGreaterThan70",
-                ThreeRSIFilterType::AllRSIGreaterThan70,
-            ),
-            ("RSIStableRange", ThreeRSIFilterType::RSIStableRange),
-            ("RSIBullishRange", ThreeRSIFilterType::RSIBullishRange),
-            ("RSIBearishRange", ThreeRSIFilterType::RSIBearishRange),
-            ("RSIOverboughtRange", ThreeRSIFilterType::RSIOverboughtRange),
-            ("RSIOversoldRange", ThreeRSIFilterType::RSIOversoldRange),
-            ("RSICrossAbove50", ThreeRSIFilterType::RSICrossAbove50),
-            ("RSICrossBelow50", ThreeRSIFilterType::RSICrossBelow50),
-            ("RSICrossAbove40", ThreeRSIFilterType::RSICrossAbove40),
-            ("RSICrossBelow60", ThreeRSIFilterType::RSICrossBelow60),
-            ("RSICrossAbove20", ThreeRSIFilterType::RSICrossAbove20),
-            ("RSICrossBelow80", ThreeRSIFilterType::RSICrossBelow80),
-            ("RSISideways", ThreeRSIFilterType::RSISideways),
-            ("RSIBullishMomentum", ThreeRSIFilterType::RSIBullishMomentum),
-            ("RSIBearishMomentum", ThreeRSIFilterType::RSIBearishMomentum),
-            ("RSIDivergence", ThreeRSIFilterType::RSIDivergence),
-            ("RSIConvergence", ThreeRSIFilterType::RSIConvergence),
-            ("RSIDoubleBottom", ThreeRSIFilterType::RSIDoubleBottom),
-            ("RSIDoubleTop", ThreeRSIFilterType::RSIDoubleTop),
-            (
-                "RSIOverboughtReversal",
-                ThreeRSIFilterType::RSIOverboughtReversal,
-            ),
-            (
-                "RSIOversoldReversal",
-                ThreeRSIFilterType::RSIOversoldReversal,
-            ),
-            ("RSINeutralTrend", ThreeRSIFilterType::RSINeutralTrend),
-            (
-                "RSIExtremeOverbought",
-                ThreeRSIFilterType::RSIExtremeOverbought,
-            ),
-            ("RSIExtremeOversold", ThreeRSIFilterType::RSIExtremeOversold),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(ThreeRSIFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownThreeRsiFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    ThreeRSIFilterType,
+    UnknownThreeRsiFilterType,
+    parse_i32,
+    [
+        AllRSILessThan50,
+        AllRSIGreaterThan50,
+        RSIReverseArrangement,
+        RSIRegularArrangement,
+        CandleLowBelowMA,
+        CandleHighAboveMA,
+        ADXGreaterThan20,
+        AllRSILessThan30,
+        AllRSIGreaterThan70,
+        RSIStableRange,
+        RSIBullishRange,
+        RSIBearishRange,
+        RSIOverboughtRange,
+        RSIOversoldRange,
+        RSICrossAbove50,
+        RSICrossBelow50,
+        RSICrossAbove40,
+        RSICrossBelow60,
+        RSICrossAbove20,
+        RSICrossBelow80,
+        RSISideways,
+        RSIBullishMomentum,
+        RSIBearishMomentum,
+        RSIDivergence,
+        RSIConvergence,
+        RSIDoubleBottom,
+        RSIDoubleTop,
+        RSIOverboughtReversal,
+        RSIOversoldReversal,
+        RSINeutralTrend,
+        RSIExtremeOverbought,
+        RSIExtremeOversold,
+    ]
+);
 
 impl_filter_type_deserialize!(ThreeRSIFilterType, ThreeRSIFilterTypeVisitor, "ThreeRSI");
 
 /// CandlePattern 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum CandlePatternFilterType {
-    StrongBullishPattern = 0,
-    StrongBearishPattern = 1,
-    ReversalPattern = 2,
-    ContinuationPattern = 3,
-    VolumeConfirmedPattern = 4,
-    HighReliabilityPattern = 5,
-    ContextAlignedPattern = 6,
-    StrongReversalSignal = 7,
-    HighConfidenceSignal = 8,
-    VolumeConfirmedSignal = 9,
-    PatternClusteringSignal = 10,
-    HammerPattern = 11,
-    ShootingStarPattern = 12,
-    DojiPattern = 13,
-    SpinningTopPattern = 14,
-    MarubozuPattern = 15,
-    MorningStarPattern = 16,
-    EveningStarPattern = 17,
-    EngulfingPattern = 18,
-    PiercingPattern = 19,
-    DarkCloudPattern = 20,
-    HaramiPattern = 21,
-    TweezerPattern = 22,
-    TriStarPattern = 23,
-    AdvanceBlockPattern = 24,
-    DeliberanceBlockPattern = 25,
-    BreakawayPattern = 26,
-    ConcealmentPattern = 27,
-    CounterattackPattern = 28,
-    DarkCloudCoverPattern = 29,
-    RisingWindowPattern = 30,
-    FallingWindowPattern = 31,
-    HighBreakoutPattern = 32,
-    LowBreakoutPattern = 33,
-    GapPattern = 34,
-    GapFillPattern = 35,
-    DoubleBottomPattern = 36,
-    DoubleTopPattern = 37,
-    TrianglePattern = 38,
-    FlagPattern = 39,
-    PennantPattern = 40,
+    StrongBullishPattern,
+    StrongBearishPattern,
+    ReversalPattern,
+    ContinuationPattern,
+    VolumeConfirmedPattern,
+    HighReliabilityPattern,
+    ContextAlignedPattern,
+    StrongReversalSignal,
+    HighConfidenceSignal,
+    VolumeConfirmedSignal,
+    PatternClusteringSignal,
+    HammerPattern,
+    ShootingStarPattern,
+    DojiPattern,
+    SpinningTopPattern,
+    MarubozuPattern,
+    MorningStarPattern,
+    EveningStarPattern,
+    EngulfingPattern,
+    PiercingPattern,
+    DarkCloudPattern,
+    HaramiPattern,
+    TweezerPattern,
+    TriStarPattern,
+    AdvanceBlockPattern,
+    DeliberanceBlockPattern,
+    BreakawayPattern,
+    ConcealmentPattern,
+    CounterattackPattern,
+    DarkCloudCoverPattern,
+    RisingWindowPattern,
+    FallingWindowPattern,
+    HighBreakoutPattern,
+    LowBreakoutPattern,
+    GapPattern,
+    GapFillPattern,
+    DoubleBottomPattern,
+    DoubleTopPattern,
+    TrianglePattern,
+    FlagPattern,
+    PennantPattern,
 }
 
-impl From<i32> for CandlePatternFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => CandlePatternFilterType::StrongBullishPattern,
-            1 => CandlePatternFilterType::StrongBearishPattern,
-            2 => CandlePatternFilterType::ReversalPattern,
-            3 => CandlePatternFilterType::ContinuationPattern,
-            4 => CandlePatternFilterType::VolumeConfirmedPattern,
-            5 => CandlePatternFilterType::HighReliabilityPattern,
-            6 => CandlePatternFilterType::ContextAlignedPattern,
-            7 => CandlePatternFilterType::StrongReversalSignal,
-            8 => CandlePatternFilterType::HighConfidenceSignal,
-            9 => CandlePatternFilterType::VolumeConfirmedSignal,
-            10 => CandlePatternFilterType::PatternClusteringSignal,
-            11 => CandlePatternFilterType::HammerPattern,
-            12 => CandlePatternFilterType::ShootingStarPattern,
-            13 => CandlePatternFilterType::DojiPattern,
-            14 => CandlePatternFilterType::SpinningTopPattern,
-            15 => CandlePatternFilterType::MarubozuPattern,
-            16 => CandlePatternFilterType::MorningStarPattern,
-            17 => CandlePatternFilterType::EveningStarPattern,
-            18 => CandlePatternFilterType::EngulfingPattern,
-            19 => CandlePatternFilterType::PiercingPattern,
-            20 => CandlePatternFilterType::DarkCloudPattern,
-            21 => CandlePatternFilterType::HaramiPattern,
-            22 => CandlePatternFilterType::TweezerPattern,
-            23 => CandlePatternFilterType::TriStarPattern,
-            24 => CandlePatternFilterType::AdvanceBlockPattern,
-            25 => CandlePatternFilterType::DeliberanceBlockPattern,
-            26 => CandlePatternFilterType::BreakawayPattern,
-            27 => CandlePatternFilterType::ConcealmentPattern,
-            28 => CandlePatternFilterType::CounterattackPattern,
-            29 => CandlePatternFilterType::DarkCloudCoverPattern,
-            30 => CandlePatternFilterType::RisingWindowPattern,
-            31 => CandlePatternFilterType::FallingWindowPattern,
-            32 => CandlePatternFilterType::HighBreakoutPattern,
-            33 => CandlePatternFilterType::LowBreakoutPattern,
-            34 => CandlePatternFilterType::GapPattern,
-            35 => CandlePatternFilterType::GapFillPattern,
-            36 => CandlePatternFilterType::DoubleBottomPattern,
-            37 => CandlePatternFilterType::DoubleTopPattern,
-            38 => CandlePatternFilterType::TrianglePattern,
-            39 => CandlePatternFilterType::FlagPattern,
-            40 => CandlePatternFilterType::PennantPattern,
-            _ => CandlePatternFilterType::StrongBullishPattern,
-        }
-    }
-}
-
-impl From<CandlePatternFilterType> for i32 {
-    fn from(value: CandlePatternFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for CandlePatternFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            (
-                "StrongBullishPattern",
-                CandlePatternFilterType::StrongBullishPattern,
-            ),
-            (
-                "StrongBearishPattern",
-                CandlePatternFilterType::StrongBearishPattern,
-            ),
-            ("ReversalPattern", CandlePatternFilterType::ReversalPattern),
-            (
-                "ContinuationPattern",
-                CandlePatternFilterType::ContinuationPattern,
-            ),
-            (
-                "VolumeConfirmedPattern",
-                CandlePatternFilterType::VolumeConfirmedPattern,
-            ),
-            (
-                "HighReliabilityPattern",
-                CandlePatternFilterType::HighReliabilityPattern,
-            ),
-            (
-                "ContextAlignedPattern",
-                CandlePatternFilterType::ContextAlignedPattern,
-            ),
-            (
-                "StrongReversalSignal",
-                CandlePatternFilterType::StrongReversalSignal,
-            ),
-            (
-                "HighConfidenceSignal",
-                CandlePatternFilterType::HighConfidenceSignal,
-            ),
-            (
-                "VolumeConfirmedSignal",
-                CandlePatternFilterType::VolumeConfirmedSignal,
-            ),
-            (
-                "PatternClusteringSignal",
-                CandlePatternFilterType::PatternClusteringSignal,
-            ),
-            ("HammerPattern", CandlePatternFilterType::HammerPattern),
-            (
-                "ShootingStarPattern",
-                CandlePatternFilterType::ShootingStarPattern,
-            ),
-            ("DojiPattern", CandlePatternFilterType::DojiPattern),
-            (
-                "SpinningTopPattern",
-                CandlePatternFilterType::SpinningTopPattern,
-            ),
-            ("MarubozuPattern", CandlePatternFilterType::MarubozuPattern),
-            (
-                "MorningStarPattern",
-                CandlePatternFilterType::MorningStarPattern,
-            ),
-            (
-                "EveningStarPattern",
-                CandlePatternFilterType::EveningStarPattern,
-            ),
-            (
-                "EngulfingPattern",
-                CandlePatternFilterType::EngulfingPattern,
-            ),
-            ("PiercingPattern", CandlePatternFilterType::PiercingPattern),
-            (
-                "DarkCloudPattern",
-                CandlePatternFilterType::DarkCloudPattern,
-            ),
-            ("HaramiPattern", CandlePatternFilterType::HaramiPattern),
-            ("TweezerPattern", CandlePatternFilterType::TweezerPattern),
-            ("TriStarPattern", CandlePatternFilterType::TriStarPattern),
-            (
-                "AdvanceBlockPattern",
-                CandlePatternFilterType::AdvanceBlockPattern,
-            ),
-            (
-                "DeliberanceBlockPattern",
-                CandlePatternFilterType::DeliberanceBlockPattern,
-            ),
-            (
-                "BreakawayPattern",
-                CandlePatternFilterType::BreakawayPattern,
-            ),
-            (
-                "ConcealmentPattern",
-                CandlePatternFilterType::ConcealmentPattern,
-            ),
-            (
-                "CounterattackPattern",
-                CandlePatternFilterType::CounterattackPattern,
-            ),
-            (
-                "DarkCloudCoverPattern",
-                CandlePatternFilterType::DarkCloudCoverPattern,
-            ),
-            (
-                "RisingWindowPattern",
-                CandlePatternFilterType::RisingWindowPattern,
-            ),
-            (
-                "FallingWindowPattern",
-                CandlePatternFilterType::FallingWindowPattern,
-            ),
-            (
-                "HighBreakoutPattern",
-                CandlePatternFilterType::HighBreakoutPattern,
-            ),
-            (
-                "LowBreakoutPattern",
-                CandlePatternFilterType::LowBreakoutPattern,
-            ),
-            ("GapPattern", CandlePatternFilterType::GapPattern),
-            ("GapFillPattern", CandlePatternFilterType::GapFillPattern),
-            (
-                "DoubleBottomPattern",
-                CandlePatternFilterType::DoubleBottomPattern,
-            ),
-            (
-                "DoubleTopPattern",
-                CandlePatternFilterType::DoubleTopPattern,
-            ),
-            ("TrianglePattern", CandlePatternFilterType::TrianglePattern),
-            ("FlagPattern", CandlePatternFilterType::FlagPattern),
-            ("PennantPattern", CandlePatternFilterType::PennantPattern),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        // 숫자로 파싱 시도
-        match s.parse::<i32>() {
-            Ok(num) => Ok(CandlePatternFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownCandlePatternFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    CandlePatternFilterType,
+    UnknownCandlePatternFilterType,
+    parse_i32,
+    [
+        StrongBullishPattern,
+        StrongBearishPattern,
+        ReversalPattern,
+        ContinuationPattern,
+        VolumeConfirmedPattern,
+        HighReliabilityPattern,
+        ContextAlignedPattern,
+        StrongReversalSignal,
+        HighConfidenceSignal,
+        VolumeConfirmedSignal,
+        PatternClusteringSignal,
+        HammerPattern,
+        ShootingStarPattern,
+        DojiPattern,
+        SpinningTopPattern,
+        MarubozuPattern,
+        MorningStarPattern,
+        EveningStarPattern,
+        EngulfingPattern,
+        PiercingPattern,
+        DarkCloudPattern,
+        HaramiPattern,
+        TweezerPattern,
+        TriStarPattern,
+        AdvanceBlockPattern,
+        DeliberanceBlockPattern,
+        BreakawayPattern,
+        ConcealmentPattern,
+        CounterattackPattern,
+        DarkCloudCoverPattern,
+        RisingWindowPattern,
+        FallingWindowPattern,
+        HighBreakoutPattern,
+        LowBreakoutPattern,
+        GapPattern,
+        GapFillPattern,
+        DoubleBottomPattern,
+        DoubleTopPattern,
+        TrianglePattern,
+        FlagPattern,
+        PennantPattern,
+    ]
+);
 
 impl_filter_type_deserialize!(
     CandlePatternFilterType,
@@ -1879,96 +1056,36 @@ impl_filter_type_deserialize!(
 
 /// SupportResistance 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum SupportResistanceFilterType {
-    SupportBreakdown = 0,
-    ResistanceBreakout = 1,
-    SupportBounce = 2,
-    ResistanceRejection = 3,
-    NearStrongSupport = 4,
-    NearStrongResistance = 5,
-    AboveSupport = 6,
-    BelowResistance = 7,
-    NearSupport = 8,
-    NearResistance = 9,
+    SupportBreakdown,
+    ResistanceBreakout,
+    SupportBounce,
+    ResistanceRejection,
+    NearStrongSupport,
+    NearStrongResistance,
+    AboveSupport,
+    BelowResistance,
+    NearSupport,
+    NearResistance,
 }
 
-impl From<i32> for SupportResistanceFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => SupportResistanceFilterType::SupportBreakdown,
-            1 => SupportResistanceFilterType::ResistanceBreakout,
-            2 => SupportResistanceFilterType::SupportBounce,
-            3 => SupportResistanceFilterType::ResistanceRejection,
-            4 => SupportResistanceFilterType::NearStrongSupport,
-            5 => SupportResistanceFilterType::NearStrongResistance,
-            6 => SupportResistanceFilterType::AboveSupport,
-            7 => SupportResistanceFilterType::BelowResistance,
-            8 => SupportResistanceFilterType::NearSupport,
-            9 => SupportResistanceFilterType::NearResistance,
-            _ => SupportResistanceFilterType::SupportBreakdown,
-        }
-    }
-}
-
-impl From<SupportResistanceFilterType> for i32 {
-    fn from(value: SupportResistanceFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for SupportResistanceFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            (
-                "SupportBreakdown",
-                SupportResistanceFilterType::SupportBreakdown,
-            ),
-            (
-                "ResistanceBreakout",
-                SupportResistanceFilterType::ResistanceBreakout,
-            ),
-            ("SupportBounce", SupportResistanceFilterType::SupportBounce),
-            (
-                "ResistanceRejection",
-                SupportResistanceFilterType::ResistanceRejection,
-            ),
-            (
-                "NearStrongSupport",
-                SupportResistanceFilterType::NearStrongSupport,
-            ),
-            (
-                "NearStrongResistance",
-                SupportResistanceFilterType::NearStrongResistance,
-            ),
-            ("AboveSupport", SupportResistanceFilterType::AboveSupport),
-            (
-                "BelowResistance",
-                SupportResistanceFilterType::BelowResistance,
-            ),
-            ("NearSupport", SupportResistanceFilterType::NearSupport),
-            (
-                "NearResistance",
-                SupportResistanceFilterType::NearResistance,
-            ),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(SupportResistanceFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownSupportResistanceFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    SupportResistanceFilterType,
+    UnknownSupportResistanceFilterType,
+    parse_i32,
+    [
+        SupportBreakdown,
+        ResistanceBreakout,
+        SupportBounce,
+        ResistanceRejection,
+        NearStrongSupport,
+        NearStrongResistance,
+        AboveSupport,
+        BelowResistance,
+        NearSupport,
+        NearResistance,
+    ]
+);
 
 impl_filter_type_deserialize!(
     SupportResistanceFilterType,
@@ -1978,135 +1095,58 @@ impl_filter_type_deserialize!(
 
 /// Momentum 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum MomentumFilterType {
-    StrongPositiveMomentum = 0,
-    StrongNegativeMomentum = 1,
-    AcceleratingMomentum = 2,
-    DeceleratingMomentum = 3,
-    Overbought = 4,
-    Oversold = 5,
-    MomentumDivergence = 6,
-    BullishDivergence = 7,
-    BearishDivergence = 8,
-    PersistentMomentum = 9,
-    StableMomentum = 10,
-    MomentumReversalSignal = 11,
-    MomentumSideways = 12,
-    MomentumSurge = 13,
-    MomentumCrash = 14,
-    MomentumConvergence = 15,
-    MomentumDivergencePattern = 16,
-    MomentumParallel = 17,
-    MomentumCrossover = 18,
-    MomentumSupportTest = 19,
-    MomentumResistanceTest = 20,
+    StrongPositiveMomentum,
+    StrongNegativeMomentum,
+    AcceleratingMomentum,
+    DeceleratingMomentum,
+    Overbought,
+    Oversold,
+    MomentumDivergence,
+    BullishDivergence,
+    BearishDivergence,
+    PersistentMomentum,
+    StableMomentum,
+    MomentumReversalSignal,
+    MomentumSideways,
+    MomentumSurge,
+    MomentumCrash,
+    MomentumConvergence,
+    MomentumDivergencePattern,
+    MomentumParallel,
+    MomentumCrossover,
+    MomentumSupportTest,
+    MomentumResistanceTest,
 }
 
-impl From<i32> for MomentumFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => MomentumFilterType::StrongPositiveMomentum,
-            1 => MomentumFilterType::StrongNegativeMomentum,
-            2 => MomentumFilterType::AcceleratingMomentum,
-            3 => MomentumFilterType::DeceleratingMomentum,
-            4 => MomentumFilterType::Overbought,
-            5 => MomentumFilterType::Oversold,
-            6 => MomentumFilterType::MomentumDivergence,
-            7 => MomentumFilterType::BullishDivergence,
-            8 => MomentumFilterType::BearishDivergence,
-            9 => MomentumFilterType::PersistentMomentum,
-            10 => MomentumFilterType::StableMomentum,
-            11 => MomentumFilterType::MomentumReversalSignal,
-            12 => MomentumFilterType::MomentumSideways,
-            13 => MomentumFilterType::MomentumSurge,
-            14 => MomentumFilterType::MomentumCrash,
-            15 => MomentumFilterType::MomentumConvergence,
-            16 => MomentumFilterType::MomentumDivergencePattern,
-            17 => MomentumFilterType::MomentumParallel,
-            18 => MomentumFilterType::MomentumCrossover,
-            19 => MomentumFilterType::MomentumSupportTest,
-            20 => MomentumFilterType::MomentumResistanceTest,
-            _ => MomentumFilterType::StrongPositiveMomentum,
-        }
-    }
-}
-
-impl From<MomentumFilterType> for i32 {
-    fn from(value: MomentumFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for MomentumFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let variants = [
-            (
-                "StrongPositiveMomentum",
-                MomentumFilterType::StrongPositiveMomentum,
-            ),
-            (
-                "StrongNegativeMomentum",
-                MomentumFilterType::StrongNegativeMomentum,
-            ),
-            (
-                "AcceleratingMomentum",
-                MomentumFilterType::AcceleratingMomentum,
-            ),
-            (
-                "DeceleratingMomentum",
-                MomentumFilterType::DeceleratingMomentum,
-            ),
-            ("Overbought", MomentumFilterType::Overbought),
-            ("Oversold", MomentumFilterType::Oversold),
-            ("MomentumDivergence", MomentumFilterType::MomentumDivergence),
-            ("BullishDivergence", MomentumFilterType::BullishDivergence),
-            ("BearishDivergence", MomentumFilterType::BearishDivergence),
-            ("PersistentMomentum", MomentumFilterType::PersistentMomentum),
-            ("StableMomentum", MomentumFilterType::StableMomentum),
-            (
-                "MomentumReversalSignal",
-                MomentumFilterType::MomentumReversalSignal,
-            ),
-            ("MomentumSideways", MomentumFilterType::MomentumSideways),
-            ("MomentumSurge", MomentumFilterType::MomentumSurge),
-            ("MomentumCrash", MomentumFilterType::MomentumCrash),
-            (
-                "MomentumConvergence",
-                MomentumFilterType::MomentumConvergence,
-            ),
-            (
-                "MomentumDivergencePattern",
-                MomentumFilterType::MomentumDivergencePattern,
-            ),
-            ("MomentumParallel", MomentumFilterType::MomentumParallel),
-            ("MomentumCrossover", MomentumFilterType::MomentumCrossover),
-            (
-                "MomentumSupportTest",
-                MomentumFilterType::MomentumSupportTest,
-            ),
-            (
-                "MomentumResistanceTest",
-                MomentumFilterType::MomentumResistanceTest,
-            ),
-        ];
-
-        for (name, variant) in &variants {
-            if s == *name {
-                return Ok(*variant);
-            }
-        }
-
-        match s.parse::<i32>() {
-            Ok(num) => Ok(MomentumFilterType::from(num)),
-            Err(_) => Err(FilterError::UnknownMomentumFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    MomentumFilterType,
+    UnknownMomentumFilterType,
+    parse_i32,
+    [
+        StrongPositiveMomentum,
+        StrongNegativeMomentum,
+        AcceleratingMomentum,
+        DeceleratingMomentum,
+        Overbought,
+        Oversold,
+        MomentumDivergence,
+        BullishDivergence,
+        BearishDivergence,
+        PersistentMomentum,
+        StableMomentum,
+        MomentumReversalSignal,
+        MomentumSideways,
+        MomentumSurge,
+        MomentumCrash,
+        MomentumConvergence,
+        MomentumDivergencePattern,
+        MomentumParallel,
+        MomentumCrossover,
+        MomentumSupportTest,
+        MomentumResistanceTest,
+    ]
+);
 
 impl_filter_type_deserialize!(MomentumFilterType, MomentumFilterTypeVisitor, "Momentum");
 
@@ -2732,64 +1772,55 @@ impl Default for MomentumParams {
 
 /// Slope 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
-#[serde(into = "i32")]
 pub enum SlopeFilterType {
-    Upward = 0,
-    Downward = 1,
-    Sideways = 2,
-    StrengthAboveThreshold = 3,
-    Accelerating = 4,
-    Decelerating = 5,
-    StrongUpward = 6,
-    StrongDownward = 7,
-    HighRSquared = 8,
+    Upward,
+    Downward,
+    Sideways,
+    StrengthAboveThreshold,
+    Accelerating,
+    Decelerating,
+    StrongUpward,
+    StrongDownward,
+    HighRSquared,
 }
 
-impl From<i32> for SlopeFilterType {
-    fn from(value: i32) -> Self {
-        match value {
-            0 => SlopeFilterType::Upward,
-            1 => SlopeFilterType::Downward,
-            2 => SlopeFilterType::Sideways,
-            3 => SlopeFilterType::StrengthAboveThreshold,
-            4 => SlopeFilterType::Accelerating,
-            5 => SlopeFilterType::Decelerating,
-            6 => SlopeFilterType::StrongUpward,
-            7 => SlopeFilterType::StrongDownward,
-            8 => SlopeFilterType::HighRSquared,
-            _ => SlopeFilterType::Upward,
-        }
-    }
-}
-
-impl From<SlopeFilterType> for i32 {
-    fn from(value: SlopeFilterType) -> Self {
-        value as i32
-    }
-}
-
-impl FromStr for SlopeFilterType {
-    type Err = FilterError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "Upward" => Ok(SlopeFilterType::Upward),
-            "Downward" => Ok(SlopeFilterType::Downward),
-            "Sideways" => Ok(SlopeFilterType::Sideways),
-            "StrengthAboveThreshold" => Ok(SlopeFilterType::StrengthAboveThreshold),
-            "Accelerating" => Ok(SlopeFilterType::Accelerating),
-            "Decelerating" => Ok(SlopeFilterType::Decelerating),
-            "StrongUpward" => Ok(SlopeFilterType::StrongUpward),
-            "StrongDownward" => Ok(SlopeFilterType::StrongDownward),
-            "HighRSquared" => Ok(SlopeFilterType::HighRSquared),
-            _ => Err(FilterError::UnknownSlopeFilterType {
-                input: s.to_string(),
-            }),
-        }
-    }
-}
+impl_filter_type_fromstr!(
+    SlopeFilterType,
+    UnknownSlopeFilterType,
+    no_parse_i32,
+    [
+        Upward,
+        Downward,
+        Sideways,
+        StrengthAboveThreshold,
+        Accelerating,
+        Decelerating,
+        StrongUpward,
+        StrongDownward,
+        HighRSquared,
+    ]
+);
 
 impl_filter_type_deserialize!(SlopeFilterType, SlopeFilterTypeVisitor, "Slope");
+
+impl_filter_type_display!(
+    RSIFilterType,
+    MACDFilterType,
+    BollingerBandFilterType,
+    ADXFilterType,
+    MovingAverageFilterType,
+    IchimokuFilterType,
+    VWAPFilterType,
+    CopysFilterType,
+    ATRFilterType,
+    SuperTrendFilterType,
+    VolumeFilterType,
+    ThreeRSIFilterType,
+    CandlePatternFilterType,
+    SupportResistanceFilterType,
+    MomentumFilterType,
+    SlopeFilterType,
+);
 
 /// Slope 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3036,14 +2067,14 @@ mod tests {
         period: usize,
         oversold: f64,
         overbought: f64,
-        filter_type: i32,
+        filter_type: RSIFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::RSI(RSIParams {
             period,
             oversold,
             overbought,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
             ..Default::default()
@@ -3055,7 +2086,7 @@ mod tests {
         fast_period: usize,
         slow_period: usize,
         signal_period: usize,
-        filter_type: i32,
+        filter_type: MACDFilterType,
         consecutive_n: usize,
         threshold: f64,
     ) -> TechnicalFilterConfig {
@@ -3063,7 +2094,7 @@ mod tests {
             fast_period,
             slow_period,
             signal_period,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             threshold,
             p: 0,
@@ -3075,13 +2106,13 @@ mod tests {
     pub fn create_bollinger_band_filter(
         period: usize,
         dev_mult: f64,
-        filter_type: i32,
+        filter_type: BollingerBandFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::BollingerBand(BollingerBandParams {
             period,
             dev_mult,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
             ..Default::default()
@@ -3092,13 +2123,13 @@ mod tests {
     pub fn create_adx_filter(
         period: usize,
         threshold: f64,
-        filter_type: i32,
+        filter_type: ADXFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::ADX(ADXParams {
             period,
             threshold,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
         })
@@ -3107,12 +2138,12 @@ mod tests {
     /// 이동평균선 필터 생성 유틸리티 함수
     pub fn create_moving_average_filter(
         periods: Vec<usize>,
-        filter_type: i32,
+        filter_type: MovingAverageFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::MovingAverage(MovingAverageParams {
             periods,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
             ..Default::default()
@@ -3125,14 +2156,14 @@ mod tests {
         tenkan_period: usize,
         kijun_period: usize,
         senkou_span_b_period: usize,
-        filter_type: i32,
+        filter_type: IchimokuFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::Ichimoku(IchimokuParams {
             tenkan_period,
             kijun_period,
             senkou_span_b_period,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
         })
@@ -3142,13 +2173,13 @@ mod tests {
     #[allow(dead_code)]
     pub fn create_vwap_filter(
         period: usize,
-        filter_type: i32,
+        filter_type: VWAPFilterType,
         consecutive_n: usize,
         threshold: f64,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::VWAP(VWAPParams {
             period,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             threshold,
             p: 0,
@@ -3160,14 +2191,14 @@ mod tests {
         rsi_period: usize,
         rsi_upper: f64,
         rsi_lower: f64,
-        filter_type: i32,
+        filter_type: CopysFilterType,
         consecutive_n: usize,
     ) -> TechnicalFilterConfig {
         TechnicalFilterConfig::Copys(CopysParams {
             rsi_period,
             rsi_upper,
             rsi_lower,
-            filter_type: filter_type.into(),
+            filter_type,
             consecutive_n,
             p: 0,
             ..Default::default()
@@ -3177,7 +2208,7 @@ mod tests {
     #[test]
     fn test_technical_filter_config() {
         // RSI 필터 생성 테스트
-        let rsi_filter = create_rsi_filter(14, 30.0, 70.0, 0, 1);
+        let rsi_filter = create_rsi_filter(14, 30.0, 70.0, RSIFilterType::Overbought, 1);
         assert_eq!(rsi_filter.filter_type(), TechnicalFilterType::RSI);
         if let TechnicalFilterConfig::RSI(params) = rsi_filter {
             assert_eq!(params.period, 14);
@@ -3190,15 +2221,16 @@ mod tests {
         }
 
         // MACD 필터 생성 테스트
-        let macd_filter = create_macd_filter(12, 26, 9, 0, 1, 0.0);
+        let macd_filter = create_macd_filter(12, 26, 9, MACDFilterType::MacdAboveSignal, 1, 0.0);
         assert_eq!(macd_filter.filter_type(), TechnicalFilterType::MACD);
 
         // 볼린저 밴드 필터 생성 테스트
-        let bb_filter = create_bollinger_band_filter(20, 2.0, 1, 1);
+        let bb_filter =
+            create_bollinger_band_filter(20, 2.0, BollingerBandFilterType::BelowLowerBand, 1);
         assert_eq!(bb_filter.filter_type(), TechnicalFilterType::BollingerBand);
 
         // CopyS 필터 생성 테스트
-        let copys_filter = create_copys_filter(14, 70.0, 30.0, 0, 1);
+        let copys_filter = create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicBuySignal, 1);
         assert_eq!(copys_filter.filter_type(), TechnicalFilterType::Copys);
         if let TechnicalFilterConfig::Copys(params) = copys_filter {
             assert_eq!(params.rsi_period, 14);
@@ -3219,13 +2251,17 @@ mod tests {
         // 빌더 함수를 사용한 필터 생성
         let filter_list = [
             // RSI 과매수 필터 (RSI > 70인 코인 제외)
-            create_rsi_filter(14, 30.0, 70.0, 0, 1),
+            create_rsi_filter(14, 30.0, 70.0, RSIFilterType::Overbought, 1),
             // 이동평균선 필터 (5일선이 20일선 위에 있을 때)
-            create_moving_average_filter(vec![5, 20], 3, 3),
+            create_moving_average_filter(
+                vec![5, 20],
+                MovingAverageFilterType::FirstMAAboveLastMA,
+                3,
+            ),
             // MACD 필터 (MACD가 시그널선 위에 있는 코인만 포함)
-            create_macd_filter(12, 26, 9, 0, 2, 0.0),
+            create_macd_filter(12, 26, 9, MACDFilterType::MacdAboveSignal, 2, 0.0),
             // ADX 필터 (추세가 강한 코인만 포함)
-            create_adx_filter(14, 25.0, 1, 1),
+            create_adx_filter(14, 25.0, ADXFilterType::AboveThreshold, 1),
         ];
 
         // filter_list 검증
@@ -3242,7 +2278,7 @@ mod tests {
     #[test]
     fn test_filter_parameter_validation() {
         // RSI 필터 파라미터 검증
-        let rsi_filter = create_rsi_filter(14, 30.0, 70.0, 0, 1);
+        let rsi_filter = create_rsi_filter(14, 30.0, 70.0, RSIFilterType::Overbought, 1);
         if let TechnicalFilterConfig::RSI(params) = rsi_filter {
             assert_eq!(params.period, 14);
             assert_eq!(params.oversold, 30.0);
@@ -3254,7 +2290,7 @@ mod tests {
         }
 
         // MACD 필터 파라미터 검증
-        let macd_filter = create_macd_filter(12, 26, 9, 0, 1, 0.0);
+        let macd_filter = create_macd_filter(12, 26, 9, MACDFilterType::MacdAboveSignal, 1, 0.0);
         if let TechnicalFilterConfig::MACD(params) = macd_filter {
             assert_eq!(params.fast_period, 12);
             assert_eq!(params.slow_period, 26);
@@ -3267,7 +2303,11 @@ mod tests {
         }
 
         // 이동평균선 필터 파라미터 검증
-        let ma_filter = create_moving_average_filter(vec![5, 20], 3, 1);
+        let ma_filter = create_moving_average_filter(
+            vec![5, 20],
+            MovingAverageFilterType::FirstMAAboveLastMA,
+            1,
+        );
         if let TechnicalFilterConfig::MovingAverage(params) = ma_filter {
             assert_eq!(params.periods, vec![5, 20]);
             assert_eq!(
@@ -3284,10 +2324,14 @@ mod tests {
     fn test_filter_combination() {
         // 여러 필터 조합 테스트
         let filters = [
-            create_rsi_filter(14, 30.0, 70.0, 0, 1),
-            create_macd_filter(12, 26, 9, 0, 1, 0.0),
-            create_moving_average_filter(vec![5, 20], 3, 1),
-            create_copys_filter(14, 70.0, 30.0, 0, 1),
+            create_rsi_filter(14, 30.0, 70.0, RSIFilterType::Overbought, 1),
+            create_macd_filter(12, 26, 9, MACDFilterType::MacdAboveSignal, 1, 0.0),
+            create_moving_average_filter(
+                vec![5, 20],
+                MovingAverageFilterType::FirstMAAboveLastMA,
+                1,
+            ),
+            create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicBuySignal, 1),
         ];
 
         assert_eq!(filters.len(), 4);
@@ -3329,11 +2373,11 @@ mod tests {
         // CopyS 필터 사용 예시
         let copys_filters = [
             // CopyS 매수 신호 필터
-            create_copys_filter(14, 70.0, 30.0, 0, 2),
+            create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicBuySignal, 2),
             // CopyS 매도 신호 필터
-            create_copys_filter(14, 70.0, 30.0, 1, 1),
+            create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicSellSignal, 1),
             // CopyS MA 정배열 필터
-            create_copys_filter(14, 70.0, 30.0, 2, 1),
+            create_copys_filter(14, 70.0, 30.0, CopysFilterType::RSIOversold, 1),
         ];
 
         assert_eq!(copys_filters.len(), 3);

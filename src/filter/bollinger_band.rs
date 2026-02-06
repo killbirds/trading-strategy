@@ -369,7 +369,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 0.into(),
+            filter_type: BollingerBandFilterType::AboveUpperBand,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -388,7 +388,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 1.into(),
+            filter_type: BollingerBandFilterType::BelowLowerBand,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -407,7 +407,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 13.into(),
+            filter_type: BollingerBandFilterType::BreakThroughUpperBand,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -426,7 +426,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 14.into(),
+            filter_type: BollingerBandFilterType::BreakThroughLowerBandFromBelow,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -445,7 +445,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 15.into(),
+            filter_type: BollingerBandFilterType::BandWidthExpanding,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -464,7 +464,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 16.into(),
+            filter_type: BollingerBandFilterType::MiddleBandSideways,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -483,7 +483,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 20.into(),
+            filter_type: BollingerBandFilterType::UpperBandTouch,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -502,7 +502,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 21.into(),
+            filter_type: BollingerBandFilterType::LowerBandTouch,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -521,7 +521,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 29.into(),
+            filter_type: BollingerBandFilterType::LowVolatility,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -540,7 +540,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 30.into(),
+            filter_type: BollingerBandFilterType::HighVolatility,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -559,7 +559,7 @@ mod tests {
         let params = BollingerBandParams {
             period: 10,
             dev_mult: 2.0,
-            filter_type: 0.into(),
+            filter_type: BollingerBandFilterType::AboveUpperBand,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -572,18 +572,7 @@ mod tests {
 
     #[test]
     fn test_invalid_filter_type() {
-        let candles = create_test_candles();
-        let params = BollingerBandParams {
-            period: 10,
-            dev_mult: 2.0,
-            filter_type: 99.into(), // 유효하지 않은 필터 타입
-            consecutive_n: 1,
-            p: 0,
-            ..Default::default()
-        };
-        let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
-        assert!(result.is_ok());
-        assert!(!result.unwrap()); // 유효하지 않은 필터 타입은 항상 false 반환
+        let result = "99".parse::<BollingerBandFilterType>();
+        assert!(result.is_err());
     }
 }

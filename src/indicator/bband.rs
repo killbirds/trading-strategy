@@ -1,6 +1,6 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder};
 use crate::indicator::utils::moving_average;
+use crate::indicator::{IndicatorResult, TABuilder};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use trading_chart::Candle;

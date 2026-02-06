@@ -488,7 +488,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 10.into(), // ADX가 극도로 높음
+            filter_type: ADXFilterType::ExtremeHigh, // ADX가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -506,7 +506,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 11.into(), // ADX가 극도로 낮음
+            filter_type: ADXFilterType::ExtremeLow, // ADX가 극도로 낮음
             consecutive_n: 1,
             p: 0,
         };
@@ -524,7 +524,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 12.into(), // ADX가 중간 수준
+            filter_type: ADXFilterType::MiddleLevel, // ADX가 중간 수준
             consecutive_n: 1,
             p: 0,
         };
@@ -542,7 +542,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 13.into(), // +DI가 -DI를 상향 돌파
+            filter_type: ADXFilterType::PDICrossAboveMDI, // +DI가 -DI를 상향 돌파
             consecutive_n: 1,
             p: 0,
         };
@@ -560,7 +560,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 14.into(), // -DI가 +DI를 상향 돌파
+            filter_type: ADXFilterType::MDICrossAbovePDI, // -DI가 +DI를 상향 돌파
             consecutive_n: 1,
             p: 0,
         };
@@ -578,7 +578,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 15.into(), // ADX가 횡보 중
+            filter_type: ADXFilterType::Sideways, // ADX가 횡보 중
             consecutive_n: 1,
             p: 0,
         };
@@ -596,7 +596,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 16.into(), // ADX가 급등 중
+            filter_type: ADXFilterType::Surge, // ADX가 급등 중
             consecutive_n: 1,
             p: 0,
         };
@@ -614,7 +614,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 17.into(), // ADX가 급락 중
+            filter_type: ADXFilterType::Crash, // ADX가 급락 중
             consecutive_n: 1,
             p: 0,
         };
@@ -632,7 +632,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 18.into(), // +DI와 -DI가 모두 높음
+            filter_type: ADXFilterType::StrongDirectionality, // +DI와 -DI가 모두 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -650,7 +650,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 19.into(), // +DI와 -DI가 모두 낮음
+            filter_type: ADXFilterType::WeakDirectionality, // +DI와 -DI가 모두 낮음
             consecutive_n: 1,
             p: 0,
         };
@@ -668,7 +668,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 20.into(), // ADX가 +DI보다 높음
+            filter_type: ADXFilterType::TrendStrengthHigherThanDirection, // ADX가 +DI보다 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -686,7 +686,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 22.into(), // +DI가 ADX보다 높음
+            filter_type: ADXFilterType::PDIHigherThanADX, // +DI가 ADX보다 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -704,7 +704,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 24.into(), // ADX가 상승 추세에서 하락 전환
+            filter_type: ADXFilterType::TrendReversalDown, // ADX가 상승 추세에서 하락 전환
             consecutive_n: 1,
             p: 0,
         };
@@ -722,7 +722,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 25.into(), // ADX가 하락 추세에서 상승 전환
+            filter_type: ADXFilterType::TrendReversalUp, // ADX가 하락 추세에서 상승 전환
             consecutive_n: 1,
             p: 0,
         };
@@ -740,7 +740,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 26.into(), // +DI와 -DI가 교차 중
+            filter_type: ADXFilterType::DICrossover, // +DI와 -DI가 교차 중
             consecutive_n: 1,
             p: 0,
         };
@@ -758,7 +758,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 27.into(), // +DI가 극도로 높음
+            filter_type: ADXFilterType::ExtremePDI, // +DI가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -776,7 +776,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 28.into(), // -DI가 극도로 높음
+            filter_type: ADXFilterType::ExtremeMDI, // -DI가 극도로 높음
             consecutive_n: 1,
             p: 0,
         };
@@ -794,7 +794,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 29.into(), // ADX가 안정적
+            filter_type: ADXFilterType::Stable, // ADX가 안정적
             consecutive_n: 1,
             p: 0,
         };
@@ -812,7 +812,7 @@ mod tests {
         let params = ADXParams {
             period: 14,
             threshold: 25.0,
-            filter_type: 30.into(), // ADX가 불안정
+            filter_type: ADXFilterType::Unstable, // ADX가 불안정
             consecutive_n: 1,
             p: 0,
         };

@@ -1,7 +1,7 @@
 use crate::candle_store::CandleStore;
+use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
 use crate::indicator::utils::moving_average;
-use crate::indicator::TABuilder;
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;

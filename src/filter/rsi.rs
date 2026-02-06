@@ -461,7 +461,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 0.into(),
+            filter_type: RSIFilterType::Overbought,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -491,7 +491,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 1.into(),
+            filter_type: RSIFilterType::Oversold,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -511,7 +511,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 2.into(),
+            filter_type: RSIFilterType::NormalRange,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -530,7 +530,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 3.into(),
+            filter_type: RSIFilterType::CrossAboveThreshold,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -569,7 +569,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 4.into(),
+            filter_type: RSIFilterType::CrossBelowThreshold,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -584,20 +584,8 @@ mod tests {
 
     #[test]
     fn test_invalid_filter_type() {
-        let candles = create_test_candles();
-        let params = RSIParams {
-            period: 14,
-            oversold: 30.0,
-            overbought: 70.0,
-            filter_type: 5.into(), // 유효하지 않은 필터 타입
-            consecutive_n: 1,
-            p: 0,
-            ..Default::default()
-        };
-        let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
-        assert!(result.is_ok());
-        assert!(!result.unwrap()); // 유효하지 않은 필터 타입은 항상 false 반환
+        let result = "5".parse::<RSIFilterType>();
+        assert!(result.is_err());
     }
 
     #[test]
@@ -618,8 +606,8 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 1.into(), // RSI가 과매도 임계값 아래
-            consecutive_n: 3,      // 3연속 조건
+            filter_type: RSIFilterType::Oversold, // RSI가 과매도 임계값 아래
+            consecutive_n: 3,                     // 3연속 조건
             p: 0,
             ..Default::default()
         };
@@ -638,7 +626,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 0.into(),
+            filter_type: RSIFilterType::Overbought,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -656,7 +644,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 9.into(),
+            filter_type: RSIFilterType::CrossAbove40,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -676,7 +664,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 10.into(),
+            filter_type: RSIFilterType::CrossBelow60,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -696,7 +684,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 13.into(),
+            filter_type: RSIFilterType::Sideways,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -716,7 +704,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 16.into(),
+            filter_type: RSIFilterType::NeutralRange,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -736,7 +724,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 21.into(),
+            filter_type: RSIFilterType::Divergence,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -756,7 +744,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 22.into(),
+            filter_type: RSIFilterType::Convergence,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -776,7 +764,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 25.into(),
+            filter_type: RSIFilterType::Stable,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -796,7 +784,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 28.into(),
+            filter_type: RSIFilterType::NeutralTrend,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -816,7 +804,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 29.into(),
+            filter_type: RSIFilterType::Bullish,
             consecutive_n: 1,
             p: 0,
             ..Default::default()
@@ -836,7 +824,7 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: 30.into(),
+            filter_type: RSIFilterType::Bearish,
             consecutive_n: 1,
             p: 0,
             ..Default::default()

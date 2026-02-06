@@ -366,7 +366,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 0.into(),
+            filter_type: CandlePatternFilterType::StrongBullishPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -425,7 +425,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 11.into(),
+            filter_type: CandlePatternFilterType::HammerPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -486,7 +486,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 12.into(),
+            filter_type: CandlePatternFilterType::ShootingStarPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -547,7 +547,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 13.into(),
+            filter_type: CandlePatternFilterType::DojiPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -608,7 +608,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 16.into(),
+            filter_type: CandlePatternFilterType::MorningStarPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -669,7 +669,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 17.into(),
+            filter_type: CandlePatternFilterType::EveningStarPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -730,7 +730,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 18.into(),
+            filter_type: CandlePatternFilterType::EngulfingPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -791,7 +791,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 36.into(),
+            filter_type: CandlePatternFilterType::DoubleBottomPattern,
             consecutive_n: 1,
             p: 0,
         };
@@ -852,7 +852,7 @@ mod tests {
             min_shadow_ratio: 0.3,
             pattern_history_length: 5,
             threshold: 0.5,
-            filter_type: 37.into(),
+            filter_type: CandlePatternFilterType::DoubleTopPattern,
             consecutive_n: 1,
             p: 0,
         };

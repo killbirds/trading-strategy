@@ -158,7 +158,7 @@ impl MAsBuilderFactory {
             }
         }
 
-        if periods.iter().any(|period| *period == 0) {
+        if periods.contains(&0) {
             return Err("이동평균 기간은 0보다 커야 합니다".to_string());
         }
 
