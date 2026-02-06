@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -28,15 +28,22 @@ where
     C: Candle,
 {
     pub fn new(period: usize) -> Self {
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("MAX 기간은 0보다 커야 합니다");
+            return Err("MAX 기간은 0보다 커야 합니다".to_string());
         }
 
-        Self {
+        Ok(Self {
             period,
             values: Vec::with_capacity(period * 2),
             _phantom: PhantomData,
-        }
+        })
     }
 
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> MAX {
@@ -131,9 +138,22 @@ pub type MAXsBuilder<C> = TAsBuilder<usize, MAX, C>;
 pub struct MAXsBuilderFactory;
 impl MAXsBuilderFactory {
     pub fn build<C: Candle + 'static>(periods: &[usize]) -> MAXsBuilder<C> {
-        MAXsBuilder::new("maxs".to_owned(), periods, |period| {
+        match Self::build_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<MAXsBuilder<C>> {
+        for period in periods {
+            MAXBuilder::<C>::new_checked(*period)?;
+        }
+
+        Ok(MAXsBuilder::new("maxs".to_owned(), periods, |period| {
             Box::new(MAXBuilder::<C>::new(*period))
-        })
+        }))
     }
 }
 

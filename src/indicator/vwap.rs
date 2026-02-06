@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -349,9 +349,20 @@ pub type VWAPsBuilder<C> = TAsBuilder<VWAPParams, VWAP, C>;
 pub struct VWAPsBuilderFactory;
 impl VWAPsBuilderFactory {
     pub fn build<C: Candle + 'static>(params_list: &[VWAPParams]) -> VWAPsBuilder<C> {
-        VWAPsBuilder::new("vwaps".to_owned(), params_list, |params| {
-            Box::new(VWAPBuilder::<C>::new(*params))
-        })
+        match Self::build_checked(params_list) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    pub fn build_checked<C: Candle + 'static>(
+        params_list: &[VWAPParams],
+    ) -> IndicatorResult<VWAPsBuilder<C>> {
+        Ok(VWAPsBuilder::new(
+            "vwaps".to_owned(),
+            params_list,
+            |params| Box::new(VWAPBuilder::<C>::new(*params)),
+        ))
     }
 
     pub fn build_default<C: Candle + 'static>() -> VWAPsBuilder<C> {

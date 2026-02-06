@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -103,16 +103,30 @@ where
     /// # Returns
     /// * `VolumeBuilder` - 새 빌더 인스턴스
     pub fn new(period: usize) -> Self {
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 새 볼륨 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `period` - 볼륨 계산 기간
+    ///
+    /// # Returns
+    /// * `IndicatorResult<VolumeBuilder>` - 새 빌더 인스턴스 또는 에러
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
         if period == 0 {
-            panic!("볼륨 계산 기간은 0보다 커야 합니다");
+            return Err("볼륨 계산 기간은 0보다 커야 합니다".to_string());
         }
 
-        VolumeBuilder {
+        Ok(VolumeBuilder {
             period,
             accumulated_volume: 0.0,
             data_buffer: Vec::with_capacity(period * 2),
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 평균 거래량 계산
@@ -285,9 +299,31 @@ impl VolumesBuilderFactory {
     /// # Returns
     /// * `VolumesBuilder` - 여러 기간의 볼륨 빌더
     pub fn build<C: Candle + 'static>(periods: &[usize]) -> VolumesBuilder<C> {
-        VolumesBuilder::new("volumes".to_owned(), periods, |period| {
-            Box::new(VolumeBuilder::<C>::new(*period))
-        })
+        match Self::build_checked(periods) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 여러 기간의 볼륨 빌더 생성 (검증 포함)
+    ///
+    /// # Arguments
+    /// * `periods` - 볼륨 계산 기간 목록
+    ///
+    /// # Returns
+    /// * `IndicatorResult<VolumesBuilder>` - 여러 기간의 볼륨 빌더 또는 에러
+    pub fn build_checked<C: Candle + 'static>(
+        periods: &[usize],
+    ) -> IndicatorResult<VolumesBuilder<C>> {
+        for period in periods {
+            VolumeBuilder::<C>::new_checked(*period)?;
+        }
+
+        Ok(VolumesBuilder::new(
+            "volumes".to_owned(),
+            periods,
+            |period| Box::new(VolumeBuilder::<C>::new(*period)),
+        ))
     }
 
     /// 기본 볼륨 빌더 생성 (20기간)
