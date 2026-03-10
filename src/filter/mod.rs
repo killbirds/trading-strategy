@@ -1917,7 +1917,6 @@ pub enum TechnicalFilterConfig {
 }
 
 impl TechnicalFilterConfig {
-    /// 필터 타입 가져오기
     pub fn filter_type(&self) -> TechnicalFilterType {
         match self {
             Self::RSI(_) => TechnicalFilterType::RSI,
@@ -1936,6 +1935,80 @@ impl TechnicalFilterConfig {
             Self::SupportResistance(_) => TechnicalFilterType::SupportResistance,
             Self::Momentum(_) => TechnicalFilterType::Momentum,
             Self::Slope(_) => TechnicalFilterType::Slope,
+        }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            Self::RSI(params) => utils::validate_period(params.period, "RSI"),
+            Self::MACD(params) => {
+                utils::validate_period(params.fast_period, "MACD fast_period")?;
+                utils::validate_period(params.slow_period, "MACD slow_period")?;
+                utils::validate_period(params.signal_period, "MACD signal_period")
+            }
+            Self::BollingerBand(params) => utils::validate_period(params.period, "BollingerBand"),
+            Self::ADX(params) => {
+                utils::validate_period(params.period, "ADX")?;
+                if !(0.0..=100.0).contains(&params.threshold) {
+                    return Err(FilterError::InvalidAdxThreshold);
+                }
+                Ok(())
+            }
+            Self::MovingAverage(params) => {
+                for period in &params.periods {
+                    utils::validate_period(*period, "MovingAverage")?;
+                }
+                Ok(())
+            }
+            Self::Ichimoku(params) => {
+                utils::validate_period(params.tenkan_period, "Ichimoku tenkan_period")?;
+                utils::validate_period(params.kijun_period, "Ichimoku kijun_period")?;
+                utils::validate_period(params.senkou_span_b_period, "Ichimoku senkou_span_b_period")
+            }
+            Self::VWAP(params) => utils::validate_period(params.period, "VWAP"),
+            Self::Copys(params) => {
+                utils::validate_period(params.rsi_period, "Copys rsi_period")?;
+                utils::validate_period(params.bband_period, "Copys bband_period")?;
+                for period in &params.ma_periods {
+                    utils::validate_period(*period, "Copys ma_period")?;
+                }
+                Ok(())
+            }
+            Self::ATR(params) => utils::validate_period(params.period, "ATR"),
+            Self::SuperTrend(params) => utils::validate_period(params.period, "SuperTrend"),
+            Self::Volume(params) => utils::validate_period(params.period, "Volume"),
+            Self::ThreeRSI(params) => {
+                for period in &params.rsi_periods {
+                    utils::validate_period(*period, "ThreeRSI rsi_period")?;
+                }
+                utils::validate_period(params.ma_period, "ThreeRSI ma_period")?;
+                utils::validate_period(params.adx_period, "ThreeRSI adx_period")
+            }
+            Self::CandlePattern(params) => {
+                if params.pattern_history_length == 0 {
+                    return Err(FilterError::InvalidCandlePatternHistoryLength);
+                }
+                Ok(())
+            }
+            Self::SupportResistance(params) => {
+                utils::validate_period(
+                    params.lookback_period,
+                    "SupportResistance lookback_period",
+                )?;
+                if params.min_touch_count == 0 {
+                    return Err(FilterError::InvalidSupportResistanceMinTouchCount);
+                }
+                Ok(())
+            }
+            Self::Momentum(params) => {
+                utils::validate_period(params.rsi_period, "Momentum rsi_period")?;
+                utils::validate_period(params.stoch_period, "Momentum stoch_period")?;
+                utils::validate_period(params.williams_period, "Momentum williams_period")?;
+                utils::validate_period(params.roc_period, "Momentum roc_period")?;
+                utils::validate_period(params.cci_period, "Momentum cci_period")?;
+                utils::validate_period(params.momentum_period, "Momentum momentum_period")
+            }
+            Self::Slope(params) => utils::validate_period(params.period, "Slope"),
         }
     }
 }
@@ -2010,6 +2083,8 @@ impl TechnicalFilter {
         filter: &TechnicalFilterConfig,
         candle_store: &crate::candle_store::CandleStore<C>,
     ) -> Result<bool> {
+        filter.validate()?;
+
         match filter {
             TechnicalFilterConfig::RSI(params) => rsi::filter_rsi(symbol, params, candle_store),
             TechnicalFilterConfig::MACD(params) => macd::filter_macd(symbol, params, candle_store),
@@ -2318,6 +2393,27 @@ mod tests {
         } else {
             panic!("이동평균선 필터 파라미터 검증 실패");
         }
+    }
+
+    #[test]
+    fn test_technical_filter_config_validate_rejects_invalid_params() {
+        let invalid_rsi = TechnicalFilterConfig::RSI(RSIParams {
+            period: 0,
+            ..RSIParams::default()
+        });
+        assert!(invalid_rsi.validate().is_err());
+
+        let invalid_adx = TechnicalFilterConfig::ADX(ADXParams {
+            threshold: 101.0,
+            ..ADXParams::default()
+        });
+        assert!(invalid_adx.validate().is_err());
+
+        let invalid_copys = TechnicalFilterConfig::Copys(CopysParams {
+            rsi_period: 0,
+            ..CopysParams::default()
+        });
+        assert!(invalid_copys.validate().is_err());
     }
 
     #[test]
