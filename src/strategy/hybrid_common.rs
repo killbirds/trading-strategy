@@ -121,6 +121,14 @@ impl HybridStrategyConfigBase {
             return Err("RSI 기간은 2 이상이어야 합니다".to_string());
         }
 
+        if !self.rsi_lower.is_finite() || !(0.0..=100.0).contains(&self.rsi_lower) {
+            return Err("RSI 하한값은 0 이상 100 이하여야 합니다".to_string());
+        }
+
+        if !self.rsi_upper.is_finite() || !(0.0..=100.0).contains(&self.rsi_upper) {
+            return Err("RSI 상한값은 0 이상 100 이하여야 합니다".to_string());
+        }
+
         if self.rsi_lower >= self.rsi_upper {
             return Err(format!(
                 "RSI 하한값({})이 상한값({})보다 크거나 같을 수 없습니다",
@@ -136,12 +144,35 @@ impl HybridStrategyConfigBase {
             return Err("볼린저밴드 기간은 2 이상이어야 합니다".to_string());
         }
 
-        if self.bband_multiplier <= 0.0 {
+        if !self.bband_multiplier.is_finite() || self.bband_multiplier <= 0.0 {
             return Err("볼린저밴드 승수는 0보다 커야 합니다".to_string());
         }
 
         if self.ma_rank_period < 2 {
             return Err("마켓 랭크 이동평균 기간은 2 이상이어야 합니다".to_string());
+        }
+
+        if self.ma_period == 0 {
+            return Err("이동평균 기간은 0보다 커야 합니다".to_string());
+        }
+
+        if self.macd_fast_period == 0 {
+            return Err("MACD 빠른 기간은 0보다 커야 합니다".to_string());
+        }
+
+        if self.macd_slow_period == 0 {
+            return Err("MACD 느린 기간은 0보다 커야 합니다".to_string());
+        }
+
+        if self.macd_fast_period >= self.macd_slow_period {
+            return Err(format!(
+                "MACD 빠른 기간({})은 느린 기간({})보다 작아야 합니다",
+                self.macd_fast_period, self.macd_slow_period
+            ));
+        }
+
+        if self.macd_signal_period == 0 {
+            return Err("MACD 시그널 기간은 0보다 커야 합니다".to_string());
         }
 
         Ok(())

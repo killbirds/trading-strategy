@@ -432,6 +432,10 @@ pub mod config_utils {
                     .parse::<f64>()
                     .map_err(|_| format!("{key} 파싱 오류"))?;
 
+                if !value.is_finite() {
+                    return Err(format!("{key}은(는) 유한한 숫자여야 합니다"));
+                }
+
                 if let Some((min, max)) = range
                     && (value < min || value > max)
                 {
@@ -509,5 +513,19 @@ pub mod config_utils {
         }
 
         Ok((rsi_period, rsi_lower, rsi_upper))
+    }
+}
+
+#[cfg(test)]
+mod config_utils_tests {
+    use super::config_utils;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_parse_f64_rejects_non_finite_values() {
+        let mut config = HashMap::new();
+        config.insert("threshold".to_string(), "NaN".to_string());
+
+        assert!(config_utils::parse_f64(&config, "threshold", Some((0.0, 1.0)), true).is_err());
     }
 }

@@ -1,7 +1,7 @@
 use crate::candle_store::CandleStore;
 use crate::model::{PositionType, Signal};
 use crate::strategy::{Strategy, StrategyFactory, StrategyType, split};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use trading_chart::{Candle, CandleInterval};
 
@@ -49,8 +49,22 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
         // 가중치 파싱
         let weights: Vec<f64> = split(weights_str)?;
 
+        if timeframe_strings.is_empty() {
+            return Err("최소 1개 이상의 타임프레임이 필요합니다".to_string());
+        }
+
         if timeframe_strings.len() != weights.len() {
             return Err("타임프레임과 가중치의 개수가 일치하지 않습니다".to_string());
+        }
+
+        for (index, weight) in weights.iter().enumerate() {
+            if !weight.is_finite() {
+                return Err(format!("weights[{index}]은(는) 유한한 숫자여야 합니다"));
+            }
+
+            if *weight < 0.0 {
+                return Err(format!("weights[{index}]은(는) 0 이상이어야 합니다"));
+            }
         }
 
         // 가중치 합계가 1.0인지 확인
@@ -63,10 +77,15 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
         let mut timeframe_weights = HashMap::new();
         let mut signals = HashMap::new();
         let mut strategies = HashMap::new();
+        let mut seen_intervals = HashSet::new();
 
         // 타임프레임 문자열을 CandleInterval로 변환하고 해시맵에 삽입
         for (i, tf_str) in timeframe_strings.iter().enumerate() {
             let interval = CandleInterval::from_str(tf_str)?;
+
+            if !seen_intervals.insert(interval) {
+                return Err(format!("중복된 타임프레임이 있습니다: {interval:?}"));
+            }
 
             timeframe_weights.insert(interval, weights[i]);
             signals.insert(interval, Signal::Hold);
@@ -99,6 +118,14 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             .transpose()
             .map_err(|e| format!("confirmation_threshold 파싱 오류: {e}"))?
             .unwrap_or(0.6);
+
+        if !confirmation_threshold.is_finite() {
+            return Err("confirmation_threshold는 유한한 숫자여야 합니다".to_string());
+        }
+
+        if !(0.0..=1.0).contains(&confirmation_threshold) {
+            return Err("confirmation_threshold는 0.0 이상 1.0 이하여야 합니다".to_string());
+        }
 
         // 포지션 타입 결정 (기본 전략의 포지션 타입을 따름)
         let position_type = StrategyFactory::position_from_strategy_type(base_strategy);

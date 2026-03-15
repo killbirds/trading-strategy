@@ -41,6 +41,21 @@ fn test_new_max_size_limit() {
 }
 
 #[test]
+fn test_new_with_duplicate_filter_enabled_deduplicates_initial_items() {
+    let candles = vec![
+        TestCandle::new(3, 120.0, 125.0, 115.0, 122.0, 1000.0),
+        TestCandle::new(1, 100.0, 105.0, 95.0, 102.0, 1000.0),
+        TestCandle::new(1, 110.0, 115.0, 105.0, 112.0, 2000.0),
+    ];
+
+    let store = CandleStore::new(candles, 100, true);
+
+    assert_eq!(store.len(), 2);
+    assert_eq!(store.get(0).unwrap().datetime().timestamp(), 3);
+    assert_eq!(store.get(1).unwrap().datetime().timestamp(), 1);
+}
+
+#[test]
 fn test_add_maintains_descending_order() {
     let mut store = CandleStore::<TestCandle>::new(Vec::new(), 100, false);
 
@@ -67,6 +82,17 @@ fn test_add_with_duplicate_filter_enabled() {
 
     let different_candle = TestCandle::new(2, 105.0, 110.0, 100.0, 107.0, 1000.0);
     store.add(different_candle);
+    assert_eq!(store.len(), 2);
+}
+
+#[test]
+fn test_add_with_duplicate_filter_enabled_rejects_out_of_order_duplicate_timestamp() {
+    let mut store = CandleStore::new(Vec::new(), 100, true);
+
+    store.add(TestCandle::new(3, 120.0, 125.0, 115.0, 122.0, 1000.0));
+    store.add(TestCandle::new(1, 100.0, 105.0, 95.0, 102.0, 1000.0));
+    store.add(TestCandle::new(1, 110.0, 115.0, 105.0, 112.0, 2000.0));
+
     assert_eq!(store.len(), 2);
 }
 

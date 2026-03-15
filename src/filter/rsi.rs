@@ -558,7 +558,7 @@ mod tests {
 
     #[test]
     fn test_invalid_filter_type() {
-        let result = "5".parse::<RSIFilterType>();
+        let result = "99".parse::<RSIFilterType>();
         assert!(result.is_err());
     }
 

@@ -47,7 +47,17 @@ impl Default for HybridStrategyConfig {
 impl HybridStrategyConfig {
     /// 설정의 유효성을 검사합니다.
     pub fn validate(&self) -> Result<(), String> {
-        self.base.validate()
+        self.base.validate()?;
+
+        if !self.entry_threshold.is_finite() || !(0.0..=1.0).contains(&self.entry_threshold) {
+            return Err("진입 신호 임계값은 0과 1 사이여야 합니다".to_string());
+        }
+
+        if !self.exit_threshold.is_finite() || !(0.0..=1.0).contains(&self.exit_threshold) {
+            return Err("청산 신호 임계값은 0과 1 사이여야 합니다".to_string());
+        }
+
+        Ok(())
     }
 
     /// JSON 문자열에서 설정 로드
@@ -262,6 +272,7 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
 mod tests {
     use super::*;
     use crate::indicator::ma::MAType;
+    use crate::tests::TestCandle;
 
     #[test]
     fn test_hybrid_strategy_config_from_json_uses_defaults() {
@@ -281,5 +292,20 @@ mod tests {
         assert_eq!(config.base.macd_signal_period, 9);
         assert_eq!(config.entry_threshold, 0.0);
         assert_eq!(config.exit_threshold, 0.2);
+    }
+
+    #[test]
+    fn test_hybrid_strategy_from_json_rejects_invalid_ma_period() {
+        let storage = CandleStore::<TestCandle>::new(Vec::new(), 10, false);
+        let result = HybridStrategy::from_json(&storage, r#"{"ma_period":0}"#);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hybrid_strategy_config_rejects_invalid_thresholds() {
+        let result = HybridStrategyConfig::from_json(r#"{"entry_threshold":1.5}"#);
+
+        assert!(result.is_err());
     }
 }

@@ -176,3 +176,40 @@ fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
     assert!(strategy.calculate_weighted_signal_for_test() >= 0.6);
     assert!(strategy.should_exit(&storage.items()[0]));
 }
+
+#[test]
+fn test_multi_timeframe_strategy_rejects_duplicate_timeframes() {
+    let candles = create_uptrend_candles(20, 100.0, 1.0);
+    let storage = create_test_storage(candles);
+    let mut config = create_multi_timeframe_config();
+    config.insert("timeframes".to_string(), "1m,1m".to_string());
+    config.insert("weights".to_string(), "0.5,0.5".to_string());
+
+    let result = MultiTimeframeStrategy::new_with_config(&storage, Some(config));
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_multi_timeframe_strategy_rejects_out_of_range_threshold() {
+    let candles = create_uptrend_candles(20, 100.0, 1.0);
+    let storage = create_test_storage(candles);
+    let mut config = create_multi_timeframe_config();
+    config.insert("confirmation_threshold".to_string(), "1.1".to_string());
+
+    let result = MultiTimeframeStrategy::new_with_config(&storage, Some(config));
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_multi_timeframe_strategy_rejects_negative_weight() {
+    let candles = create_uptrend_candles(20, 100.0, 1.0);
+    let storage = create_test_storage(candles);
+    let mut config = create_multi_timeframe_config();
+    config.insert("weights".to_string(), "-0.1,0.4,0.4,0.3".to_string());
+
+    let result = MultiTimeframeStrategy::new_with_config(&storage, Some(config));
+
+    assert!(result.is_err());
+}

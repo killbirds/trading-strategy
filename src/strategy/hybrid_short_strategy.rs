@@ -68,18 +68,24 @@ impl HybridShortStrategyConfig {
         self.base.validate()?;
 
         // 임계값 검사
-        if self.entry_threshold <= 0.0 || self.entry_threshold > 1.0 {
+        if !self.entry_threshold.is_finite()
+            || self.entry_threshold <= 0.0
+            || self.entry_threshold > 1.0
+        {
             return Err("진입 신호 임계값은 0과 1 사이여야 합니다".to_string());
         }
-        if self.exit_threshold <= 0.0 || self.exit_threshold > 1.0 {
+        if !self.exit_threshold.is_finite()
+            || self.exit_threshold <= 0.0
+            || self.exit_threshold > 1.0
+        {
             return Err("청산 신호 임계값은 0과 1 사이여야 합니다".to_string());
         }
 
         // 손절/이익실현 레벨 검사
-        if self.stop_loss >= 0.0 {
+        if !self.stop_loss.is_finite() || self.stop_loss >= 0.0 {
             return Err("손절 수준은 음수여야 합니다".to_string());
         }
-        if self.take_profit <= 0.0 {
+        if !self.take_profit.is_finite() || self.take_profit <= 0.0 {
             return Err("이익 실현 수준은 양수여야 합니다".to_string());
         }
 

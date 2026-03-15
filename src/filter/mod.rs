@@ -79,6 +79,30 @@ macro_rules! impl_filter_type_deserialize {
                         $type::from_str(value)
                             .map_err(|e| E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, e)))
                     }
+
+                    fn visit_i64<E>(self, value: i64) -> std::result::Result<$type, E>
+                    where
+                        E: de::Error,
+                    {
+                        let index = usize::try_from(value).map_err(|_| {
+                            E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, value))
+                        })?;
+
+                        $type::from_index(index)
+                            .map_err(|e| E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, e)))
+                    }
+
+                    fn visit_u64<E>(self, value: u64) -> std::result::Result<$type, E>
+                    where
+                        E: de::Error,
+                    {
+                        let index = usize::try_from(value).map_err(|_| {
+                            E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, value))
+                        })?;
+
+                        $type::from_index(index)
+                            .map_err(|e| E::custom(format!("{} 필터 타입 파싱 오류: {}", $name, e)))
+                    }
                 }
 
                 deserializer.deserialize_any($visitor)
@@ -101,10 +125,27 @@ macro_rules! impl_filter_type_display {
 
 macro_rules! impl_filter_type_fromstr {
     ($type:ident, $error_variant:ident, parse_i32, [$($variant:ident),+ $(,)?]) => {
+        impl $type {
+            fn from_index(index: usize) -> Result<Self> {
+                const VARIANTS: &[$type] = &[$($type::$variant),+];
+
+                VARIANTS
+                    .get(index)
+                    .copied()
+                    .ok_or(FilterError::$error_variant {
+                        input: index.to_string(),
+                    })
+            }
+        }
+
         impl FromStr for $type {
             type Err = FilterError;
 
             fn from_str(s: &str) -> Result<Self> {
+                if let Ok(index) = s.parse::<usize>() {
+                    return Self::from_index(index);
+                }
+
                 match s {
                     $(stringify!($variant) => Ok($type::$variant),)+
                     _ => Err(FilterError::$error_variant {
@@ -115,10 +156,27 @@ macro_rules! impl_filter_type_fromstr {
         }
     };
     ($type:ident, $error_variant:ident, no_parse_i32, [$($variant:ident),+ $(,)?]) => {
+        impl $type {
+            fn from_index(index: usize) -> Result<Self> {
+                const VARIANTS: &[$type] = &[$($type::$variant),+];
+
+                VARIANTS
+                    .get(index)
+                    .copied()
+                    .ok_or(FilterError::$error_variant {
+                        input: index.to_string(),
+                    })
+            }
+        }
+
         impl FromStr for $type {
             type Err = FilterError;
 
             fn from_str(s: &str) -> Result<Self> {
+                if let Ok(index) = s.parse::<usize>() {
+                    return Self::from_index(index);
+                }
+
                 match s {
                     $(stringify!($variant) => Ok($type::$variant),)+
                     _ => Err(FilterError::$error_variant {
@@ -2514,6 +2572,20 @@ mod tests {
         assert_eq!(params.consecutive_n, 1);
         assert_eq!(params.p, 0);
         assert_eq!(params.cross_threshold, 50.0);
+    }
+
+    #[test]
+    fn test_rsi_filter_type_deserialize_supports_numeric_values() {
+        let params: RSIParams = serde_json::from_str(r#"{"filter_type":0}"#).unwrap();
+
+        assert_eq!(params.filter_type, RSIFilterType::Overbought);
+    }
+
+    #[test]
+    fn test_slope_filter_type_deserialize_supports_numeric_values() {
+        let params: SlopeParams = serde_json::from_str(r#"{"filter_type":3}"#).unwrap();
+
+        assert_eq!(params.filter_type, SlopeFilterType::StrengthAboveThreshold);
     }
 
     #[test]

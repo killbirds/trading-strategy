@@ -28,6 +28,10 @@ where
         // datetime 기준으로 내림차순 정렬 (최신 데이터가 먼저 오도록)
         items.sort_by_key(|b| std::cmp::Reverse(b.datetime()));
 
+        if use_duplicated_filter {
+            items.dedup_by(|lhs, rhs| lhs.datetime() == rhs.datetime());
+        }
+
         // 최대 크기를 초과하는 아이템들 제거
         if items.len() > max_size {
             items.truncate(max_size);
@@ -42,27 +46,20 @@ where
     /// 데이터를 datetime 기준으로 내림차순 정렬하여 삽입합니다.
     ///
     /// 이미 저장소가 최대 크기에 도달했다면, 가장 오래된 데이터가 제거됩니다.
-    /// 중복 필터링이 활성화된 경우, 첫 번째 아이템과 동일한 타임스탬프를 가진 데이터는 삽입하지 않습니다.
+    /// 중복 필터링이 활성화된 경우, 동일한 타임스탬프를 가진 데이터는 삽입하지 않습니다.
     ///
     /// # Arguments
     /// * `data` - 삽입할 데이터
     pub fn add(&mut self, data: T) {
-        // 중복 필터링이 활성화되고 첫 번째 아이템과 동일한 타임스탬프면 무시
-        // 내림차순 정렬이므로 최신 데이터가 첫 번째에 위치하여 첫 번째만 확인하면 됨
-        if self.use_duplicated_filter
-            && !self.items.is_empty()
-            && self.items.first().map(|item| item.datetime()) == Some(data.datetime())
-        {
-            return;
-        }
-
-        // datetime 기준으로 내림차순 정렬된 위치 찾기
-        // binary_search_by는 오름차순 배열을 가정하지만, Err(idx)로 반환되는 인덱스가
-        // 내림차순 배열에서도 올바른 삽입 위치를 제공함 (테스트로 검증됨)
-        let insert_idx = self
+        // datetime 기준으로 내림차순 정렬된 위치를 찾고, 중복 필터가 켜져 있으면 같은
+        // 타임스탬프의 캔들을 저장하지 않습니다.
+        let insert_idx = match self
             .items
             .binary_search_by(|item| data.datetime().cmp(&item.datetime()))
-            .unwrap_or_else(|idx| idx);
+        {
+            Ok(_) if self.use_duplicated_filter => return,
+            Ok(idx) | Err(idx) => idx,
+        };
 
         // 데이터 삽입
         self.items.insert(insert_idx, data);
