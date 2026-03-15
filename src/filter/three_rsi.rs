@@ -39,6 +39,7 @@ impl ThreeRSIFilter {
         }
         utils::validate_period(ma_period, "ThreeRSI ma_period")?;
         utils::validate_period(adx_period, "ThreeRSI adx_period")?;
+        utils::validate_percentage_threshold(params.cross_threshold, "ThreeRSI cross_threshold")?;
 
         // 경계 조건 체크
         let required_length = ma_period.max(consecutive_n);
@@ -107,57 +108,29 @@ impl ThreeRSIFilter {
                 consecutive_n,
                 p,
             ),
-            ThreeRSIFilterType::RSICrossAbove50 => {
+            ThreeRSIFilterType::RSICrossAbove => {
                 if analyzer.items.len() < p + 2 {
                     false
                 } else {
-                    let current_all_above = analyzer.items[p].rsis.is_all(|rsi| rsi.value > 50.0);
-                    let prev_all_below = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value <= 50.0);
+                    let current_all_above = analyzer.items[p]
+                        .rsis
+                        .is_all(|rsi| rsi.value > params.cross_threshold);
+                    let prev_all_below = analyzer.items[p + 1]
+                        .rsis
+                        .is_all(|rsi| rsi.value <= params.cross_threshold);
                     current_all_above && prev_all_below
                 }
             }
-            ThreeRSIFilterType::RSICrossBelow50 => {
+            ThreeRSIFilterType::RSICrossBelow => {
                 if analyzer.items.len() < p + 2 {
                     false
                 } else {
-                    let current_all_below = analyzer.items[p].rsis.is_all(|rsi| rsi.value < 50.0);
-                    let prev_all_above = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value >= 50.0);
-                    current_all_below && prev_all_above
-                }
-            }
-            ThreeRSIFilterType::RSICrossAbove40 => {
-                if analyzer.items.len() < p + 2 {
-                    false
-                } else {
-                    let current_all_above = analyzer.items[p].rsis.is_all(|rsi| rsi.value > 40.0);
-                    let prev_all_below = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value <= 40.0);
-                    current_all_above && prev_all_below
-                }
-            }
-            ThreeRSIFilterType::RSICrossBelow60 => {
-                if analyzer.items.len() < p + 2 {
-                    false
-                } else {
-                    let current_all_below = analyzer.items[p].rsis.is_all(|rsi| rsi.value < 60.0);
-                    let prev_all_above = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value >= 60.0);
-                    current_all_below && prev_all_above
-                }
-            }
-            ThreeRSIFilterType::RSICrossAbove20 => {
-                if analyzer.items.len() < p + 2 {
-                    false
-                } else {
-                    let current_all_above = analyzer.items[p].rsis.is_all(|rsi| rsi.value > 20.0);
-                    let prev_all_below = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value <= 20.0);
-                    current_all_above && prev_all_below
-                }
-            }
-            ThreeRSIFilterType::RSICrossBelow80 => {
-                if analyzer.items.len() < p + 2 {
-                    false
-                } else {
-                    let current_all_below = analyzer.items[p].rsis.is_all(|rsi| rsi.value < 80.0);
-                    let prev_all_above = analyzer.items[p + 1].rsis.is_all(|rsi| rsi.value >= 80.0);
+                    let current_all_below = analyzer.items[p]
+                        .rsis
+                        .is_all(|rsi| rsi.value < params.cross_threshold);
+                    let prev_all_above = analyzer.items[p + 1]
+                        .rsis
+                        .is_all(|rsi| rsi.value >= params.cross_threshold);
                     current_all_below && prev_all_above
                 }
             }
@@ -271,6 +244,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::AllRSILessThan50,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -330,6 +304,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::AllRSILessThan50,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -389,6 +364,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::RSIExtremeOversold,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -451,6 +427,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::RSIExtremeOverbought,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -513,6 +490,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::RSIStableRange,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -575,6 +553,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::RSIBullishRange,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());
@@ -637,6 +616,7 @@ mod tests {
             filter_type: ThreeRSIFilterType::RSIBearishRange,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 50.0,
         };
         let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
         assert!(result.is_ok());

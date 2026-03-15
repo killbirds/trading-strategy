@@ -12,6 +12,7 @@ use trading_chart::Candle;
 
 /// 이동평균(MA) 숏 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct MAShortStrategyConfig {
     /// 이동평균 계산 방식 (SMA, EMA 등)
     pub ma: crate::indicator::ma::MAType,

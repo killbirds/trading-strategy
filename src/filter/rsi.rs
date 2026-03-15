@@ -6,6 +6,14 @@ use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use trading_chart::Candle;
 
+fn crossed_above(current: f64, previous: f64, threshold: f64) -> bool {
+    current > threshold && previous <= threshold
+}
+
+fn crossed_below(current: f64, previous: f64, threshold: f64) -> bool {
+    current < threshold && previous >= threshold
+}
+
 /// 개별 코인에 대한 RSI 필터 적용
 pub(crate) fn filter_rsi<C: Candle + 'static>(
     coin: &str,
@@ -13,16 +21,18 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
     candle_store: &CandleStore<C>,
 ) -> Result<bool> {
     log::debug!(
-        "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 타입: {:?}, 연속성: {}",
+        "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 교차임계값: {}, 타입: {:?}, 연속성: {}",
         params.period,
         params.oversold,
         params.overbought,
+        params.cross_threshold,
         params.filter_type,
         params.consecutive_n
     );
 
     // 파라미터 검증
     utils::validate_period(params.period, "RSI")?;
+    utils::validate_percentage_threshold(params.cross_threshold, "RSI cross_threshold")?;
 
     // 경계 조건 체크
     let required_length = params.period + params.consecutive_n;
@@ -81,7 +91,7 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 let threshold = (params.oversold + params.overbought) / 2.0;
-                current_rsi > threshold && previous_rsi <= threshold
+                crossed_above(current_rsi, previous_rsi, threshold)
             }
         }
         RSIFilterType::CrossBelowThreshold => {
@@ -91,25 +101,25 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 1].rsi.value();
                 let threshold = (params.oversold + params.overbought) / 2.0;
-                current_rsi < threshold && previous_rsi >= threshold
+                crossed_below(current_rsi, previous_rsi, threshold)
             }
         }
-        RSIFilterType::CrossAbove50 => {
+        RSIFilterType::CrossAbove => {
             if analyzer.items.len() < params.p + 2 {
                 false
             } else {
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi > 50.0 && previous_rsi <= 50.0
+                crossed_above(current_rsi, previous_rsi, params.cross_threshold)
             }
         }
-        RSIFilterType::CrossBelow50 => {
+        RSIFilterType::CrossBelow => {
             if analyzer.items.len() < params.p + 2 {
                 false
             } else {
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi < 50.0 && previous_rsi >= 50.0
+                crossed_below(current_rsi, previous_rsi, params.cross_threshold)
             }
         }
         RSIFilterType::RisingTrend => {
@@ -142,42 +152,6 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
                     }
                 }
                 descending
-            }
-        }
-        RSIFilterType::CrossAbove40 => {
-            if analyzer.items.len() < params.p + 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[params.p].rsi.value();
-                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi > 40.0 && previous_rsi <= 40.0
-            }
-        }
-        RSIFilterType::CrossBelow60 => {
-            if analyzer.items.len() < params.p + 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[params.p].rsi.value();
-                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi < 60.0 && previous_rsi >= 60.0
-            }
-        }
-        RSIFilterType::CrossAbove20 => {
-            if analyzer.items.len() < params.p + 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[params.p].rsi.value();
-                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi > 20.0 && previous_rsi <= 20.0
-            }
-        }
-        RSIFilterType::CrossBelow80 => {
-            if analyzer.items.len() < params.p + 2 {
-                false
-            } else {
-                let current_rsi = analyzer.items[params.p].rsi.value();
-                let previous_rsi = analyzer.items[params.p + 1].rsi.value();
-                current_rsi < 80.0 && previous_rsi >= 80.0
             }
         }
         RSIFilterType::Sideways => {
@@ -644,9 +618,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: RSIFilterType::CrossAbove40,
+            filter_type: RSIFilterType::CrossAbove,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 40.0,
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
@@ -664,9 +639,10 @@ mod tests {
             period: 14,
             oversold: 30.0,
             overbought: 70.0,
-            filter_type: RSIFilterType::CrossBelow60,
+            filter_type: RSIFilterType::CrossBelow,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: 60.0,
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);

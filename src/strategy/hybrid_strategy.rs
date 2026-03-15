@@ -15,14 +15,13 @@ use trading_chart::Candle;
 
 /// 하이브리드 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct HybridStrategyConfig {
     #[serde(flatten)]
     pub base: HybridStrategyConfigBase,
     /// 진입 신호 임계값 (기본값: 0.0)
-    #[serde(default = "default_entry_threshold")]
     pub entry_threshold: f64,
     /// 청산 신호 임계값 (기본값: 0.2)
-    #[serde(default = "default_exit_threshold")]
     pub exit_threshold: f64,
 }
 
@@ -256,5 +255,31 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
 
     fn name(&self) -> StrategyType {
         StrategyType::Hybrid
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::indicator::ma::MAType;
+
+    #[test]
+    fn test_hybrid_strategy_config_from_json_uses_defaults() {
+        let config = HybridStrategyConfig::from_json("{}").unwrap();
+
+        assert_eq!(config.base.rsi_period, 14);
+        assert_eq!(config.base.rsi_upper, 70.0);
+        assert_eq!(config.base.rsi_lower, 30.0);
+        assert_eq!(config.base.rsi_count, 3);
+        assert_eq!(config.base.bband_period, 20);
+        assert_eq!(config.base.bband_multiplier, 2.0);
+        assert_eq!(config.base.ma_rank_period, 20);
+        assert_eq!(config.base.ma_type, MAType::SMA);
+        assert_eq!(config.base.ma_period, 20);
+        assert_eq!(config.base.macd_fast_period, 12);
+        assert_eq!(config.base.macd_slow_period, 26);
+        assert_eq!(config.base.macd_signal_period, 9);
+        assert_eq!(config.entry_threshold, 0.0);
+        assert_eq!(config.exit_threshold, 0.2);
     }
 }

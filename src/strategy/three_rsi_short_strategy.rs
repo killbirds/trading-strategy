@@ -14,6 +14,7 @@ use trading_chart::Candle;
 
 /// 세 개의 RSI를 사용하는 숏 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct ThreeRSIShortStrategyConfig {
     #[serde(flatten)]
     pub base: ThreeRSIStrategyConfigBase,

@@ -94,14 +94,15 @@ p = 0                  # 과거 시점 확인을 위한 오프셋 (기본값: 0,
 period = 14                    # RSI 계산 기간 (기본값: 14)
 oversold = 30.0                # 과매도 기준점 (기본값: 30.0)
 overbought = 70.0              # 과매수 기준점 (기본값: 70.0)
-filter_type = "Overbought"    # 필터 타입 (enum 이름 또는 0-30)
+filter_type = "Overbought"     # 필터 타입 (enum 이름)
 consecutive_n = 1               # 연속 캔들 수 (기본값: 1)
 p = 0                           # 오프셋 (기본값: 0)
 sideways_threshold = 0.02       # 횡보 판단 임계값 (기본값: 0.02 = 2%)
 momentum_threshold = 3.0        # 강한 모멘텀 임계값 (기본값: 3.0)
+cross_threshold = 50.0          # CrossAbove/CrossBelow용 임계값 (기본값: 50.0)
 ```
 
-#### 필터 타입 (총 31개)
+#### 필터 타입 (총 23개)
 
 **기본 신호**
 | 값 | 설명 | 계산 방식 | 사용 시기 |
@@ -115,48 +116,40 @@ momentum_threshold = 3.0        # 강한 모멘텀 임계값 (기본값: 3.0)
 |----|------|----------|----------|
 | 3 | 상향 돌파 | RSI가 중간값((oversold+overbought)/2) 상향 돌파 | 반등 매수 |
 | 4 | 하향 돌파 | RSI가 중간값 하향 돌파 | 반락 매도 |
-| 5 | 50 상향 돌파 | RSI가 50 상향 돌파 | 상승 전환 |
-| 6 | 50 하향 돌파 | RSI가 50 하향 돌파 | 하락 전환 |
-| 9 | 40 상향 돌파 | RSI가 40 상향 돌파 | 약세→중립 전환 |
-| 10 | 60 하향 돌파 | RSI가 60 하향 돌파 | 강세→중립 전환 |
-| 11 | 20 상향 돌파 | RSI가 20 상향 돌파 | 극도 과매도 반등 |
-| 12 | 80 하향 돌파 | RSI가 80 하향 돌파 | 극도 과매수 하락 |
+| 5 | 임계값 상향 돌파 | RSI가 `cross_threshold` 상향 돌파 | 50/40/20 돌파 대응 |
+| 6 | 임계값 하향 돌파 | RSI가 `cross_threshold` 하향 돌파 | 50/60/80 이탈 대응 |
 
 **추세 신호**
 | 값 | 설명 | 계산 방식 | 사용 시기 |
 |----|------|----------|----------|
 | 7 | RSI 상승 추세 | 연속 N개 캔들에서 RSI가 상승 | 상승 지속 |
 | 8 | RSI 하락 추세 | 연속 N개 캔들에서 RSI가 하락 | 하락 지속 |
-| 13 | RSI 횡보 | RSI가 횡보 상태 (변화율 < threshold) | 중립 상태 |
-| 16 | 50 근처 횡보 | RSI가 45-55 범위 | 중립 상태 |
-| 25 | 30-70 구간 안정 | RSI가 30-70 범위 유지 | 중립 상태 |
-| 28 | 50 중심 진동 | RSI가 40-60 범위 | 중립적 추세 |
+| 9 | RSI 횡보 | RSI가 횡보 상태 (변화율 < sideways_threshold) | 중립 상태 |
 
 **모멘텀 신호**
 | 값 | 설명 | 계산 방식 | 사용 시기 |
 |----|------|----------|----------|
-| 14 | 강한 상승 모멘텀 | 연속 N개에서 RSI가 momentum_threshold 이상 상승 | 상승 가속 |
-| 15 | 강한 하락 모멘텀 | 연속 N개에서 RSI가 momentum_threshold 이상 하락 | 하락 가속 |
-| 17 | 과매수 구간 하락 시작 | RSI > 40에서 하락 시작 | 반락 신호 |
-| 18 | 과매도 구간 상승 시작 | RSI < 60에서 상승 시작 | 반등 신호 |
+| 10 | 강한 상승 모멘텀 | 연속 N개에서 RSI가 `momentum_threshold` 이상 상승 | 상승 가속 |
+| 11 | 강한 하락 모멘텀 | 연속 N개에서 RSI가 `momentum_threshold` 이상 하락 | 하락 가속 |
+| 15 | 과매도권 반등 패턴 | 과매도권 재확인 후 반등 지속 패턴 | 반등 신호 |
+| 16 | 과매수권 하락 패턴 | 과매수권 재확인 후 하락 지속 패턴 | 반락 신호 |
 
 **패턴 신호**
 | 값 | 설명 | 계산 방식 | 사용 시기 |
 |----|------|----------|----------|
-| 19 | 이중 바닥 패턴 (W) | RSI가 과매도→상승→과매도→상승 패턴 | 반등 신호 |
-| 20 | 이중 천정 패턴 (M) | RSI가 과매수→하락→과매수→하락 패턴 | 반락 신호 |
-| 21 | 다이버전스 패턴 | 가격 상승, RSI 하락 | 전환 신호 |
-| 22 | 컨버전스 패턴 | 가격 하락, RSI 상승 | 전환 신호 |
-| 23 | 과매수 구간 반전 | 과매수 구간에서 반전 | 반락 신호 |
-| 24 | 과매도 구간 반전 | 과매도 구간에서 반전 | 반등 신호 |
+| 17 | 다이버전스 패턴 | 가격 상승, RSI 하락 | 전환 신호 |
+| 18 | 컨버전스 패턴 | 가격 하락, RSI 상승 | 전환 신호 |
 
 **범위 신호**
 | 값 | 설명 | 계산 방식 | 사용 시기 |
 |----|------|----------|----------|
-| 26 | 극단적 과매수 (90+) | RSI ≥ 90 | 강한 매도 |
-| 27 | 극단적 과매도 (10-) | RSI ≤ 10 | 강한 매수 |
-| 29 | 강세 구간 (60-80) | RSI가 60-80 범위 | 상승 추세 |
-| 30 | 약세 구간 (20-40) | RSI가 20-40 범위 | 하락 추세 |
+| 12 | 중립 범위 | RSI가 45-55 범위 | 중립 상태 |
+| 13 | 40 초과 유지 | 연속 N개 캔들에서 RSI > 40 | 약세 해소 확인 |
+| 14 | 60 미만 유지 | 연속 N개 캔들에서 RSI < 60 | 강세 둔화 확인 |
+| 19 | 안정 구간 | RSI가 30-70 범위 유지 | 박스권/안정 상태 |
+| 20 | 중립 추세 | RSI가 40-60 범위 유지 | 중립 추세 |
+| 21 | 강세 구간 | RSI가 60-80 범위 유지 | 상승 추세 |
+| 22 | 약세 구간 | RSI가 20-40 범위 유지 | 하락 추세 |
 
 #### 설정 예시
 
@@ -178,7 +171,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossAbove50"  # 50 상향 돌파
+filter_type = "CrossAbove"  # 임계값 상향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 ```
 
@@ -2004,7 +1998,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossAbove50"  # 50 상향 돌파
+filter_type = "CrossAbove"  # 임계값 상향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 
 # MACD 상향돌파
@@ -2086,7 +2081,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossBelow50"  # 50 하향 돌파
+filter_type = "CrossBelow"  # 임계값 하향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 
 # MACD 하향돌파
@@ -2434,7 +2430,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossAbove50"  # 50 상향 돌파
+filter_type = "CrossAbove"  # 임계값 상향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 
 # MACD 상승 추세
@@ -2547,7 +2544,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossAbove50"  # 50 상향 돌파
+filter_type = "CrossAbove"  # 임계값 상향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 
 # MACD 상향돌파
@@ -2608,7 +2606,8 @@ type = "RSI"
 period = 14
 oversold = 30.0
 overbought = 70.0
-filter_type = "CrossBelow50"  # 50 하향 돌파
+filter_type = "CrossBelow"  # 임계값 하향 돌파
+cross_threshold = 50.0
 consecutive_n = 1
 
 # MACD 하향돌파

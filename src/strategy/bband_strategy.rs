@@ -14,6 +14,7 @@ use trading_chart::Candle;
 
 /// 볼린저 밴드 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct BBandStrategyConfig {
     /// 확인 캔들 수
     pub count: usize,

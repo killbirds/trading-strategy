@@ -15,6 +15,7 @@ use trading_chart::Candle;
 
 /// 볼린저밴드 숏 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct BBandShortStrategyConfig {
     /// 판정 기간
     pub count: usize,
@@ -23,13 +24,10 @@ pub struct BBandShortStrategyConfig {
     /// 표준편차 배수
     pub multiplier: f64,
     /// 밴드 폭 감소 확인 기간 (스퀴즈 감지용, 기본값: 5)
-    #[serde(default = "default_narrowing_period")]
     pub narrowing_period: usize,
     /// 좁은 상태 유지 기간 (스퀴즈 감지용, 기본값: 5)
-    #[serde(default = "default_squeeze_period")]
     pub squeeze_period: usize,
     /// 스퀴즈 조건을 위한 최소 밴드 폭 (비율, 기본값: 0.02)
-    #[serde(default = "default_squeeze_threshold")]
     pub squeeze_threshold: f64,
 }
 
@@ -52,9 +50,9 @@ impl Default for BBandShortStrategyConfig {
             count: 3,
             period: 20,
             multiplier: 2.0,
-            narrowing_period: 5,
-            squeeze_period: 5,
-            squeeze_threshold: 0.02,
+            narrowing_period: default_narrowing_period(),
+            squeeze_period: default_squeeze_period(),
+            squeeze_threshold: default_squeeze_threshold(),
         }
     }
 }

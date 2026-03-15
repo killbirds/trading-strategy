@@ -14,6 +14,7 @@ use trading_chart::Candle;
 
 /// 이동평균(MA) 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct MAStrategyConfig {
     /// 이동평균 계산 방식 (SMA, EMA 등)
     pub ma: crate::indicator::ma::MAType,

@@ -61,6 +61,7 @@ impl SignalCache {
 
 /// 하이브리드 전략 공통 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct HybridStrategyConfigBase {
     /// RSI 계산 기간
     pub rsi_period: usize,

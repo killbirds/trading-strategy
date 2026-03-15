@@ -14,6 +14,7 @@ use trading_chart::Candle;
 
 /// Copys 숏 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct CopysShortStrategyConfig {
     #[serde(flatten)]
     pub base: CopysStrategyConfigBase,
@@ -25,14 +26,7 @@ impl Default for CopysShortStrategyConfig {
     /// 기본 설정값 반환
     fn default() -> Self {
         CopysShortStrategyConfig {
-            base: CopysStrategyConfigBase {
-                rsi_period: 14,
-                rsi_upper: 70.0,
-                rsi_lower: 30.0,
-                bband_period: 20,
-                bband_multiplier: 2.0,
-                ma_distance_threshold: 0.02,
-            },
+            base: CopysStrategyConfigBase::default(),
             rsi_count: 3,
         }
     }

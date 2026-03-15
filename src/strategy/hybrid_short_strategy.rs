@@ -15,26 +15,23 @@ use trading_chart::Candle;
 
 /// 하이브리드 숏 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct HybridShortStrategyConfig {
     #[serde(flatten)]
     pub base: HybridStrategyConfigBase,
 
     /// 진입 신호 임계값 (기본값: 0.7)
-    #[serde(default = "default_entry_threshold")]
     pub entry_threshold: f64,
 
     /// 청산 신호 임계값 (기본값: 0.6)
-    #[serde(default = "default_exit_threshold")]
     pub exit_threshold: f64,
 
     /// 손절 수준 (기본값: -7.0)
     /// 주의: 현재 구현에서는 사용되지 않으며, 향후 확장을 위해 예약된 설정입니다.
-    #[serde(default = "default_stop_loss")]
     pub stop_loss: f64,
 
     /// 이익 실현 수준 (기본값: 10.0)
     /// 주의: 현재 구현에서는 사용되지 않으며, 향후 확장을 위해 예약된 설정입니다.
-    #[serde(default = "default_take_profit")]
     pub take_profit: f64,
 }
 

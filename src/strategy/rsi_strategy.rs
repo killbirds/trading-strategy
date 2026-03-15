@@ -18,6 +18,7 @@ use crate::analyzer::base::AnalyzerOps;
 ///
 /// RSI(상대강도지수) 기반 트레이딩 전략에 필요한 모든 설정 파라미터를 포함합니다.
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct RSIStrategyConfig {
     /// RSI 판단에 필요한 연속 데이터 수
     pub rsi_count: usize,
@@ -212,5 +213,22 @@ impl<C: Candle + 'static> Strategy<C> for RSIStrategy<C> {
 
     fn name(&self) -> StrategyType {
         StrategyType::RSI
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rsi_strategy_config_from_json_uses_defaults() {
+        let config = RSIStrategyConfig::from_json("{}").unwrap();
+
+        assert_eq!(config.rsi_count, 3);
+        assert_eq!(config.rsi_lower, 30.0);
+        assert_eq!(config.rsi_upper, 70.0);
+        assert_eq!(config.rsi_period, 14);
+        assert_eq!(config.ma, crate::indicator::ma::MAType::EMA);
+        assert_eq!(config.ma_periods, vec![5, 20, 60]);
     }
 }

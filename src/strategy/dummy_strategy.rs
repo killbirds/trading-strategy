@@ -9,6 +9,7 @@ use trading_chart::Candle;
 
 /// 더미 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct DummyStrategyConfig {
     /// 예제 설정 값
     example_value: String,

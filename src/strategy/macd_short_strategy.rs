@@ -16,6 +16,7 @@ use crate::analyzer::base::AnalyzerOps;
 
 /// MACD 숏 전략 설정
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub struct MACDShortStrategyConfig {
     /// 빠른 EMA 기간
     pub fast_period: usize,

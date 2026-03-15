@@ -20,6 +20,7 @@ pub enum CopysContextError {
 
 /// Copys 전략 공통 설정 기본 구조체
 #[derive(Debug, Deserialize, Clone)]
+#[serde(default)]
 pub struct CopysStrategyConfigBase {
     /// RSI 계산 기간
     pub rsi_period: usize,
@@ -32,12 +33,24 @@ pub struct CopysStrategyConfigBase {
     /// 볼린저밴드 표준편차 승수
     pub bband_multiplier: f64,
     /// 이동평균선 거리 임계값 (비율, 기본값: 0.02 = 2%)
-    #[serde(default = "default_ma_distance_threshold")]
     pub ma_distance_threshold: f64,
 }
 
 fn default_ma_distance_threshold() -> f64 {
     0.02
+}
+
+impl Default for CopysStrategyConfigBase {
+    fn default() -> Self {
+        Self {
+            rsi_period: 14,
+            rsi_upper: 70.0,
+            rsi_lower: 30.0,
+            bband_period: 20,
+            bband_multiplier: 2.0,
+            ma_distance_threshold: default_ma_distance_threshold(),
+        }
+    }
 }
 
 impl CopysStrategyConfigBase {

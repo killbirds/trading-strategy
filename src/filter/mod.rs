@@ -13,6 +13,8 @@ pub enum FilterError {
     InvalidPeriod { param_name: String },
     #[error("ADX 파라미터 오류: threshold는 0에서 100 사이여야 합니다")]
     InvalidAdxThreshold,
+    #[error("{param_name} 파라미터 오류: threshold는 0에서 100 사이여야 합니다")]
+    InvalidPercentageThreshold { param_name: String },
     #[error("SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다")]
     InvalidSupportResistanceMinTouchCount,
     #[error("CandlePattern 파라미터 오류: pattern_history_length는 0보다 커야 합니다")]
@@ -168,6 +170,16 @@ pub mod utils {
         Ok(())
     }
 
+    /// 퍼센트 기준 임계값 검증 (0-100 범위)
+    pub fn validate_percentage_threshold(threshold: f64, param_name: &str) -> Result<()> {
+        if !(0.0..=100.0).contains(&threshold) {
+            return Err(FilterError::InvalidPercentageThreshold {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
     /// 경계 조건 체크 (캔들 데이터 부족 확인)
     pub fn check_sufficient_candles(
         candles_len: usize,
@@ -283,14 +295,10 @@ pub enum RSIFilterType {
     NormalRange,
     CrossAboveThreshold,
     CrossBelowThreshold,
-    CrossAbove50,
-    CrossBelow50,
+    CrossAbove,
+    CrossBelow,
     RisingTrend,
     FallingTrend,
-    CrossAbove40,
-    CrossBelow60,
-    CrossAbove20,
-    CrossBelow80,
     Sideways,
     StrongRisingMomentum,
     StrongFallingMomentum,
@@ -317,14 +325,10 @@ impl_filter_type_fromstr!(
         NormalRange,
         CrossAboveThreshold,
         CrossBelowThreshold,
-        CrossAbove50,
-        CrossBelow50,
+        CrossAbove,
+        CrossBelow,
         RisingTrend,
         FallingTrend,
-        CrossAbove40,
-        CrossBelow60,
-        CrossAbove20,
-        CrossBelow80,
         Sideways,
         StrongRisingMomentum,
         StrongFallingMomentum,
@@ -891,12 +895,8 @@ pub enum ThreeRSIFilterType {
     RSIBearishRange,
     RSIOverboughtRange,
     RSIOversoldRange,
-    RSICrossAbove50,
-    RSICrossBelow50,
-    RSICrossAbove40,
-    RSICrossBelow60,
-    RSICrossAbove20,
-    RSICrossBelow80,
+    RSICrossAbove,
+    RSICrossBelow,
     RSISideways,
     RSIBullishMomentum,
     RSIBearishMomentum,
@@ -930,12 +930,8 @@ impl_filter_type_fromstr!(
         RSIBearishRange,
         RSIOverboughtRange,
         RSIOversoldRange,
-        RSICrossAbove50,
-        RSICrossBelow50,
-        RSICrossAbove40,
-        RSICrossBelow60,
-        RSICrossAbove20,
-        RSICrossBelow80,
+        RSICrossAbove,
+        RSICrossBelow,
         RSISideways,
         RSIBullishMomentum,
         RSIBearishMomentum,
@@ -1152,6 +1148,7 @@ impl_filter_type_deserialize!(MomentumFilterType, MomentumFilterTypeVisitor, "Mo
 
 /// RSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RSIParams {
     /// RSI 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1164,14 +1161,13 @@ pub struct RSIParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 횡보 임계값 (변화율, 기본값: 0.02 = 2%)
-    #[serde(default = "default_rsi_sideways_threshold")]
     pub sideways_threshold: f64,
     /// 강한 모멘텀 임계값 (RSI 변화량, 기본값: 3.0)
-    #[serde(default = "default_rsi_momentum_threshold")]
     pub momentum_threshold: f64,
+    /// 교차 판단 임계값 (기본값: 50.0)
+    pub cross_threshold: f64,
 }
 
 fn default_rsi_sideways_threshold() -> f64 {
@@ -1180,6 +1176,10 @@ fn default_rsi_sideways_threshold() -> f64 {
 
 fn default_rsi_momentum_threshold() -> f64 {
     3.0
+}
+
+fn default_rsi_cross_threshold() -> f64 {
+    50.0
 }
 
 impl Default for RSIParams {
@@ -1191,14 +1191,16 @@ impl Default for RSIParams {
             filter_type: RSIFilterType::Overbought,
             consecutive_n: 1,
             p: 0,
-            sideways_threshold: 0.02,
-            momentum_threshold: 3.0,
+            sideways_threshold: default_rsi_sideways_threshold(),
+            momentum_threshold: default_rsi_momentum_threshold(),
+            cross_threshold: default_rsi_cross_threshold(),
         }
     }
 }
 
 /// MACD 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MACDParams {
     /// 빠른 이동평균 기간 (기본값: 12)
     pub fast_period: usize,
@@ -1213,16 +1215,12 @@ pub struct MACDParams {
     /// 히스토그램 임계값 (기본값: 0)
     pub threshold: f64,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 과매수 임계값 (MACD/가격 비율, 기본값: 0.02 = 2%)
-    #[serde(default = "default_macd_overbought_threshold")]
     pub overbought_threshold: f64,
     /// 과매도 임계값 (MACD/가격 비율, 기본값: 0.02 = 2%)
-    #[serde(default = "default_macd_oversold_threshold")]
     pub oversold_threshold: f64,
     /// 횡보 임계값 (변화율, 기본값: 0.05 = 5%)
-    #[serde(default = "default_macd_sideways_threshold")]
     pub sideways_threshold: f64,
 }
 
@@ -1248,15 +1246,16 @@ impl Default for MACDParams {
             consecutive_n: 1,
             threshold: 0.0,
             p: 0,
-            overbought_threshold: 0.02,
-            oversold_threshold: 0.02,
-            sideways_threshold: 0.05,
+            overbought_threshold: default_macd_overbought_threshold(),
+            oversold_threshold: default_macd_oversold_threshold(),
+            sideways_threshold: default_macd_sideways_threshold(),
         }
     }
 }
 
 /// 볼린저 밴드 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BollingerBandParams {
     /// 볼린저 밴드 기간 (기본값: 20)
     pub period: usize,
@@ -1267,31 +1266,22 @@ pub struct BollingerBandParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 스퀴즈/횡보 임계값 (기본값: 0.02 = 2%)
-    #[serde(default = "default_bband_squeeze_threshold")]
     pub squeeze_threshold: f64,
     /// 중간 변동성 임계값 (기본값: 0.05 = 5%)
-    #[serde(default = "default_bband_medium_threshold")]
     pub medium_threshold: f64,
     /// 큰 변동성/가격 이동 임계값 (기본값: 0.1 = 10%)
-    #[serde(default = "default_bband_large_threshold")]
     pub large_threshold: f64,
     /// 스퀴즈 브레이크아웃 확인 기간 (기본값: 5)
-    #[serde(default = "default_bband_squeeze_breakout_period")]
     pub squeeze_breakout_period: usize,
     /// 향상된 스퀴즈 브레이크아웃 좁아지는 기간 (기본값: 3)
-    #[serde(default = "default_bband_enhanced_narrowing_period")]
     pub enhanced_narrowing_period: usize,
     /// 향상된 스퀴즈 브레이크아웃 스퀴즈 기간 (기본값: 2)
-    #[serde(default = "default_bband_enhanced_squeeze_period")]
     pub enhanced_squeeze_period: usize,
     /// 상단 밴드 터치 임계값 (기본값: 0.99 = 99%)
-    #[serde(default = "default_bband_upper_touch_threshold")]
     pub upper_touch_threshold: f64,
     /// 하단 밴드 터치 임계값 (기본값: 1.01 = 101%)
-    #[serde(default = "default_bband_lower_touch_threshold")]
     pub lower_touch_threshold: f64,
 }
 
@@ -1335,20 +1325,21 @@ impl Default for BollingerBandParams {
             filter_type: BollingerBandFilterType::AboveUpperBand,
             consecutive_n: 1,
             p: 0,
-            squeeze_threshold: 0.02,
-            medium_threshold: 0.05,
-            large_threshold: 0.1,
-            squeeze_breakout_period: 5,
-            enhanced_narrowing_period: 3,
-            enhanced_squeeze_period: 2,
-            upper_touch_threshold: 0.99,
-            lower_touch_threshold: 1.01,
+            squeeze_threshold: default_bband_squeeze_threshold(),
+            medium_threshold: default_bband_medium_threshold(),
+            large_threshold: default_bband_large_threshold(),
+            squeeze_breakout_period: default_bband_squeeze_breakout_period(),
+            enhanced_narrowing_period: default_bband_enhanced_narrowing_period(),
+            enhanced_squeeze_period: default_bband_enhanced_squeeze_period(),
+            upper_touch_threshold: default_bband_upper_touch_threshold(),
+            lower_touch_threshold: default_bband_lower_touch_threshold(),
         }
     }
 }
 
 /// ADX 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ADXParams {
     /// ADX 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1359,7 +1350,6 @@ pub struct ADXParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
@@ -1377,6 +1367,7 @@ impl Default for ADXParams {
 
 /// 이동평균선 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MovingAverageParams {
     /// 이동평균 기간 목록
     pub periods: Vec<usize>,
@@ -1385,13 +1376,10 @@ pub struct MovingAverageParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 횡보 판단 임계값 (기본값: 0.02 = 2%)
-    #[serde(default = "default_ma_sideways_threshold")]
     pub sideways_threshold: f64,
     /// 교차점 근처 판단 임계값 (기본값: 0.005 = 0.5%)
-    #[serde(default = "default_ma_crossover_threshold")]
     pub crossover_threshold: f64,
 }
 
@@ -1410,14 +1398,15 @@ impl Default for MovingAverageParams {
             filter_type: MovingAverageFilterType::PriceAboveFirstMA,
             consecutive_n: 1,
             p: 0,
-            sideways_threshold: 0.02,
-            crossover_threshold: 0.005,
+            sideways_threshold: default_ma_sideways_threshold(),
+            crossover_threshold: default_ma_crossover_threshold(),
         }
     }
 }
 
 /// 이치모쿠 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct IchimokuParams {
     /// 전환선 기간 (기본값: 9)
     pub tenkan_period: usize,
@@ -1430,7 +1419,6 @@ pub struct IchimokuParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
@@ -1449,6 +1437,7 @@ impl Default for IchimokuParams {
 
 /// VWAP 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct VWAPParams {
     /// VWAP 계산 기간 (기본값: 20)
     pub period: usize,
@@ -1459,7 +1448,6 @@ pub struct VWAPParams {
     /// 임계값 (기본값: 0.05 - 5%)
     pub threshold: f64,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
@@ -1477,6 +1465,7 @@ impl Default for VWAPParams {
 
 /// CopyS 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CopysParams {
     /// RSI 계산 기간 (기본값: 14)
     pub rsi_period: usize,
@@ -1489,16 +1478,12 @@ pub struct CopysParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 볼린저밴드 기간 (기본값: 20)
-    #[serde(default = "default_copys_bband_period")]
     pub bband_period: usize,
     /// 볼린저밴드 표준편차 배수 (기본값: 2.0)
-    #[serde(default = "default_copys_bband_multiplier")]
     pub bband_multiplier: f64,
     /// 이동평균 기간 목록 (기본값: [5, 20, 60, 120, 200, 240])
-    #[serde(default = "default_copys_ma_periods")]
     pub ma_periods: Vec<usize>,
 }
 
@@ -1516,6 +1501,7 @@ fn default_copys_ma_periods() -> Vec<usize> {
 
 /// ATR 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ATRParams {
     /// ATR 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1526,12 +1512,12 @@ pub struct ATRParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
 /// SuperTrend 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SuperTrendParams {
     /// SuperTrend 계산 기간 (기본값: 10)
     pub period: usize,
@@ -1542,12 +1528,12 @@ pub struct SuperTrendParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
 /// Volume 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct VolumeParams {
     /// Volume 계산 기간 (기본값: 20)
     pub period: usize,
@@ -1558,10 +1544,8 @@ pub struct VolumeParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// VolumeStable 필터의 최소 임계값 (기본값: 0.1)
-    #[serde(default = "default_volume_stable_min_threshold")]
     pub stable_min_threshold: f64,
 }
 
@@ -1571,6 +1555,7 @@ fn default_volume_stable_min_threshold() -> f64 {
 
 /// ThreeRSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ThreeRSIParams {
     /// RSI 계산 기간 목록 (기본값: [7, 14, 21])
     pub rsi_periods: Vec<usize>,
@@ -1585,12 +1570,14 @@ pub struct ThreeRSIParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
+    /// 교차 판단 임계값 (기본값: 50.0)
+    pub cross_threshold: f64,
 }
 
 /// CandlePattern 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct CandlePatternParams {
     /// 최소 몸통 크기 비율 (기본값: 0.3)
     pub min_body_ratio: f64,
@@ -1605,12 +1592,12 @@ pub struct CandlePatternParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
 /// SupportResistance 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SupportResistanceParams {
     /// 되돌아 볼 기간 (기본값: 20)
     pub lookback_period: usize,
@@ -1625,12 +1612,12 @@ pub struct SupportResistanceParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
 /// Momentum 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct MomentumParams {
     /// RSI 기간 (기본값: 14)
     pub rsi_period: usize,
@@ -1653,7 +1640,6 @@ pub struct MomentumParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
 }
 
@@ -1666,9 +1652,9 @@ impl Default for CopysParams {
             filter_type: CopysFilterType::BasicBuySignal,
             consecutive_n: 1,
             p: 0,
-            bband_period: 20,
-            bband_multiplier: 2.0,
-            ma_periods: vec![5, 20, 60, 120, 200, 240],
+            bband_period: default_copys_bband_period(),
+            bband_multiplier: default_copys_bband_multiplier(),
+            ma_periods: default_copys_ma_periods(),
         }
     }
 }
@@ -1705,7 +1691,7 @@ impl Default for VolumeParams {
             filter_type: VolumeFilterType::VolumeAboveAverage,
             consecutive_n: 1,
             p: 0,
-            stable_min_threshold: 0.1,
+            stable_min_threshold: default_volume_stable_min_threshold(),
         }
     }
 }
@@ -1720,6 +1706,7 @@ impl Default for ThreeRSIParams {
             filter_type: ThreeRSIFilterType::AllRSILessThan50,
             consecutive_n: 1,
             p: 0,
+            cross_threshold: default_rsi_cross_threshold(),
         }
     }
 }
@@ -1824,6 +1811,7 @@ impl_filter_type_display!(
 
 /// Slope 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SlopeParams {
     /// 분석할 지표 타입 설정
     pub indicator_type: crate::analyzer::IndicatorType,
@@ -1834,19 +1822,14 @@ pub struct SlopeParams {
     /// 연속 캔들 수 (기본값: 1)
     pub consecutive_n: usize,
     /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
-    #[serde(default)]
     pub p: usize,
     /// 선형 회귀 사용 여부 (기본값: false)
-    #[serde(default)]
     pub use_linear_regression: Option<bool>,
     /// 기울기 강도 임계값 (기본값: 0.01)
-    #[serde(default)]
     pub strength_threshold: Option<f64>,
     /// R² 임계값 (기본값: 0.7)
-    #[serde(default)]
     pub r_squared_threshold: Option<f64>,
     /// 단기 기간 (가속도/감속도 분석용, 기본값: period / 2)
-    #[serde(default)]
     pub short_period: Option<usize>,
 }
 
@@ -1940,7 +1923,10 @@ impl TechnicalFilterConfig {
 
     pub fn validate(&self) -> Result<()> {
         match self {
-            Self::RSI(params) => utils::validate_period(params.period, "RSI"),
+            Self::RSI(params) => {
+                utils::validate_period(params.period, "RSI")?;
+                utils::validate_percentage_threshold(params.cross_threshold, "RSI cross_threshold")
+            }
             Self::MACD(params) => {
                 utils::validate_period(params.fast_period, "MACD fast_period")?;
                 utils::validate_period(params.slow_period, "MACD slow_period")?;
@@ -1982,7 +1968,11 @@ impl TechnicalFilterConfig {
                     utils::validate_period(*period, "ThreeRSI rsi_period")?;
                 }
                 utils::validate_period(params.ma_period, "ThreeRSI ma_period")?;
-                utils::validate_period(params.adx_period, "ThreeRSI adx_period")
+                utils::validate_period(params.adx_period, "ThreeRSI adx_period")?;
+                utils::validate_percentage_threshold(
+                    params.cross_threshold,
+                    "ThreeRSI cross_threshold",
+                )
             }
             Self::CandlePattern(params) => {
                 if params.pattern_history_length == 0 {
@@ -2289,6 +2279,7 @@ mod tests {
             assert_eq!(params.period, 14);
             assert_eq!(params.oversold, 30.0);
             assert_eq!(params.overbought, 70.0);
+            assert_eq!(params.cross_threshold, 50.0);
             assert_eq!(params.filter_type, RSIFilterType::Overbought);
             assert_eq!(params.consecutive_n, 1);
         } else {
@@ -2358,6 +2349,7 @@ mod tests {
             assert_eq!(params.period, 14);
             assert_eq!(params.oversold, 30.0);
             assert_eq!(params.overbought, 70.0);
+            assert_eq!(params.cross_threshold, 50.0);
             assert_eq!(params.filter_type, RSIFilterType::Overbought);
             assert_eq!(params.consecutive_n, 1);
         } else {
@@ -2403,6 +2395,12 @@ mod tests {
         });
         assert!(invalid_rsi.validate().is_err());
 
+        let invalid_rsi_cross_threshold = TechnicalFilterConfig::RSI(RSIParams {
+            cross_threshold: 101.0,
+            ..RSIParams::default()
+        });
+        assert!(invalid_rsi_cross_threshold.validate().is_err());
+
         let invalid_adx = TechnicalFilterConfig::ADX(ADXParams {
             threshold: 101.0,
             ..ADXParams::default()
@@ -2414,6 +2412,12 @@ mod tests {
             ..CopysParams::default()
         });
         assert!(invalid_copys.validate().is_err());
+
+        let invalid_three_rsi_cross_threshold = TechnicalFilterConfig::ThreeRSI(ThreeRSIParams {
+            cross_threshold: -1.0,
+            ..ThreeRSIParams::default()
+        });
+        assert!(invalid_three_rsi_cross_threshold.validate().is_err());
     }
 
     #[test]
@@ -2444,6 +2448,7 @@ mod tests {
         assert_eq!(rsi_params.period, 14);
         assert_eq!(rsi_params.oversold, 30.0);
         assert_eq!(rsi_params.overbought, 70.0);
+        assert_eq!(rsi_params.cross_threshold, 50.0);
         assert_eq!(rsi_params.filter_type, RSIFilterType::Overbought);
         assert_eq!(rsi_params.consecutive_n, 1);
 
@@ -2462,6 +2467,53 @@ mod tests {
             MovingAverageFilterType::PriceAboveFirstMA
         );
         assert_eq!(ma_params.consecutive_n, 1);
+    }
+
+    #[test]
+    fn test_rsi_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: RSIParams = serde_json::from_str(r#"{"filter_type":"CrossAbove"}"#).unwrap();
+
+        assert_eq!(params.period, 14);
+        assert_eq!(params.oversold, 30.0);
+        assert_eq!(params.overbought, 70.0);
+        assert_eq!(params.filter_type, RSIFilterType::CrossAbove);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.p, 0);
+        assert_eq!(params.sideways_threshold, 0.02);
+        assert_eq!(params.momentum_threshold, 3.0);
+        assert_eq!(params.cross_threshold, 50.0);
+    }
+
+    #[test]
+    fn test_macd_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: MACDParams =
+            serde_json::from_str(r#"{"filter_type":"MacdAboveSignal"}"#).unwrap();
+
+        assert_eq!(params.fast_period, 12);
+        assert_eq!(params.slow_period, 26);
+        assert_eq!(params.signal_period, 9);
+        assert_eq!(params.filter_type, MACDFilterType::MacdAboveSignal);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.threshold, 0.0);
+        assert_eq!(params.p, 0);
+        assert_eq!(params.overbought_threshold, 0.02);
+        assert_eq!(params.oversold_threshold, 0.02);
+        assert_eq!(params.sideways_threshold, 0.05);
+    }
+
+    #[test]
+    fn test_three_rsi_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: ThreeRSIParams =
+            serde_json::from_str(r#"{"filter_type":"RSICrossAbove"}"#).unwrap();
+
+        assert_eq!(params.rsi_periods, vec![7, 14, 21]);
+        assert_eq!(params.ma_type, "SMA");
+        assert_eq!(params.ma_period, 20);
+        assert_eq!(params.adx_period, 14);
+        assert_eq!(params.filter_type, ThreeRSIFilterType::RSICrossAbove);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.p, 0);
+        assert_eq!(params.cross_threshold, 50.0);
     }
 
     #[test]

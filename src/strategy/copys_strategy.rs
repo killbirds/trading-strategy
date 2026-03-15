@@ -14,6 +14,7 @@ use trading_chart::Candle;
 
 /// CopyS 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct CopysStrategyConfig {
     #[serde(flatten)]
     pub base: CopysStrategyConfigBase,
@@ -25,14 +26,7 @@ impl Default for CopysStrategyConfig {
     /// 기본 설정값 반환
     fn default() -> Self {
         CopysStrategyConfig {
-            base: CopysStrategyConfigBase {
-                rsi_period: 14,
-                rsi_upper: 70.0,
-                rsi_lower: 30.0,
-                bband_period: 20,
-                bband_multiplier: 2.0,
-                ma_distance_threshold: 0.02,
-            },
+            base: CopysStrategyConfigBase::default(),
             rsi_count: 3,
         }
     }
@@ -232,5 +226,23 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
 
     fn name(&self) -> StrategyType {
         StrategyType::Copys
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_copys_strategy_config_from_json_uses_defaults() {
+        let config = CopysStrategyConfig::from_json("{}").unwrap();
+
+        assert_eq!(config.base.rsi_period, 14);
+        assert_eq!(config.base.rsi_upper, 70.0);
+        assert_eq!(config.base.rsi_lower, 30.0);
+        assert_eq!(config.base.bband_period, 20);
+        assert_eq!(config.base.bband_multiplier, 2.0);
+        assert_eq!(config.base.ma_distance_threshold, 0.02);
+        assert_eq!(config.rsi_count, 3);
     }
 }

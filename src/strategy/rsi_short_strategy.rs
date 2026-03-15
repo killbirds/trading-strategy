@@ -15,6 +15,7 @@ use crate::analyzer::base::AnalyzerOps;
 
 /// RSI 숏 전략 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct RSIShortStrategyConfig {
     /// RSI 계산 기간
     pub rsi_period: usize,

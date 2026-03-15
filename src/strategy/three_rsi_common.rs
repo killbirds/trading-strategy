@@ -12,6 +12,7 @@ pub use crate::analyzer::three_rsi_analyzer::{ThreeRSIAnalyzer, ThreeRSIAnalyzer
 
 /// 세 개의 RSI를 사용하는 전략 공통 설정
 #[derive(Debug, Deserialize)]
+#[serde(default)]
 pub struct ThreeRSIStrategyConfigBase {
     /// 세 가지 RSI 기간
     pub rsi_periods: Vec<usize>,
@@ -22,10 +23,8 @@ pub struct ThreeRSIStrategyConfigBase {
     /// ADX 계산 기간
     pub adx_period: usize,
     /// ADX 강도 임계값 (기본값: 20.0)
-    #[serde(default = "default_adx_threshold")]
     pub adx_threshold: f64,
     /// RSI 중간값 임계값 (기본값: 50.0)
-    #[serde(default = "default_rsi_mid_threshold")]
     pub rsi_mid_threshold: f64,
 }
 
@@ -45,8 +44,8 @@ impl Default for ThreeRSIStrategyConfigBase {
             ma: MAType::EMA,
             ma_period: 50,
             adx_period: 14,
-            adx_threshold: 20.0,
-            rsi_mid_threshold: 50.0,
+            adx_threshold: default_adx_threshold(),
+            rsi_mid_threshold: default_rsi_mid_threshold(),
         }
     }
 }
@@ -144,11 +143,11 @@ impl ThreeRSIStrategyConfigBase {
         // 공통 유틸리티를 사용하여 선택적 설정 파싱
         let adx_threshold =
             config_utils::parse_f64(config, "adx_threshold", Some((0.0, f64::MAX)), false)?
-                .unwrap_or(20.0);
+                .unwrap_or_else(default_adx_threshold);
 
         let rsi_mid_threshold =
             config_utils::parse_f64(config, "rsi_mid_threshold", Some((0.0, 100.0)), false)?
-                .unwrap_or(50.0);
+                .unwrap_or_else(default_rsi_mid_threshold);
 
         let result = ThreeRSIStrategyConfigBase {
             rsi_periods,
