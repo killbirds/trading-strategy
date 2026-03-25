@@ -74,6 +74,7 @@ cargo build --release
 ### 의존성
 
 주요 의존성:
+
 - `chrono`: 날짜 및 시간 처리
 - `serde`: 직렬화/역직렬화
 - `toml`: TOML 설정 파일 파싱
@@ -126,6 +127,7 @@ let strategy = BBandStrategy::new_with_config(&storage, Some(config))?;
 ### 설정 파일 예시
 
 **TOML 설정 (`config/bband_squeeze_strategy.toml`)**:
+
 ```toml
 count = 2
 period = 20
@@ -136,6 +138,7 @@ squeeze_threshold = 0.015
 ```
 
 **JSON 설정 (`config/bband_squeeze.json`)**:
+
 ```json
 {
   "count": 2,
@@ -178,9 +181,9 @@ squeeze_threshold = 0.015
 다음과 같은 기술적 필터를 제공합니다:
 
 - RSI, MACD, 볼린저 밴드, ADX, 이동평균선
-- 이치모쿠, VWAP, ATR, SuperTrend
-- 거래량, ThreeRSI, 캔들 패턴
-- 지지/저항, 모멘텀
+- 이치모쿠, VWAP, PriceReferenceGap, CopyS
+- ATR, SuperTrend, 거래량, ThreeRSI
+- 캔들 패턴, 지지/저항, 모멘텀, Slope
 
 ## 테스트
 

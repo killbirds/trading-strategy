@@ -15,10 +15,16 @@ pub enum FilterError {
     InvalidAdxThreshold,
     #[error("{param_name} 파라미터 오류: threshold는 0에서 100 사이여야 합니다")]
     InvalidPercentageThreshold { param_name: String },
+    #[error("{param_name} 파라미터 오류: threshold는 0에서 1 사이여야 합니다")]
+    InvalidRatioThreshold { param_name: String },
+    #[error("{param_name} 파라미터 오류: consecutive_n은 0보다 커야 합니다")]
+    InvalidConsecutiveN { param_name: String },
     #[error("SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다")]
     InvalidSupportResistanceMinTouchCount,
     #[error("CandlePattern 파라미터 오류: pattern_history_length는 0보다 커야 합니다")]
     InvalidCandlePatternHistoryLength,
+    #[error("PriceReferenceGap 파라미터 오류: 지원하지 않는 이동평균 타입입니다: {ma_type}")]
+    UnsupportedPriceReferenceGapMaType { ma_type: String },
     #[error("알 수 없는 필터 타입: {input}")]
     UnknownTechnicalFilterType { input: String },
     #[error("알 수 없는 RSI 필터 타입: {input}")]
@@ -35,6 +41,8 @@ pub enum FilterError {
     UnknownIchimokuFilterType { input: String },
     #[error("알 수 없는 VWAP 필터 타입: {input}")]
     UnknownVwapFilterType { input: String },
+    #[error("알 수 없는 PriceReferenceGap 필터 타입: {input}")]
+    UnknownPriceReferenceGapFilterType { input: String },
     #[error("알 수 없는 Copys 필터 타입: {input}")]
     UnknownCopysFilterType { input: String },
     #[error("알 수 없는 ATR 필터 타입: {input}")]
@@ -198,6 +206,7 @@ mod ichimoku;
 mod macd;
 mod momentum;
 mod moving_average;
+mod price_reference_gap;
 mod rsi;
 mod slope;
 mod supertrend;
@@ -232,6 +241,15 @@ pub mod utils {
     pub fn validate_percentage_threshold(threshold: f64, param_name: &str) -> Result<()> {
         if !(0.0..=100.0).contains(&threshold) {
             return Err(FilterError::InvalidPercentageThreshold {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_ratio_threshold(threshold: f64, param_name: &str) -> Result<()> {
+        if !(0.0..=1.0).contains(&threshold) {
+            return Err(FilterError::InvalidRatioThreshold {
                 param_name: param_name.to_string(),
             });
         }
@@ -274,6 +292,7 @@ pub enum TechnicalFilterType {
     Ichimoku,
     /// VWAP 기반 필터 (가격/거래량)
     VWAP,
+    PriceReferenceGap,
     /// CopyS 기반 필터 (복합 전략)
     Copys,
     /// ATR 기반 필터 (변동성)
@@ -304,6 +323,7 @@ impl fmt::Display for TechnicalFilterType {
             TechnicalFilterType::MovingAverage => write!(f, "이동평균선"),
             TechnicalFilterType::Ichimoku => write!(f, "이치모쿠"),
             TechnicalFilterType::VWAP => write!(f, "VWAP"),
+            TechnicalFilterType::PriceReferenceGap => write!(f, "PriceReferenceGap"),
             TechnicalFilterType::Copys => write!(f, "COPYS"),
             TechnicalFilterType::ATR => write!(f, "ATR"),
             TechnicalFilterType::SuperTrend => write!(f, "SuperTrend"),
@@ -329,6 +349,9 @@ impl FromStr for TechnicalFilterType {
             "MOVINGAVERAGE" | "MOVING_AVERAGE" | "MA" => Ok(TechnicalFilterType::MovingAverage),
             "ICHIMOKU" => Ok(TechnicalFilterType::Ichimoku),
             "VWAP" => Ok(TechnicalFilterType::VWAP),
+            "PRICEREFERENCEGAP" | "PRICE_REFERENCE_GAP" => {
+                Ok(TechnicalFilterType::PriceReferenceGap)
+            }
             "COPYS" => Ok(TechnicalFilterType::Copys),
             "ATR" => Ok(TechnicalFilterType::ATR),
             "SUPERTREND" => Ok(TechnicalFilterType::SuperTrend),
@@ -765,6 +788,32 @@ impl_filter_type_fromstr!(
 );
 
 impl_filter_type_deserialize!(VWAPFilterType, VWAPFilterTypeVisitor, "VWAP");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum PriceReferenceGapFilterType {
+    GapAboveThreshold,
+    GapBelowThreshold,
+    GapAboveReferenceThreshold,
+    GapBelowReferenceThreshold,
+}
+
+impl_filter_type_fromstr!(
+    PriceReferenceGapFilterType,
+    UnknownPriceReferenceGapFilterType,
+    parse_i32,
+    [
+        GapAboveThreshold,
+        GapBelowThreshold,
+        GapAboveReferenceThreshold,
+        GapBelowReferenceThreshold,
+    ]
+);
+
+impl_filter_type_deserialize!(
+    PriceReferenceGapFilterType,
+    PriceReferenceGapFilterTypeVisitor,
+    "PriceReferenceGap"
+);
 
 /// CopyS 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -1521,6 +1570,67 @@ impl Default for VWAPParams {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum PriceReferenceSource {
+    #[serde(alias = "MA", rename = "MOVING_AVERAGE")]
+    MovingAverage {
+        ma_type: crate::indicator::ma::MAType,
+        period: usize,
+    },
+    #[serde(rename = "VWAP")]
+    VWAP { period: usize },
+    #[serde(rename = "HIGHEST_HIGH")]
+    HighestHigh {
+        lookback_period: usize,
+        #[serde(default = "default_price_reference_include_current_candle")]
+        include_current_candle: bool,
+    },
+    #[serde(rename = "LOWEST_LOW")]
+    LowestLow {
+        lookback_period: usize,
+        #[serde(default = "default_price_reference_include_current_candle")]
+        include_current_candle: bool,
+    },
+}
+
+fn default_price_reference_source() -> PriceReferenceSource {
+    PriceReferenceSource::MovingAverage {
+        ma_type: crate::indicator::ma::MAType::SMA,
+        period: 20,
+    }
+}
+
+fn default_price_reference_gap_threshold() -> f64 {
+    0.02
+}
+
+fn default_price_reference_include_current_candle() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PriceReferenceGapParams {
+    pub reference_source: PriceReferenceSource,
+    pub filter_type: PriceReferenceGapFilterType,
+    pub gap_threshold: f64,
+    pub consecutive_n: usize,
+    pub p: usize,
+}
+
+impl Default for PriceReferenceGapParams {
+    fn default() -> Self {
+        Self {
+            reference_source: default_price_reference_source(),
+            filter_type: PriceReferenceGapFilterType::GapAboveThreshold,
+            gap_threshold: default_price_reference_gap_threshold(),
+            consecutive_n: 1,
+            p: 0,
+        }
+    }
+}
+
 /// CopyS 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -1856,6 +1966,7 @@ impl_filter_type_display!(
     MovingAverageFilterType,
     IchimokuFilterType,
     VWAPFilterType,
+    PriceReferenceGapFilterType,
     CopysFilterType,
     ATRFilterType,
     SuperTrendFilterType,
@@ -1923,6 +2034,8 @@ pub enum TechnicalFilterConfig {
     /// 이동평균선 필터 설정
     #[serde(alias = "MA", rename = "MOVING_AVERAGE")]
     MovingAverage(MovingAverageParams),
+    #[serde(rename = "PRICE_REFERENCE_GAP")]
+    PriceReferenceGap(PriceReferenceGapParams),
     /// 이치모쿠 필터 설정
     #[serde(rename = "ICHIMOKU")]
     Ichimoku(IchimokuParams),
@@ -1965,6 +2078,7 @@ impl TechnicalFilterConfig {
             Self::BollingerBand(_) => TechnicalFilterType::BollingerBand,
             Self::ADX(_) => TechnicalFilterType::ADX,
             Self::MovingAverage(_) => TechnicalFilterType::MovingAverage,
+            Self::PriceReferenceGap(_) => TechnicalFilterType::PriceReferenceGap,
             Self::Ichimoku(_) => TechnicalFilterType::Ichimoku,
             Self::VWAP(_) => TechnicalFilterType::VWAP,
             Self::Copys(_) => TechnicalFilterType::Copys,
@@ -2003,6 +2117,47 @@ impl TechnicalFilterConfig {
                     utils::validate_period(*period, "MovingAverage")?;
                 }
                 Ok(())
+            }
+            Self::PriceReferenceGap(params) => {
+                if params.consecutive_n == 0 {
+                    return Err(FilterError::InvalidConsecutiveN {
+                        param_name: "PriceReferenceGap consecutive_n".to_string(),
+                    });
+                }
+
+                utils::validate_ratio_threshold(
+                    params.gap_threshold,
+                    "PriceReferenceGap gap_threshold",
+                )?;
+
+                match &params.reference_source {
+                    PriceReferenceSource::MovingAverage { ma_type, period } => {
+                        utils::validate_period(*period, "PriceReferenceGap moving_average period")?;
+
+                        match ma_type {
+                            crate::indicator::ma::MAType::EMA
+                            | crate::indicator::ma::MAType::SMA => Ok(()),
+                            _ => Err(FilterError::UnsupportedPriceReferenceGapMaType {
+                                ma_type: ma_type.to_string(),
+                            }),
+                        }
+                    }
+                    PriceReferenceSource::VWAP { period } => {
+                        utils::validate_period(*period, "PriceReferenceGap VWAP period")
+                    }
+                    PriceReferenceSource::HighestHigh {
+                        lookback_period, ..
+                    } => utils::validate_period(
+                        *lookback_period,
+                        "PriceReferenceGap highest_high lookback_period",
+                    ),
+                    PriceReferenceSource::LowestLow {
+                        lookback_period, ..
+                    } => utils::validate_period(
+                        *lookback_period,
+                        "PriceReferenceGap lowest_low lookback_period",
+                    ),
+                }
             }
             Self::Ichimoku(params) => {
                 utils::validate_period(params.tenkan_period, "Ichimoku tenkan_period")?;
@@ -2143,6 +2298,9 @@ impl TechnicalFilter {
             TechnicalFilterConfig::MovingAverage(params) => {
                 moving_average::filter_moving_average(symbol, params, candle_store)
             }
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                price_reference_gap::filter_price_reference_gap(symbol, params, candle_store)
+            }
             TechnicalFilterConfig::Ichimoku(params) => {
                 ichimoku::filter_ichimoku(symbol, params, candle_store)
             }
@@ -2184,6 +2342,18 @@ impl TechnicalFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::TestCandle;
+
+    fn test_candle(timestamp: i64, close: f64, high: f64, low: f64) -> TestCandle {
+        TestCandle {
+            timestamp,
+            open: close,
+            high,
+            low,
+            close,
+            volume: 1_000.0,
+        }
+    }
 
     /// RSI 필터 생성 유틸리티 함수
     pub fn create_rsi_filter(
@@ -2273,6 +2443,21 @@ mod tests {
         })
     }
 
+    pub fn create_price_reference_gap_filter(
+        reference_source: PriceReferenceSource,
+        filter_type: PriceReferenceGapFilterType,
+        gap_threshold: f64,
+        consecutive_n: usize,
+    ) -> TechnicalFilterConfig {
+        TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source,
+            filter_type,
+            gap_threshold,
+            consecutive_n,
+            p: 0,
+        })
+    }
+
     /// 이치모쿠 필터 생성 유틸리티 함수
     #[allow(dead_code)]
     pub fn create_ichimoku_filter(
@@ -2353,6 +2538,20 @@ mod tests {
             create_bollinger_band_filter(20, 2.0, BollingerBandFilterType::BelowLowerBand, 1);
         assert_eq!(bb_filter.filter_type(), TechnicalFilterType::BollingerBand);
 
+        let price_gap_filter = create_price_reference_gap_filter(
+            PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::EMA,
+                period: 20,
+            },
+            PriceReferenceGapFilterType::GapAboveThreshold,
+            0.02,
+            1,
+        );
+        assert_eq!(
+            price_gap_filter.filter_type(),
+            TechnicalFilterType::PriceReferenceGap
+        );
+
         // CopyS 필터 생성 테스트
         let copys_filter = create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicBuySignal, 1);
         assert_eq!(copys_filter.filter_type(), TechnicalFilterType::Copys);
@@ -2386,10 +2585,19 @@ mod tests {
             create_macd_filter(12, 26, 9, MACDFilterType::MacdAboveSignal, 2, 0.0),
             // ADX 필터 (추세가 강한 코인만 포함)
             create_adx_filter(14, 25.0, ADXFilterType::AboveThreshold, 1),
+            create_price_reference_gap_filter(
+                PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::EMA,
+                    period: 20,
+                },
+                PriceReferenceGapFilterType::GapBelowThreshold,
+                0.02,
+                1,
+            ),
         ];
 
         // filter_list 검증
-        assert_eq!(filter_list.len(), 4);
+        assert_eq!(filter_list.len(), 5);
         assert_eq!(filter_list[0].filter_type(), TechnicalFilterType::RSI);
         assert_eq!(
             filter_list[1].filter_type(),
@@ -2397,6 +2605,10 @@ mod tests {
         );
         assert_eq!(filter_list[2].filter_type(), TechnicalFilterType::MACD);
         assert_eq!(filter_list[3].filter_type(), TechnicalFilterType::ADX);
+        assert_eq!(
+            filter_list[4].filter_type(),
+            TechnicalFilterType::PriceReferenceGap
+        );
     }
 
     #[test]
@@ -2443,6 +2655,28 @@ mod tests {
         } else {
             panic!("이동평균선 필터 파라미터 검증 실패");
         }
+
+        let price_gap_filter = create_price_reference_gap_filter(
+            PriceReferenceSource::VWAP { period: 20 },
+            PriceReferenceGapFilterType::GapAboveThreshold,
+            0.03,
+            2,
+        );
+        if let TechnicalFilterConfig::PriceReferenceGap(params) = price_gap_filter {
+            assert_eq!(
+                params.reference_source,
+                PriceReferenceSource::VWAP { period: 20 }
+            );
+            assert_eq!(
+                params.filter_type,
+                PriceReferenceGapFilterType::GapAboveThreshold
+            );
+            assert_eq!(params.gap_threshold, 0.03);
+            assert_eq!(params.consecutive_n, 2);
+            assert_eq!(params.p, 0);
+        } else {
+            panic!("PriceReferenceGap 필터 파라미터 검증 실패");
+        }
     }
 
     #[test]
@@ -2476,6 +2710,23 @@ mod tests {
             ..ThreeRSIParams::default()
         });
         assert!(invalid_three_rsi_cross_threshold.validate().is_err());
+
+        let invalid_price_gap_threshold =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                gap_threshold: 1.5,
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(invalid_price_gap_threshold.validate().is_err());
+
+        let invalid_price_gap_ma_type =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::WMA,
+                    period: 20,
+                },
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(invalid_price_gap_ma_type.validate().is_err());
     }
 
     #[test]
@@ -2489,14 +2740,27 @@ mod tests {
                 MovingAverageFilterType::FirstMAAboveLastMA,
                 1,
             ),
+            create_price_reference_gap_filter(
+                PriceReferenceSource::HighestHigh {
+                    lookback_period: 10,
+                    include_current_candle: true,
+                },
+                PriceReferenceGapFilterType::GapAboveThreshold,
+                0.02,
+                1,
+            ),
             create_copys_filter(14, 70.0, 30.0, CopysFilterType::BasicBuySignal, 1),
         ];
 
-        assert_eq!(filters.len(), 4);
+        assert_eq!(filters.len(), 5);
         assert_eq!(filters[0].filter_type(), TechnicalFilterType::RSI);
         assert_eq!(filters[1].filter_type(), TechnicalFilterType::MACD);
         assert_eq!(filters[2].filter_type(), TechnicalFilterType::MovingAverage);
-        assert_eq!(filters[3].filter_type(), TechnicalFilterType::Copys);
+        assert_eq!(
+            filters[3].filter_type(),
+            TechnicalFilterType::PriceReferenceGap
+        );
+        assert_eq!(filters[4].filter_type(), TechnicalFilterType::Copys);
     }
 
     #[test]
@@ -2525,6 +2789,22 @@ mod tests {
             MovingAverageFilterType::PriceAboveFirstMA
         );
         assert_eq!(ma_params.consecutive_n, 1);
+
+        let price_gap_params = PriceReferenceGapParams::default();
+        assert_eq!(
+            price_gap_params.reference_source,
+            PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::SMA,
+                period: 20,
+            }
+        );
+        assert_eq!(
+            price_gap_params.filter_type,
+            PriceReferenceGapFilterType::GapAboveThreshold
+        );
+        assert_eq!(price_gap_params.gap_threshold, 0.02);
+        assert_eq!(price_gap_params.consecutive_n, 1);
+        assert_eq!(price_gap_params.p, 0);
     }
 
     #[test]
@@ -2560,6 +2840,34 @@ mod tests {
     }
 
     #[test]
+    fn test_price_reference_gap_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: PriceReferenceGapParams = serde_json::from_str(
+            r#"{
+                "reference_source": {
+                    "type": "LOWEST_LOW",
+                    "lookback_period": 7
+                }
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            params.reference_source,
+            PriceReferenceSource::LowestLow {
+                lookback_period: 7,
+                include_current_candle: true,
+            }
+        );
+        assert_eq!(
+            params.filter_type,
+            PriceReferenceGapFilterType::GapAboveThreshold
+        );
+        assert_eq!(params.gap_threshold, 0.02);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.p, 0);
+    }
+
+    #[test]
     fn test_three_rsi_params_deserialize_uses_defaults_for_missing_fields() {
         let params: ThreeRSIParams =
             serde_json::from_str(r#"{"filter_type":"RSICrossAbove"}"#).unwrap();
@@ -2586,6 +2894,454 @@ mod tests {
         let params: SlopeParams = serde_json::from_str(r#"{"filter_type":3}"#).unwrap();
 
         assert_eq!(params.filter_type, SlopeFilterType::StrengthAboveThreshold);
+    }
+
+    #[test]
+    fn test_price_reference_gap_filter_type_deserialize_supports_numeric_values() {
+        let params: PriceReferenceGapParams = serde_json::from_str(r#"{"filter_type":1}"#).unwrap();
+
+        assert_eq!(
+            params.filter_type,
+            PriceReferenceGapFilterType::GapBelowThreshold
+        );
+
+        let directional_params: PriceReferenceGapParams =
+            serde_json::from_str(r#"{"filter_type":3}"#).unwrap();
+
+        assert_eq!(
+            directional_params.filter_type,
+            PriceReferenceGapFilterType::GapBelowReferenceThreshold
+        );
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "PRICE_REFERENCE_GAP",
+                "reference_source": {
+                    "type": "MOVING_AVERAGE",
+                    "ma_type": "EMA",
+                    "period": 12
+                },
+                "filter_type": "GapAboveThreshold",
+                "gap_threshold": 0.05,
+                "consecutive_n": 2,
+                "p": 1
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.reference_source,
+                    PriceReferenceSource::MovingAverage {
+                        ma_type: crate::indicator::ma::MAType::EMA,
+                        period: 12,
+                    }
+                );
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapAboveThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.05);
+                assert_eq!(params.consecutive_n, 2);
+                assert_eq!(params.p, 1);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_toml() {
+        let filter: TechnicalFilterConfig = toml::from_str(
+            r#"
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapBelowThreshold"
+gap_threshold = 0.03
+consecutive_n = 1
+
+[reference_source]
+type = "HIGHEST_HIGH"
+lookback_period = 5
+"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.reference_source,
+                    PriceReferenceSource::HighestHigh {
+                        lookback_period: 5,
+                        include_current_candle: true,
+                    }
+                );
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapBelowThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.03);
+                assert_eq!(params.consecutive_n, 1);
+                assert_eq!(params.p, 0);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_previous_bars_only_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "PRICE_REFERENCE_GAP",
+                "reference_source": {
+                    "type": "LOWEST_LOW",
+                    "lookback_period": 5,
+                    "include_current_candle": false
+                },
+                "filter_type": "GapBelowReferenceThreshold",
+                "gap_threshold": 0.03,
+                "consecutive_n": 1,
+                "p": 0
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.reference_source,
+                    PriceReferenceSource::LowestLow {
+                        lookback_period: 5,
+                        include_current_candle: false,
+                    }
+                );
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapBelowReferenceThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.03);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_vwap_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "PRICE_REFERENCE_GAP",
+                "reference_source": {
+                    "type": "VWAP",
+                    "period": 14
+                },
+                "filter_type": "GapAboveThreshold",
+                "gap_threshold": 0.02,
+                "consecutive_n": 1,
+                "p": 0
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.reference_source,
+                    PriceReferenceSource::VWAP { period: 14 }
+                );
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapAboveThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.02);
+                assert_eq!(params.consecutive_n, 1);
+                assert_eq!(params.p, 0);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_inline_table_toml() {
+        let filter: TechnicalFilterConfig = toml::from_str(
+            r#"
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapAboveReferenceThreshold"
+gap_threshold = 0.02
+consecutive_n = 1
+reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_current_candle = false }
+"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.reference_source,
+                    PriceReferenceSource::HighestHigh {
+                        lookback_period: 20,
+                        include_current_candle: false,
+                    }
+                );
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapAboveReferenceThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.02);
+                assert_eq!(params.consecutive_n, 1);
+                assert_eq!(params.p, 0);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_price_reference_gap_validate_rejects_zero_period_and_negative_gap() {
+        let zero_period = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::VWAP { period: 0 },
+            ..PriceReferenceGapParams::default()
+        });
+        assert!(zero_period.validate().is_err());
+
+        let zero_highest_high_lookback =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::HighestHigh {
+                    lookback_period: 0,
+                    include_current_candle: false,
+                },
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(zero_highest_high_lookback.validate().is_err());
+
+        let zero_lowest_low_lookback =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::LowestLow {
+                    lookback_period: 0,
+                    include_current_candle: false,
+                },
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(zero_lowest_low_lookback.validate().is_err());
+
+        let zero_consecutive_n =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                consecutive_n: 0,
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(zero_consecutive_n.validate().is_err());
+
+        let negative_gap = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            gap_threshold: -0.01,
+            ..PriceReferenceGapParams::default()
+        });
+        assert!(negative_gap.validate().is_err());
+    }
+
+    #[test]
+    fn test_price_reference_gap_validate_rejects_wma_when_scope_is_ema_sma_only() {
+        let filter = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::WMA,
+                period: 20,
+            },
+            ..PriceReferenceGapParams::default()
+        });
+
+        assert!(filter.validate().is_err());
+    }
+
+    #[test]
+    fn test_technical_filter_matches_price_reference_gap() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+            test_candle(4, 130.0, 131.0, 129.0),
+        ];
+        let filter = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapAboveThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        });
+
+        let result = TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles).unwrap();
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_technical_filter_matches_directional_price_reference_gap() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+            test_candle(4, 70.0, 71.0, 69.0),
+        ];
+        let filter = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapBelowReferenceThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        });
+
+        let result = TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles).unwrap();
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_technical_filter_matches_zero_threshold_directional_price_reference_gap_includes_equality()
+     {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+        ];
+        let above_or_equal_filter =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::SMA,
+                    period: 3,
+                },
+                filter_type: PriceReferenceGapFilterType::GapAboveReferenceThreshold,
+                gap_threshold: 0.0,
+                consecutive_n: 1,
+                p: 0,
+            });
+        let below_or_equal_filter =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::SMA,
+                    period: 3,
+                },
+                filter_type: PriceReferenceGapFilterType::GapBelowReferenceThreshold,
+                gap_threshold: 0.0,
+                consecutive_n: 1,
+                p: 0,
+            });
+
+        let above_result =
+            TechnicalFilter::matches_filter("TEST/USDT", &above_or_equal_filter, &candles).unwrap();
+        let below_result =
+            TechnicalFilter::matches_filter("TEST/USDT", &below_or_equal_filter, &candles).unwrap();
+
+        assert!(above_result);
+        assert!(below_result);
+    }
+
+    #[test]
+    fn test_technical_filter_matches_multiple_price_reference_gap_filters() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+            test_candle(4, 100.0, 101.0, 99.0),
+            test_candle(5, 100.0, 101.0, 99.0),
+            test_candle(6, 100.0, 101.0, 99.0),
+            test_candle(7, 100.0, 101.0, 99.0),
+            test_candle(8, 100.0, 101.0, 99.0),
+            test_candle(9, 100.0, 101.0, 99.0),
+            test_candle(10, 100.0, 101.0, 99.0),
+            test_candle(11, 100.0, 101.0, 99.0),
+            test_candle(12, 100.0, 101.0, 99.0),
+            test_candle(13, 100.0, 101.0, 99.0),
+            test_candle(14, 100.0, 101.0, 99.0),
+            test_candle(15, 100.0, 101.0, 99.0),
+            test_candle(16, 100.0, 101.0, 99.0),
+            test_candle(17, 100.0, 101.0, 99.0),
+            test_candle(18, 100.0, 101.0, 99.0),
+            test_candle(19, 100.0, 101.0, 99.0),
+            test_candle(20, 101.0, 102.0, 100.0),
+        ];
+        let filters = vec![
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::EMA,
+                    period: 20,
+                },
+                filter_type: PriceReferenceGapFilterType::GapAboveReferenceThreshold,
+                gap_threshold: 0.0,
+                consecutive_n: 1,
+                p: 0,
+            }),
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::EMA,
+                    period: 20,
+                },
+                filter_type: PriceReferenceGapFilterType::GapBelowThreshold,
+                gap_threshold: 0.02,
+                consecutive_n: 1,
+                p: 0,
+            }),
+        ];
+
+        let result = TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles).unwrap();
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_technical_filter_matches_multiple_price_reference_gap_filters_rejects_out_of_range_gap()
+    {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+            test_candle(4, 100.0, 101.0, 99.0),
+            test_candle(5, 100.0, 101.0, 99.0),
+            test_candle(6, 100.0, 101.0, 99.0),
+            test_candle(7, 100.0, 101.0, 99.0),
+            test_candle(8, 100.0, 101.0, 99.0),
+            test_candle(9, 100.0, 101.0, 99.0),
+            test_candle(10, 100.0, 101.0, 99.0),
+            test_candle(11, 100.0, 101.0, 99.0),
+            test_candle(12, 100.0, 101.0, 99.0),
+            test_candle(13, 100.0, 101.0, 99.0),
+            test_candle(14, 100.0, 101.0, 99.0),
+            test_candle(15, 100.0, 101.0, 99.0),
+            test_candle(16, 100.0, 101.0, 99.0),
+            test_candle(17, 100.0, 101.0, 99.0),
+            test_candle(18, 100.0, 101.0, 99.0),
+            test_candle(19, 100.0, 101.0, 99.0),
+            test_candle(20, 103.0, 104.0, 102.0),
+        ];
+        let filters = vec![
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::EMA,
+                    period: 20,
+                },
+                filter_type: PriceReferenceGapFilterType::GapAboveReferenceThreshold,
+                gap_threshold: 0.0,
+                consecutive_n: 1,
+                p: 0,
+            }),
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                reference_source: PriceReferenceSource::MovingAverage {
+                    ma_type: crate::indicator::ma::MAType::EMA,
+                    period: 20,
+                },
+                filter_type: PriceReferenceGapFilterType::GapBelowThreshold,
+                gap_threshold: 0.02,
+                consecutive_n: 1,
+                p: 0,
+            }),
+        ];
+
+        let result = TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles).unwrap();
+
+        assert!(!result);
     }
 
     #[test]
