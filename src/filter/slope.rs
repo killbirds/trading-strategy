@@ -1,5 +1,5 @@
 use super::Result;
-use super::{SlopeFilterType, SlopeParams, utils};
+use super::{utils, SlopeFilterType, SlopeParams};
 use crate::analyzer::slope_analyzer::SlopeAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;

@@ -1,5 +1,5 @@
 use super::Result;
-use super::{VWAPFilterType, VWAPParams, utils};
+use super::{utils, VWAPFilterType, VWAPParams};
 use crate::analyzer::vwap_analyzer::VWAPAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::vwap::VWAPParams as IndicatorVWAPParams;

@@ -7,7 +7,7 @@ use crate::analyzer::bband_analyzer::BBandAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use crate::strategy::copys_common::{
-    CopysStrategyCommon, CopysStrategyContext, create_strategy_context_for_filter_with_store,
+    create_strategy_context_for_filter_with_store, CopysStrategyCommon, CopysStrategyContext,
 };
 use crate::strategy::{Strategy, StrategyType};
 

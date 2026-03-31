@@ -1,5 +1,5 @@
 use super::Result;
-use super::{ThreeRSIFilterType, ThreeRSIParams, utils};
+use super::{utils, ThreeRSIFilterType, ThreeRSIParams};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::three_rsi_analyzer::ThreeRSIAnalyzer;
 use crate::candle_store::CandleStore;

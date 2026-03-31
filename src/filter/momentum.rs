@@ -1,5 +1,5 @@
 use super::Result;
-use super::{MomentumFilterType, MomentumParams, utils};
+use super::{utils, MomentumFilterType, MomentumParams};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::momentum_analyzer::MomentumAnalyzer;
 use crate::candle_store::CandleStore;

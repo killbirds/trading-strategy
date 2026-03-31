@@ -1,5 +1,5 @@
 use super::Result;
-use super::{VolumeFilterType, VolumeParams, utils};
+use super::{utils, VolumeFilterType, VolumeParams};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::volume_analyzer::VolumeAnalyzer;
 use crate::candle_store::CandleStore;

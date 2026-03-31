@@ -1,4 +1,4 @@
-use super::{ADXFilterType, ADXParams, FilterError, Result, utils};
+use super::{utils, ADXFilterType, ADXParams, FilterError, Result};
 use crate::analyzer::adx_analyzer::ADXAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;
