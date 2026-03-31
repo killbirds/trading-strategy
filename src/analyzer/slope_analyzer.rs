@@ -84,7 +84,7 @@ impl SlopeAnalysis {
 
 /// 분석할 지표 타입
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum IndicatorType {
     /// 종가
     ClosePrice,

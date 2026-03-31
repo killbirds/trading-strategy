@@ -1255,7 +1255,7 @@ impl_filter_type_deserialize!(MomentumFilterType, MomentumFilterTypeVisitor, "Mo
 
 /// RSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct RSIParams {
     /// RSI 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1307,7 +1307,7 @@ impl Default for RSIParams {
 
 /// MACD 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct MACDParams {
     /// 빠른 이동평균 기간 (기본값: 12)
     pub fast_period: usize,
@@ -1362,7 +1362,7 @@ impl Default for MACDParams {
 
 /// 볼린저 밴드 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct BollingerBandParams {
     /// 볼린저 밴드 기간 (기본값: 20)
     pub period: usize,
@@ -1446,7 +1446,7 @@ impl Default for BollingerBandParams {
 
 /// ADX 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ADXParams {
     /// ADX 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1474,7 +1474,7 @@ impl Default for ADXParams {
 
 /// 이동평균선 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct MovingAverageParams {
     /// 이동평균 기간 목록
     pub periods: Vec<usize>,
@@ -1513,7 +1513,7 @@ impl Default for MovingAverageParams {
 
 /// 이치모쿠 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct IchimokuParams {
     /// 전환선 기간 (기본값: 9)
     pub tenkan_period: usize,
@@ -1544,7 +1544,7 @@ impl Default for IchimokuParams {
 
 /// VWAP 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct VWAPParams {
     /// VWAP 계산 기간 (기본값: 20)
     pub period: usize,
@@ -1571,7 +1571,7 @@ impl Default for VWAPParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum PriceReferenceSource {
     #[serde(alias = "MA", rename = "MOVING_AVERAGE")]
     MovingAverage {
@@ -1610,7 +1610,7 @@ fn default_price_reference_include_current_candle() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct PriceReferenceGapParams {
     pub reference_source: PriceReferenceSource,
     pub filter_type: PriceReferenceGapFilterType,
@@ -1633,7 +1633,7 @@ impl Default for PriceReferenceGapParams {
 
 /// CopyS 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct CopysParams {
     /// RSI 계산 기간 (기본값: 14)
     pub rsi_period: usize,
@@ -1669,7 +1669,7 @@ fn default_copys_ma_periods() -> Vec<usize> {
 
 /// ATR 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ATRParams {
     /// ATR 계산 기간 (기본값: 14)
     pub period: usize,
@@ -1685,7 +1685,7 @@ pub struct ATRParams {
 
 /// SuperTrend 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SuperTrendParams {
     /// SuperTrend 계산 기간 (기본값: 10)
     pub period: usize,
@@ -1701,7 +1701,7 @@ pub struct SuperTrendParams {
 
 /// Volume 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct VolumeParams {
     /// Volume 계산 기간 (기본값: 20)
     pub period: usize,
@@ -1723,7 +1723,7 @@ fn default_volume_stable_min_threshold() -> f64 {
 
 /// ThreeRSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ThreeRSIParams {
     /// RSI 계산 기간 목록 (기본값: [7, 14, 21])
     pub rsi_periods: Vec<usize>,
@@ -1745,7 +1745,7 @@ pub struct ThreeRSIParams {
 
 /// CandlePattern 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct CandlePatternParams {
     /// 최소 몸통 크기 비율 (기본값: 0.3)
     pub min_body_ratio: f64,
@@ -1765,7 +1765,7 @@ pub struct CandlePatternParams {
 
 /// SupportResistance 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SupportResistanceParams {
     /// 되돌아 볼 기간 (기본값: 20)
     pub lookback_period: usize,
@@ -1785,7 +1785,7 @@ pub struct SupportResistanceParams {
 
 /// Momentum 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct MomentumParams {
     /// RSI 기간 (기본값: 14)
     pub rsi_period: usize,
@@ -1980,7 +1980,7 @@ impl_filter_type_display!(
 
 /// Slope 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SlopeParams {
     /// 분석할 지표 타입 설정
     pub indicator_type: crate::analyzer::IndicatorType,
@@ -2020,7 +2020,7 @@ impl Default for SlopeParams {
 
 /// 기술적 필터 설정
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", deny_unknown_fields)]
 pub enum TechnicalFilterConfig {
     /// RSI 필터 설정
     RSI(RSIParams),
@@ -3200,8 +3200,8 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
     }
 
     #[test]
-    fn test_technical_filter_matches_zero_threshold_directional_price_reference_gap_includes_equality()
-     {
+    fn test_technical_filter_matches_zero_threshold_directional_price_reference_gap_includes_equality(
+    ) {
         let candles = vec![
             test_candle(1, 100.0, 101.0, 99.0),
             test_candle(2, 100.0, 101.0, 99.0),
