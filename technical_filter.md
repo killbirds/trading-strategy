@@ -29,9 +29,9 @@ p = 0
 
 - `RSI`
 - `MACD`
-- `BOLLINGER_BAND` (`BB` alias 지원)
+- `BOLLINGER_BAND`
 - `ADX`
-- `MOVING_AVERAGE` (`MA` alias 지원)
+- `MOVING_AVERAGE`
 - `PRICE_REFERENCE_GAP`
 - `ICHIMOKU`
 - `VWAP`

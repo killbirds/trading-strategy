@@ -344,9 +344,9 @@ impl FromStr for TechnicalFilterType {
         match s.to_uppercase().as_str() {
             "RSI" => Ok(TechnicalFilterType::RSI),
             "MACD" => Ok(TechnicalFilterType::MACD),
-            "BOLLINGERBAND" | "BOLLINGER_BAND" | "BB" => Ok(TechnicalFilterType::BollingerBand),
+            "BOLLINGERBAND" | "BOLLINGER_BAND" => Ok(TechnicalFilterType::BollingerBand),
             "ADX" => Ok(TechnicalFilterType::ADX),
-            "MOVINGAVERAGE" | "MOVING_AVERAGE" | "MA" => Ok(TechnicalFilterType::MovingAverage),
+            "MOVINGAVERAGE" | "MOVING_AVERAGE" => Ok(TechnicalFilterType::MovingAverage),
             "ICHIMOKU" => Ok(TechnicalFilterType::Ichimoku),
             "VWAP" => Ok(TechnicalFilterType::VWAP),
             "PRICEREFERENCEGAP" | "PRICE_REFERENCE_GAP" => {
@@ -1573,7 +1573,7 @@ impl Default for VWAPParams {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", deny_unknown_fields)]
 pub enum PriceReferenceSource {
-    #[serde(alias = "MA", rename = "MOVING_AVERAGE")]
+    #[serde(rename = "MOVING_AVERAGE")]
     MovingAverage {
         ma_type: crate::indicator::ma::MAType,
         period: usize,
@@ -2027,12 +2027,12 @@ pub enum TechnicalFilterConfig {
     /// MACD 필터 설정
     MACD(MACDParams),
     /// 볼린저 밴드 필터 설정
-    #[serde(alias = "BB", rename = "BOLLINGER_BAND")]
+    #[serde(rename = "BOLLINGER_BAND")]
     BollingerBand(BollingerBandParams),
     /// ADX 필터 설정
     ADX(ADXParams),
     /// 이동평균선 필터 설정
-    #[serde(alias = "MA", rename = "MOVING_AVERAGE")]
+    #[serde(rename = "MOVING_AVERAGE")]
     MovingAverage(MovingAverageParams),
     #[serde(rename = "PRICE_REFERENCE_GAP")]
     PriceReferenceGap(PriceReferenceGapParams),
@@ -3200,8 +3200,8 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
     }
 
     #[test]
-    fn test_technical_filter_matches_zero_threshold_directional_price_reference_gap_includes_equality(
-    ) {
+    fn test_technical_filter_matches_zero_threshold_directional_price_reference_gap_includes_equality()
+     {
         let candles = vec![
             test_candle(1, 100.0, 101.0, 99.0),
             test_candle(2, 100.0, 101.0, 99.0),
@@ -3374,5 +3374,43 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
         } else {
             panic!("잘못된 필터 타입");
         }
+    }
+
+    #[test]
+    fn test_technical_filter_config_rejects_legacy_bb_alias() {
+        let err = serde_json::from_str::<TechnicalFilterConfig>(r#"{"type":"BB"}"#)
+            .expect_err("legacy BB alias should now be rejected");
+
+        assert!(err.to_string().contains("unknown variant `BB`"));
+    }
+
+    #[test]
+    fn test_technical_filter_config_rejects_legacy_ma_alias() {
+        let err = serde_json::from_str::<TechnicalFilterConfig>(r#"{"type":"MA"}"#)
+            .expect_err("legacy MA alias should now be rejected");
+
+        assert!(err.to_string().contains("unknown variant `MA`"));
+    }
+
+    #[test]
+    fn test_price_reference_source_rejects_legacy_ma_alias() {
+        let err = serde_json::from_str::<PriceReferenceGapParams>(
+            r#"{
+                "reference_source": {
+                    "type": "MA",
+                    "ma_type": "EMA",
+                    "period": 20
+                }
+            }"#,
+        )
+        .expect_err("legacy MA reference source alias should now be rejected");
+
+        assert!(err.to_string().contains("unknown variant `MA`"));
+    }
+
+    #[test]
+    fn test_technical_filter_type_from_str_rejects_legacy_shorthand_aliases() {
+        assert!("BB".parse::<TechnicalFilterType>().is_err());
+        assert!("MA".parse::<TechnicalFilterType>().is_err());
     }
 }
