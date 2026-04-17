@@ -1,5 +1,5 @@
 use super::Result;
-use super::{utils, ATRFilterType, ATRParams};
+use super::{ATRFilterType, ATRParams, utils};
 use crate::analyzer::atr_analyzer::ATRAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;

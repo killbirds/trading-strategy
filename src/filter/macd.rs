@@ -1,7 +1,7 @@
 use super::Result;
-use super::{utils, MACDFilterType, MACDParams};
-use crate::analyzer::macd_analyzer::MACDAnalyzer;
+use super::{MACDFilterType, MACDParams, utils};
 use crate::analyzer::AnalyzerOps;
+use crate::analyzer::macd_analyzer::MACDAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;
 

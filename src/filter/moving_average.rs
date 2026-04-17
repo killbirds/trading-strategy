@@ -1,7 +1,7 @@
 use super::Result;
-use super::{utils, MovingAverageFilterType, MovingAverageParams};
-use crate::analyzer::ma_analyzer::MAAnalyzer;
+use super::{MovingAverageFilterType, MovingAverageParams, utils};
 use crate::analyzer::AnalyzerOps;
+use crate::analyzer::ma_analyzer::MAAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use trading_chart::Candle;

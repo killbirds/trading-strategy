@@ -1,5 +1,5 @@
 use super::Result;
-use super::{utils, IchimokuFilterType, IchimokuParams};
+use super::{IchimokuFilterType, IchimokuParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::ichimoku_analyzer::IchimokuAnalyzer;
 use crate::candle_store::CandleStore;

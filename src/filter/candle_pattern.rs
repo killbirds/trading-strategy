@@ -1,4 +1,4 @@
-use super::{utils, CandlePatternFilterType, CandlePatternParams, FilterError, Result};
+use super::{CandlePatternFilterType, CandlePatternParams, FilterError, Result, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::candle_pattern_analyzer::CandlePatternAnalyzer;
 use crate::candle_store::CandleStore;

@@ -1,5 +1,5 @@
 use super::Result;
-use super::{utils, SuperTrendFilterType, SuperTrendParams};
+use super::{SuperTrendFilterType, SuperTrendParams, utils};
 use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;

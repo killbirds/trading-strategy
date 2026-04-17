@@ -1,5 +1,5 @@
 use super::{
-    utils, PriceReferenceGapFilterType, PriceReferenceGapParams, PriceReferenceSource, Result,
+    PriceReferenceGapFilterType, PriceReferenceGapParams, PriceReferenceSource, Result, utils,
 };
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MABuilderFactory;

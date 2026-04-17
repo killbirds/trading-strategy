@@ -1,7 +1,7 @@
 use super::Result;
-use super::{utils, RSIFilterType, RSIParams};
-use crate::analyzer::rsi_analyzer::RSIAnalyzer;
+use super::{RSIFilterType, RSIParams, utils};
 use crate::analyzer::AnalyzerOps;
+use crate::analyzer::rsi_analyzer::RSIAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
 use trading_chart::Candle;

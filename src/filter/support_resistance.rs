@@ -1,4 +1,4 @@
-use super::{utils, FilterError, Result, SupportResistanceFilterType, SupportResistanceParams};
+use super::{FilterError, Result, SupportResistanceFilterType, SupportResistanceParams, utils};
 use crate::analyzer::support_resistance_analyzer::SupportResistanceAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;

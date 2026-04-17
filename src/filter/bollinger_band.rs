@@ -1,5 +1,5 @@
 use super::Result;
-use super::{utils, BollingerBandFilterType, BollingerBandParams};
+use super::{BollingerBandFilterType, BollingerBandParams, utils};
 use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::bband_analyzer::BBandAnalyzer;
 use crate::candle_store::CandleStore;
