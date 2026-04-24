@@ -17,8 +17,24 @@ pub enum FilterError {
     InvalidPercentageThreshold { param_name: String },
     #[error("{param_name} 파라미터 오류: threshold는 0에서 1 사이여야 합니다")]
     InvalidRatioThreshold { param_name: String },
+    #[error("{param_name} 파라미터 오류: 값은 유한한 0 이상 숫자여야 합니다")]
+    InvalidNonNegativeNumber { param_name: String },
+    #[error("{param_name} 파라미터 오류: 값은 유한한 양수여야 합니다")]
+    InvalidPositiveNumber { param_name: String },
     #[error("{param_name} 파라미터 오류: consecutive_n은 0보다 커야 합니다")]
     InvalidConsecutiveN { param_name: String },
+    #[error("{param_name} 파라미터 오류: 최소 1개 이상 필요합니다")]
+    InvalidEmptyList { param_name: String },
+    #[error(
+        "{param_name} 파라미터 오류: {left_name}({left})는 {right_name}({right})보다 작아야 합니다"
+    )]
+    InvalidPeriodOrder {
+        param_name: String,
+        left_name: String,
+        left: usize,
+        right_name: String,
+        right: usize,
+    },
     #[error("SupportResistance 파라미터 오류: min_touch_count는 0보다 커야 합니다")]
     InvalidSupportResistanceMinTouchCount,
     #[error("CandlePattern 파라미터 오류: pattern_history_length는 0보다 커야 합니다")]
@@ -251,6 +267,61 @@ pub mod utils {
         if !(0.0..=1.0).contains(&threshold) {
             return Err(FilterError::InvalidRatioThreshold {
                 param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_non_negative_number(value: f64, param_name: &str) -> Result<()> {
+        if !value.is_finite() || value < 0.0 {
+            return Err(FilterError::InvalidNonNegativeNumber {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_positive_number(value: f64, param_name: &str) -> Result<()> {
+        if !value.is_finite() || value <= 0.0 {
+            return Err(FilterError::InvalidPositiveNumber {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_consecutive_n(consecutive_n: usize, param_name: &str) -> Result<()> {
+        if consecutive_n == 0 {
+            return Err(FilterError::InvalidConsecutiveN {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_non_empty_list<T>(values: &[T], param_name: &str) -> Result<()> {
+        if values.is_empty() {
+            return Err(FilterError::InvalidEmptyList {
+                param_name: param_name.to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_period_order(
+        left: usize,
+        left_name: &str,
+        right: usize,
+        right_name: &str,
+        param_name: &str,
+    ) -> Result<()> {
+        if left >= right {
+            return Err(FilterError::InvalidPeriodOrder {
+                param_name: param_name.to_string(),
+                left_name: left_name.to_string(),
+                left,
+                right_name: right_name.to_string(),
+                right,
             });
         }
         Ok(())
@@ -2097,33 +2168,110 @@ impl TechnicalFilterConfig {
         match self {
             Self::RSI(params) => {
                 utils::validate_period(params.period, "RSI")?;
+                utils::validate_percentage_threshold(params.oversold, "RSI oversold")?;
+                utils::validate_percentage_threshold(params.overbought, "RSI overbought")?;
+                utils::validate_consecutive_n(params.consecutive_n, "RSI consecutive_n")?;
+                utils::validate_non_negative_number(
+                    params.sideways_threshold,
+                    "RSI sideways_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.momentum_threshold,
+                    "RSI momentum_threshold",
+                )?;
                 utils::validate_percentage_threshold(params.cross_threshold, "RSI cross_threshold")
             }
             Self::MACD(params) => {
                 utils::validate_period(params.fast_period, "MACD fast_period")?;
                 utils::validate_period(params.slow_period, "MACD slow_period")?;
-                utils::validate_period(params.signal_period, "MACD signal_period")
+                utils::validate_period(params.signal_period, "MACD signal_period")?;
+                utils::validate_period_order(
+                    params.fast_period,
+                    "fast_period",
+                    params.slow_period,
+                    "slow_period",
+                    "MACD",
+                )?;
+                utils::validate_consecutive_n(params.consecutive_n, "MACD consecutive_n")?;
+                utils::validate_non_negative_number(
+                    params.overbought_threshold,
+                    "MACD overbought_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.oversold_threshold,
+                    "MACD oversold_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.sideways_threshold,
+                    "MACD sideways_threshold",
+                )
             }
-            Self::BollingerBand(params) => utils::validate_period(params.period, "BollingerBand"),
+            Self::BollingerBand(params) => {
+                utils::validate_period(params.period, "BollingerBand")?;
+                utils::validate_positive_number(params.dev_mult, "BollingerBand dev_mult")?;
+                utils::validate_consecutive_n(params.consecutive_n, "BollingerBand consecutive_n")?;
+                utils::validate_non_negative_number(
+                    params.squeeze_threshold,
+                    "BollingerBand squeeze_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.medium_threshold,
+                    "BollingerBand medium_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.large_threshold,
+                    "BollingerBand large_threshold",
+                )?;
+                utils::validate_period(
+                    params.squeeze_breakout_period,
+                    "BollingerBand squeeze_breakout_period",
+                )?;
+                utils::validate_period(
+                    params.enhanced_narrowing_period,
+                    "BollingerBand enhanced_narrowing_period",
+                )?;
+                utils::validate_period(
+                    params.enhanced_squeeze_period,
+                    "BollingerBand enhanced_squeeze_period",
+                )?;
+                utils::validate_positive_number(
+                    params.upper_touch_threshold,
+                    "BollingerBand upper_touch_threshold",
+                )?;
+                utils::validate_positive_number(
+                    params.lower_touch_threshold,
+                    "BollingerBand lower_touch_threshold",
+                )
+            }
             Self::ADX(params) => {
                 utils::validate_period(params.period, "ADX")?;
                 if !(0.0..=100.0).contains(&params.threshold) {
                     return Err(FilterError::InvalidAdxThreshold);
                 }
+                utils::validate_consecutive_n(params.consecutive_n, "ADX consecutive_n")?;
                 Ok(())
             }
             Self::MovingAverage(params) => {
+                utils::validate_non_empty_list(&params.periods, "MovingAverage periods")?;
                 for period in &params.periods {
                     utils::validate_period(*period, "MovingAverage")?;
                 }
+                utils::validate_consecutive_n(params.consecutive_n, "MovingAverage consecutive_n")?;
+                utils::validate_non_negative_number(
+                    params.sideways_threshold,
+                    "MovingAverage sideways_threshold",
+                )?;
+                utils::validate_non_negative_number(
+                    params.crossover_threshold,
+                    "MovingAverage crossover_threshold",
+                )?;
                 Ok(())
             }
             Self::PriceReferenceGap(params) => {
-                if params.consecutive_n == 0 {
-                    return Err(FilterError::InvalidConsecutiveN {
-                        param_name: "PriceReferenceGap consecutive_n".to_string(),
-                    });
-                }
+                utils::validate_consecutive_n(
+                    params.consecutive_n,
+                    "PriceReferenceGap consecutive_n",
+                )?;
 
                 utils::validate_ratio_threshold(
                     params.gap_threshold,
@@ -2162,35 +2310,90 @@ impl TechnicalFilterConfig {
             Self::Ichimoku(params) => {
                 utils::validate_period(params.tenkan_period, "Ichimoku tenkan_period")?;
                 utils::validate_period(params.kijun_period, "Ichimoku kijun_period")?;
-                utils::validate_period(params.senkou_span_b_period, "Ichimoku senkou_span_b_period")
+                utils::validate_period(
+                    params.senkou_span_b_period,
+                    "Ichimoku senkou_span_b_period",
+                )?;
+                utils::validate_period_order(
+                    params.tenkan_period,
+                    "tenkan_period",
+                    params.kijun_period,
+                    "kijun_period",
+                    "Ichimoku",
+                )?;
+                utils::validate_period_order(
+                    params.kijun_period,
+                    "kijun_period",
+                    params.senkou_span_b_period,
+                    "senkou_span_b_period",
+                    "Ichimoku",
+                )?;
+                utils::validate_consecutive_n(params.consecutive_n, "Ichimoku consecutive_n")
             }
-            Self::VWAP(params) => utils::validate_period(params.period, "VWAP"),
+            Self::VWAP(params) => {
+                utils::validate_period(params.period, "VWAP")?;
+                utils::validate_consecutive_n(params.consecutive_n, "VWAP consecutive_n")?;
+                utils::validate_non_negative_number(params.threshold, "VWAP threshold")
+            }
             Self::Copys(params) => {
                 utils::validate_period(params.rsi_period, "Copys rsi_period")?;
+                utils::validate_percentage_threshold(params.rsi_upper, "Copys rsi_upper")?;
+                utils::validate_percentage_threshold(params.rsi_lower, "Copys rsi_lower")?;
+                utils::validate_consecutive_n(params.consecutive_n, "Copys consecutive_n")?;
                 utils::validate_period(params.bband_period, "Copys bband_period")?;
+                utils::validate_positive_number(params.bband_multiplier, "Copys bband_multiplier")?;
+                utils::validate_non_empty_list(&params.ma_periods, "Copys ma_periods")?;
                 for period in &params.ma_periods {
                     utils::validate_period(*period, "Copys ma_period")?;
                 }
                 Ok(())
             }
-            Self::ATR(params) => utils::validate_period(params.period, "ATR"),
-            Self::SuperTrend(params) => utils::validate_period(params.period, "SuperTrend"),
-            Self::Volume(params) => utils::validate_period(params.period, "Volume"),
+            Self::ATR(params) => {
+                utils::validate_period(params.period, "ATR")?;
+                utils::validate_non_negative_number(params.threshold, "ATR threshold")?;
+                utils::validate_consecutive_n(params.consecutive_n, "ATR consecutive_n")
+            }
+            Self::SuperTrend(params) => {
+                utils::validate_period(params.period, "SuperTrend")?;
+                utils::validate_positive_number(params.multiplier, "SuperTrend multiplier")?;
+                utils::validate_consecutive_n(params.consecutive_n, "SuperTrend consecutive_n")
+            }
+            Self::Volume(params) => {
+                utils::validate_period(params.period, "Volume")?;
+                utils::validate_positive_number(params.threshold, "Volume threshold")?;
+                utils::validate_consecutive_n(params.consecutive_n, "Volume consecutive_n")?;
+                utils::validate_non_negative_number(
+                    params.stable_min_threshold,
+                    "Volume stable_min_threshold",
+                )
+            }
             Self::ThreeRSI(params) => {
+                utils::validate_non_empty_list(&params.rsi_periods, "ThreeRSI rsi_periods")?;
                 for period in &params.rsi_periods {
                     utils::validate_period(*period, "ThreeRSI rsi_period")?;
                 }
                 utils::validate_period(params.ma_period, "ThreeRSI ma_period")?;
                 utils::validate_period(params.adx_period, "ThreeRSI adx_period")?;
+                utils::validate_consecutive_n(params.consecutive_n, "ThreeRSI consecutive_n")?;
                 utils::validate_percentage_threshold(
                     params.cross_threshold,
                     "ThreeRSI cross_threshold",
                 )
             }
             Self::CandlePattern(params) => {
+                utils::validate_non_negative_number(
+                    params.min_body_ratio,
+                    "CandlePattern min_body_ratio",
+                )?;
+                utils::validate_non_negative_number(
+                    params.min_shadow_ratio,
+                    "CandlePattern min_shadow_ratio",
+                )?;
                 if params.pattern_history_length == 0 {
                     return Err(FilterError::InvalidCandlePatternHistoryLength);
                 }
+                utils::validate_non_negative_number(params.threshold, "CandlePattern threshold")?;
+                utils::validate_consecutive_n(params.consecutive_n, "CandlePattern consecutive_n")?;
                 Ok(())
             }
             Self::SupportResistance(params) => {
@@ -2198,9 +2401,21 @@ impl TechnicalFilterConfig {
                     params.lookback_period,
                     "SupportResistance lookback_period",
                 )?;
+                utils::validate_non_negative_number(
+                    params.touch_threshold,
+                    "SupportResistance touch_threshold",
+                )?;
                 if params.min_touch_count == 0 {
                     return Err(FilterError::InvalidSupportResistanceMinTouchCount);
                 }
+                utils::validate_non_negative_number(
+                    params.threshold,
+                    "SupportResistance threshold",
+                )?;
+                utils::validate_consecutive_n(
+                    params.consecutive_n,
+                    "SupportResistance consecutive_n",
+                )?;
                 Ok(())
             }
             Self::Momentum(params) => {
@@ -2209,9 +2424,42 @@ impl TechnicalFilterConfig {
                 utils::validate_period(params.williams_period, "Momentum williams_period")?;
                 utils::validate_period(params.roc_period, "Momentum roc_period")?;
                 utils::validate_period(params.cci_period, "Momentum cci_period")?;
-                utils::validate_period(params.momentum_period, "Momentum momentum_period")
+                utils::validate_period(params.momentum_period, "Momentum momentum_period")?;
+                utils::validate_period(params.history_length, "Momentum history_length")?;
+                utils::validate_non_negative_number(params.threshold, "Momentum threshold")?;
+                utils::validate_consecutive_n(params.consecutive_n, "Momentum consecutive_n")
             }
-            Self::Slope(params) => utils::validate_period(params.period, "Slope"),
+            Self::Slope(params) => {
+                utils::validate_period(params.period, "Slope")?;
+                utils::validate_consecutive_n(params.consecutive_n, "Slope consecutive_n")?;
+
+                if let Some(strength_threshold) = params.strength_threshold {
+                    utils::validate_non_negative_number(
+                        strength_threshold,
+                        "Slope strength_threshold",
+                    )?;
+                }
+
+                if let Some(r_squared_threshold) = params.r_squared_threshold {
+                    utils::validate_ratio_threshold(
+                        r_squared_threshold,
+                        "Slope r_squared_threshold",
+                    )?;
+                }
+
+                if let Some(short_period) = params.short_period {
+                    utils::validate_period(short_period, "Slope short_period")?;
+                    utils::validate_period_order(
+                        short_period,
+                        "short_period",
+                        params.period,
+                        "period",
+                        "Slope",
+                    )?;
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -3149,6 +3397,56 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
         });
 
         assert!(filter.validate().is_err());
+    }
+
+    #[test]
+    fn test_technical_filter_config_validate_uses_specific_validation_errors() {
+        let empty_periods = TechnicalFilterConfig::MovingAverage(MovingAverageParams {
+            periods: vec![],
+            ..MovingAverageParams::default()
+        });
+        assert!(matches!(
+            empty_periods.validate(),
+            Err(FilterError::InvalidEmptyList { .. })
+        ));
+
+        let invalid_period_order = TechnicalFilterConfig::MACD(MACDParams {
+            fast_period: 26,
+            slow_period: 12,
+            ..MACDParams::default()
+        });
+        assert!(matches!(
+            invalid_period_order.validate(),
+            Err(FilterError::InvalidPeriodOrder { .. })
+        ));
+
+        let invalid_positive = TechnicalFilterConfig::BollingerBand(BollingerBandParams {
+            dev_mult: 0.0,
+            ..BollingerBandParams::default()
+        });
+        assert!(matches!(
+            invalid_positive.validate(),
+            Err(FilterError::InvalidPositiveNumber { .. })
+        ));
+
+        let invalid_non_negative = TechnicalFilterConfig::RSI(RSIParams {
+            sideways_threshold: f64::NAN,
+            ..RSIParams::default()
+        });
+        assert!(matches!(
+            invalid_non_negative.validate(),
+            Err(FilterError::InvalidNonNegativeNumber { .. })
+        ));
+
+        let invalid_consecutive_n =
+            TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+                consecutive_n: 0,
+                ..PriceReferenceGapParams::default()
+            });
+        assert!(matches!(
+            invalid_consecutive_n.validate(),
+            Err(FilterError::InvalidConsecutiveN { .. })
+        ));
     }
 
     #[test]
