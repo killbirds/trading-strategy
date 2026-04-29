@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "trading-strategy"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "chrono",
  "log",

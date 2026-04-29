@@ -147,6 +147,8 @@ fn matches_gap_threshold(
         PriceReferenceGapFilterType::GapBelowThreshold => gap_ratio.abs() <= threshold,
         PriceReferenceGapFilterType::GapAboveReferenceThreshold => gap_ratio >= threshold,
         PriceReferenceGapFilterType::GapBelowReferenceThreshold => gap_ratio <= -threshold,
+        PriceReferenceGapFilterType::GapBelowReferenceUpperThreshold => gap_ratio <= threshold,
+        PriceReferenceGapFilterType::GapAboveReferenceLowerThreshold => gap_ratio >= -threshold,
     }
 }
 
@@ -469,6 +471,94 @@ mod tests {
         };
 
         assert!(run_filter(params, &candles));
+    }
+
+    #[test]
+    fn test_filter_price_reference_gap_below_reference_upper_threshold() {
+        let candles = build_candles(&[
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (105.0, 106.0, 104.0),
+        ]);
+        let params = PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapBelowReferenceUpperThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        };
+
+        assert!(run_filter(params, &candles));
+    }
+
+    #[test]
+    fn test_filter_price_reference_gap_below_reference_upper_threshold_rejects_too_high() {
+        let candles = build_candles(&[
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (130.0, 131.0, 129.0),
+        ]);
+        let params = PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapBelowReferenceUpperThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        };
+
+        assert!(!run_filter(params, &candles));
+    }
+
+    #[test]
+    fn test_filter_price_reference_gap_above_reference_lower_threshold() {
+        let candles = build_candles(&[
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (95.0, 96.0, 94.0),
+        ]);
+        let params = PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapAboveReferenceLowerThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        };
+
+        assert!(run_filter(params, &candles));
+    }
+
+    #[test]
+    fn test_filter_price_reference_gap_above_reference_lower_threshold_rejects_too_low() {
+        let candles = build_candles(&[
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (85.0, 86.0, 84.0),
+        ]);
+        let params = PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapAboveReferenceLowerThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        };
+
+        assert!(!run_filter(params, &candles));
     }
 
     #[test]

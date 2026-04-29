@@ -866,6 +866,8 @@ pub enum PriceReferenceGapFilterType {
     GapBelowThreshold,
     GapAboveReferenceThreshold,
     GapBelowReferenceThreshold,
+    GapBelowReferenceUpperThreshold,
+    GapAboveReferenceLowerThreshold,
 }
 
 impl_filter_type_fromstr!(
@@ -877,6 +879,8 @@ impl_filter_type_fromstr!(
         GapBelowThreshold,
         GapAboveReferenceThreshold,
         GapBelowReferenceThreshold,
+        GapBelowReferenceUpperThreshold,
+        GapAboveReferenceLowerThreshold,
     ]
 );
 
@@ -3160,6 +3164,22 @@ mod tests {
             directional_params.filter_type,
             PriceReferenceGapFilterType::GapBelowReferenceThreshold
         );
+
+        let upper_bound_params: PriceReferenceGapParams =
+            serde_json::from_str(r#"{"filter_type":4}"#).unwrap();
+
+        assert_eq!(
+            upper_bound_params.filter_type,
+            PriceReferenceGapFilterType::GapBelowReferenceUpperThreshold
+        );
+
+        let lower_bound_params: PriceReferenceGapParams =
+            serde_json::from_str(r#"{"filter_type":5}"#).unwrap();
+
+        assert_eq!(
+            lower_bound_params.filter_type,
+            PriceReferenceGapFilterType::GapAboveReferenceLowerThreshold
+        );
     }
 
     #[test]
@@ -3305,6 +3325,36 @@ lookback_period = 5
                 assert_eq!(params.gap_threshold, 0.02);
                 assert_eq!(params.consecutive_n, 1);
                 assert_eq!(params.p, 0);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_price_reference_gap_bound_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "PRICE_REFERENCE_GAP",
+                "reference_source": {
+                    "type": "MOVING_AVERAGE",
+                    "ma_type": "SMA",
+                    "period": 20
+                },
+                "filter_type": "GapBelowReferenceUpperThreshold",
+                "gap_threshold": 0.05,
+                "consecutive_n": 1,
+                "p": 0
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::PriceReferenceGap(params) => {
+                assert_eq!(
+                    params.filter_type,
+                    PriceReferenceGapFilterType::GapBelowReferenceUpperThreshold
+                );
+                assert_eq!(params.gap_threshold, 0.05);
             }
             _ => panic!("잘못된 필터 타입"),
         }

@@ -235,7 +235,8 @@ StrongDowntrend, TrendStrengthening, TrendWeakening
 
 ```text
 GapAboveThreshold, GapBelowThreshold,
-GapAboveReferenceThreshold, GapBelowReferenceThreshold
+GapAboveReferenceThreshold, GapBelowReferenceThreshold,
+GapBelowReferenceUpperThreshold, GapAboveReferenceLowerThreshold
 ```
 
 `reference_source`:
@@ -250,7 +251,31 @@ GapAboveReferenceThreshold, GapBelowReferenceThreshold
 - `GapAboveThreshold` / `GapBelowThreshold` 는 **절대 괴리율** 기준입니다.
 - `GapAboveReferenceThreshold` 는 `gap_ratio >= threshold` 입니다.
 - `GapBelowReferenceThreshold` 는 `gap_ratio <= -threshold` 입니다.
+- `GapBelowReferenceUpperThreshold` 는 `gap_ratio <= threshold` 입니다.
+- `GapAboveReferenceLowerThreshold` 는 `gap_ratio >= -threshold` 입니다.
 - `p` 는 reference window 만이 아니라 **평가 캔들 자체도 과거로 이동**시킵니다.
+
+`gap_ratio` 계산식:
+
+```text
+gap_ratio = (current_price - reference_price) / reference_price
+```
+
+`filter_type` 판단식:
+
+| filter_type | 조건 | 의미 |
+| --- | --- | --- |
+| `GapAboveThreshold` | `abs(gap_ratio) >= threshold` | 기준가와의 괴리율이 임계값 이상 |
+| `GapBelowThreshold` | `abs(gap_ratio) <= threshold` | 기준가와의 괴리율이 임계값 이하 |
+| `GapAboveReferenceThreshold` | `gap_ratio >= threshold` | 기준가보다 임계값 이상 높음 |
+| `GapBelowReferenceThreshold` | `gap_ratio <= -threshold` | 기준가보다 임계값 이상 낮음 |
+| `GapBelowReferenceUpperThreshold` | `gap_ratio <= threshold` | 기준가 대비 상단 임계값 이하 |
+| `GapAboveReferenceLowerThreshold` | `gap_ratio >= -threshold` | 기준가 대비 하단 임계값 이상 |
+
+방향별 threshold 안쪽 범위를 확인하려면 필터를 조합합니다.
+
+- 기준가 이상이면서 상단 `threshold` 이내: `GapAboveReferenceThreshold(gap_threshold=0.0)` + `GapBelowReferenceUpperThreshold(gap_threshold=N)`
+- 기준가 이하이면서 하단 `threshold` 이내: `GapBelowReferenceThreshold(gap_threshold=0.0)` + `GapAboveReferenceLowerThreshold(gap_threshold=N)`
 
 예시:
 
@@ -266,6 +291,21 @@ reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
 type = "PRICE_REFERENCE_GAP"
 filter_type = "GapBelowThreshold"
 gap_threshold = 0.02
+consecutive_n = 1
+reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
+
+# 기준가 이상이면서 +5% 이내
+[[filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapAboveReferenceThreshold"
+gap_threshold = 0.0
+consecutive_n = 1
+reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
+
+[[filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapBelowReferenceUpperThreshold"
+gap_threshold = 0.05
 consecutive_n = 1
 reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
 ```
