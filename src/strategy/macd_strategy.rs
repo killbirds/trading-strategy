@@ -164,7 +164,7 @@ impl<C: Candle + 'static> Strategy<C> for MACDStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // MACD가 시그널 라인을 상향 돌파하고 히스토그램이 임계값보다 크면 매수 신호
         self.ctx
             .is_macd_crossed_above_signal(1, self.config.confirm_period)
@@ -173,7 +173,7 @@ impl<C: Candle + 'static> Strategy<C> for MACDStrategy<C> {
                 .is_histogram_above_threshold(self.config.histogram_threshold, 1, 0)
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // MACD가 시그널 라인을 하향 돌파하면 매도 신호
         self.ctx
             .is_macd_crossed_below_signal(1, self.config.confirm_period)

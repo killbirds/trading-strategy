@@ -59,12 +59,12 @@ impl<C: Candle + 'static> Strategy<C> for CopysFilter<C> {
         self.bband_analyzer.next(candle);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 전략 트레이트 구현 요구사항
         false
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 전략 트레이트 구현 요구사항
         false
     }

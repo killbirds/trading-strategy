@@ -107,6 +107,21 @@ config.insert("squeeze_threshold".to_string(), "0.015".to_string());
 let strategy = BBandStrategy::new_with_config(&storage, Some(config))?;
 ```
 
+### 전략 신호 평가
+
+전략은 `next(candle)` 로 캔들 기반 지표 상태를 업데이트하고, 매수/매도 신호는 호출부가 전달하는 `current_price` 기준으로 평가합니다. 캔들 종가가 아닌 실시간 현재가를 반복해서 전달할 수 있어, 같은 지표 상태에서 가격만 바뀌는 tick 단위 평가에 사용할 수 있습니다.
+
+```rust
+use trading_chart::Candle;
+use trading_strategy::strategy::Strategy;
+
+strategy.next(candle.clone());
+
+let current_price = candle.close_price();
+let should_enter = strategy.should_enter(current_price);
+let should_exit = strategy.should_exit(current_price);
+```
+
 ## 볼린저 밴드 스퀴즈 돌파 전략
 
 향상된 볼린저 밴드 전략은 다음과 같은 정교한 패턴을 감지합니다:

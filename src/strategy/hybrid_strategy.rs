@@ -245,12 +245,12 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         let signal_strength = self.calculate_buy_signal_strength_cached();
         signal_strength >= self.config.entry_threshold
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         if self.ctx.items.is_empty() {
             return false;
         }

@@ -197,12 +197,12 @@ impl<C: Candle + 'static> Strategy<C> for RSIStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // RSI가 과매도 구간에서 진입
         self.is_rsi_oversold()
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // RSI가 과매수 구간에서 청산
         self.is_rsi_overbought()
     }

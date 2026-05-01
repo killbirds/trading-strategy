@@ -239,13 +239,13 @@ impl<C: Candle + 'static> Strategy<C> for ThreeRSIShortStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         self.should_enter_by_rsi_below_50_with_reverse_arrangement()
             || self.should_enter_by_break_through_rsi_below_50()
             || self.should_enter_by_break_through_below_ma()
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         self.should_exit_by_rsi_above_50_with_regular_arrangement()
             || self.should_exit_by_break_through_rsi_above_50()
             || self.should_exit_by_break_through_above_ma()

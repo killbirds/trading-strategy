@@ -6,7 +6,7 @@ use crate::strategy::tests::common::{
     create_uptrend_candles,
 };
 use std::collections::HashMap;
-use trading_chart::CandleInterval;
+use trading_chart::{Candle, CandleInterval};
 
 // 테스트용 설정 생성 함수
 fn create_multi_timeframe_config() -> HashMap<String, String> {
@@ -168,13 +168,14 @@ fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
     strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Exit);
     strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Exit);
     assert!(strategy.calculate_weighted_signal_for_test() <= -0.6);
-    assert!(strategy.should_enter(&storage.items()[0]));
+    let current_price = storage.items()[0].close_price();
+    assert!(strategy.should_enter(current_price));
 
     // 숏 전략은 매수(Enter) 신호 합산이 임계값 이상이면 청산해야 한다.
     strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Enter);
     strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Enter);
     assert!(strategy.calculate_weighted_signal_for_test() >= 0.6);
-    assert!(strategy.should_exit(&storage.items()[0]));
+    assert!(strategy.should_exit(current_price));
 }
 
 #[test]

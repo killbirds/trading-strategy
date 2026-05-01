@@ -170,13 +170,13 @@ impl<C: Candle + 'static> Strategy<C> for MAShortStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 데드 크로스 발생시 숏 진입 신호
         self.ctx
             .is_ma_reverse_arrangement_dead_cross(1, self.config.cross_previous_periods, 0)
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 단기 이동평균이 장기 이동평균보다 높아질 때(골든 크로스) 숏 청산
         self.check_cross_condition(|data| {
             if data.mas.len() < 2 {

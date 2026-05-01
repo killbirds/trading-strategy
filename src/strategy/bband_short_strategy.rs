@@ -191,7 +191,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 숏 진입: 스퀴즈 후 상단 밴드 돌파 시 숏 진입 신호
         // 스퀴즈 패턴 확인 (밴드 폭이 좁아지다가 좁은 상태 유지)
         let squeeze_pattern = self.ctx.is_narrowing_then_squeeze_pattern(
@@ -211,7 +211,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         squeeze_pattern && breaks_upper && band_width_sufficient
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 숏 청산: 하단 밴드 하향 돌파 또는 중간 밴드 아래로 하락
         let breaks_lower = self
             .ctx

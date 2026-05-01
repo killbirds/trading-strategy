@@ -207,7 +207,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 향상된 볼린저 밴드 스퀴즈 돌파 조건 체크:
         // 1. 밴드 폭이 좁아지다가 (narrowing_period 동안)
         // 2. 좁은 상태를 유지하다가 (squeeze_period 동안)
@@ -221,7 +221,7 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
             )
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         self.ctx.is_above_middle_band(1, 0)
     }
 

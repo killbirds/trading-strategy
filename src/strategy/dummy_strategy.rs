@@ -103,11 +103,11 @@ impl<C: Candle> Display for DummyStrategy<C> {
 impl<C: Candle> Strategy<C> for DummyStrategy<C> {
     fn next(&mut self, _candle: C) {}
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         false
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         false
     }
 

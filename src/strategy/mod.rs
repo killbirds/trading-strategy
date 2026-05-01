@@ -112,20 +112,20 @@ pub trait Strategy<C: Candle>: Display + Send {
     /// 매수 신호 확인
     ///
     /// # Arguments
-    /// * `candle` - 현재 캔들 데이터
+    /// * `current_price` - 현재 가격
     ///
     /// # Returns
     /// * `bool` - 매수 신호 여부
-    fn should_enter(&self, candle: &C) -> bool;
+    fn should_enter(&self, current_price: f64) -> bool;
 
     /// 매도 신호 확인
     ///
     /// # Arguments
-    /// * `candle` - 현재 캔들 데이터
+    /// * `current_price` - 현재 가격
     ///
     /// # Returns
     /// * `bool` - 매도 신호 여부
-    fn should_exit(&self, candle: &C) -> bool;
+    fn should_exit(&self, current_price: f64) -> bool;
 
     /// 전략의 포지션 타입 반환
     ///

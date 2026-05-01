@@ -175,13 +175,13 @@ impl<C: Candle + 'static> Strategy<C> for MAStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 골든 크로스 발생시 롱 진입 신호
         self.ctx
             .is_ma_regular_arrangement_golden_cross(1, self.config.cross_previous_periods, 0)
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 단기 이동평균이 장기 이동평균보다 낮아질 때(데드 크로스) 롱 청산
         self.check_cross_condition(|data| {
             if data.mas.len() < 2 {

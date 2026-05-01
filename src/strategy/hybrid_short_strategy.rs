@@ -453,7 +453,7 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridShortStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 여러 지표를 종합한 매도(숏 진입) 신호를 기반으로 결정
         let signal_strength = self.calculate_sell_signal_strength_optimized(0.0);
 
@@ -464,7 +464,7 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridShortStrategy<C> {
         signal_strength >= self.config.entry_threshold
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         if self.ctx.items.is_empty() {
             return false;
         }

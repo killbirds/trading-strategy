@@ -164,7 +164,7 @@ impl<C: Candle + 'static> Strategy<C> for RSIShortStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 이동평균이 정규 배열이면 숏 진입 금지 (상승 추세)
         if self.ctx.is_ma_regular_arrangement(1, 0) {
             return false;
@@ -174,7 +174,7 @@ impl<C: Candle + 'static> Strategy<C> for RSIShortStrategy<C> {
         self.is_rsi_overbought()
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 이동평균이 역배열이면 숏 청산 금지 (하락 추세)
         if self.ctx.is_ma_reverse_arrangement(1, 0) {
             return false;

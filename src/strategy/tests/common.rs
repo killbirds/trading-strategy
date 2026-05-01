@@ -208,20 +208,21 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
     // 백테스팅 로직
     for candle in &candles {
         strategy.next(candle.clone());
+        let current_price = candle.close_price();
 
         // 포지션이 없는 경우 매수 신호 확인
         if position.is_none() {
-            if strategy.should_enter(candle) {
-                let price = candle.close_price();
+            if strategy.should_enter(current_price) {
+                let price = current_price;
                 let quantity = capital / price;
                 position = Some((price, quantity));
             }
         }
         // 포지션이 있는 경우 매도 신호 확인
         else if let Some((entry_price, quantity)) = position
-            && strategy.should_exit(candle)
+            && strategy.should_exit(current_price)
         {
-            let exit_price = candle.close_price();
+            let exit_price = current_price;
             let profit = (exit_price - entry_price) * quantity;
             let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;
 

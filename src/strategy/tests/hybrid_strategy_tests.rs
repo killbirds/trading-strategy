@@ -63,8 +63,9 @@ fn test_hybrid_strategy_signals_uptrend() {
 
         if i >= 30 {
             // 충분한 데이터가 있을 때부터 확인
-            let enter_signal = strategy.should_enter(candle);
-            let exit_signal = strategy.should_exit(candle);
+            let current_price = candle.close_price();
+            let enter_signal = strategy.should_enter(current_price);
+            let exit_signal = strategy.should_exit(current_price);
 
             if enter_signal {
                 enter_signals += 1;

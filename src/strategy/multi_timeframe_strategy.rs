@@ -180,7 +180,8 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
     ///
     /// # Arguments
     /// * `candle` - 최신 캔들 데이터
-    fn update_signals(&mut self, candle: &C) {
+    /// * `current_price` - 현재 가격
+    fn update_signals(&mut self, candle: &C, current_price: f64) {
         // 각 타임프레임별로 신호 업데이트
         for (interval, strategy) in &mut self.strategies {
             // 해당 타임프레임의 캔들인지 확인
@@ -190,9 +191,9 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             }
 
             // 각 타임프레임에 맞게 신호 생성
-            let signal = if strategy.should_enter(candle) {
+            let signal = if strategy.should_enter(current_price) {
                 Signal::Enter
-            } else if strategy.should_exit(candle) {
+            } else if strategy.should_exit(current_price) {
                 Signal::Exit
             } else {
                 Signal::Hold
@@ -271,11 +272,13 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
             strategy.next(candle.clone());
         }
 
+        let current_price = candle.close_price();
+
         // 신호 업데이트 (참조 사용으로 클론 최소화)
-        self.update_signals(&candle);
+        self.update_signals(&candle, current_price);
     }
 
-    fn should_enter(&self, _candle: &C) -> bool {
+    fn should_enter(&self, _current_price: f64) -> bool {
         // 가중 평균 신호가 임계값보다 크면 매수(롱), 작으면 매도(숏)
         if self.position() == PositionType::Long {
             self.calculate_weighted_signal() >= self.confirmation_threshold
@@ -284,7 +287,7 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
         }
     }
 
-    fn should_exit(&self, _candle: &C) -> bool {
+    fn should_exit(&self, _current_price: f64) -> bool {
         // 가중 평균 신호가 임계값보다 작으면 매도
         if self.position() == PositionType::Long {
             self.calculate_weighted_signal() <= -self.confirmation_threshold
