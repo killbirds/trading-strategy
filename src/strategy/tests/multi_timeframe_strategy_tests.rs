@@ -1,12 +1,15 @@
-use crate::model::Signal;
+use crate::model::PositionType;
 use crate::strategy::Strategy;
+use crate::strategy::StrategyType;
 use crate::strategy::multi_timeframe_strategy::MultiTimeframeStrategy;
 use crate::strategy::tests::common::{
-    backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_storage,
-    create_uptrend_candles,
+    backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_candle,
+    create_test_storage, create_uptrend_candles,
 };
+use crate::tests::TestCandle;
 use std::collections::HashMap;
-use trading_chart::{Candle, CandleInterval};
+use std::fmt::{Display, Formatter};
+use trading_chart::CandleInterval;
 
 // 테스트용 설정 생성 함수
 fn create_multi_timeframe_config() -> HashMap<String, String> {
@@ -47,6 +50,34 @@ fn create_short_multi_timeframe_config() -> HashMap<String, String> {
     config.insert("weights".to_string(), "0.5,0.5".to_string());
     config.insert("confirmation_threshold".to_string(), "0.6".to_string());
     config
+}
+
+struct PriceSensitiveStrategy;
+
+impl Display for PriceSensitiveStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "price sensitive strategy")
+    }
+}
+
+impl Strategy<TestCandle> for PriceSensitiveStrategy {
+    fn next(&mut self, _candle: TestCandle) {}
+
+    fn should_enter(&self, current_price: f64) -> bool {
+        current_price >= 150.0
+    }
+
+    fn should_exit(&self, current_price: f64) -> bool {
+        current_price <= 80.0
+    }
+
+    fn position(&self) -> PositionType {
+        PositionType::Long
+    }
+
+    fn name(&self) -> StrategyType {
+        StrategyType::Dummy
+    }
 }
 
 #[test]
@@ -162,20 +193,32 @@ fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
     let storage = create_test_storage(candles);
     let config = create_short_multi_timeframe_config();
 
-    let mut strategy = MultiTimeframeStrategy::new_with_config(&storage, Some(config)).unwrap();
+    let strategy = MultiTimeframeStrategy::new_with_config(&storage, Some(config)).unwrap();
 
     // 숏 전략은 매도(Exit) 신호 합산이 임계값 이하이면 진입해야 한다.
-    strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Exit);
-    strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Exit);
-    assert!(strategy.calculate_weighted_signal_for_test() <= -0.6);
-    let current_price = storage.items()[0].close_price();
-    assert!(strategy.should_enter(current_price));
+    assert!(strategy.should_enter_for_weighted_signal_for_test(-1.0));
 
     // 숏 전략은 매수(Enter) 신호 합산이 임계값 이상이면 청산해야 한다.
-    strategy.set_signal_for_test(CandleInterval::Minute1, Signal::Enter);
-    strategy.set_signal_for_test(CandleInterval::Minute5, Signal::Enter);
-    assert!(strategy.calculate_weighted_signal_for_test() >= 0.6);
-    assert!(strategy.should_exit(current_price));
+    assert!(strategy.should_exit_for_weighted_signal_for_test(1.0));
+}
+
+#[test]
+fn test_multi_timeframe_strategy_uses_supplied_current_price() {
+    let candle = create_test_candle(100.0, 1, 100.0, "test");
+    let storage = create_test_storage(vec![candle.clone()]);
+    let mut config = create_multi_timeframe_config();
+    config.insert("timeframes".to_string(), "1m".to_string());
+    config.insert("weights".to_string(), "1.0".to_string());
+    config.insert("confirmation_threshold".to_string(), "0.6".to_string());
+
+    let mut strategy = MultiTimeframeStrategy::new_with_config(&storage, Some(config)).unwrap();
+    strategy.set_strategy_for_test(CandleInterval::Minute1, Box::new(PriceSensitiveStrategy));
+
+    strategy.next(candle);
+
+    assert!(!strategy.should_enter(100.0));
+    assert!(strategy.should_enter(150.0));
+    assert!(strategy.should_exit(80.0));
 }
 
 #[test]

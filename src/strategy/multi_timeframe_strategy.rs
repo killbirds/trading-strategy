@@ -19,7 +19,6 @@ pub struct MultiTimeframeStrategy<C: Candle + 'static> {
     confirmation_threshold: f64,
     strategies: HashMap<CandleInterval, Box<dyn Strategy<C>>>,
     position_type: PositionType,
-    signals: HashMap<CandleInterval, Signal>,
 }
 
 impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
@@ -75,7 +74,6 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 
         // HashMap으로 타임프레임과 가중치 매핑
         let mut timeframe_weights = HashMap::new();
-        let mut signals = HashMap::new();
         let mut strategies = HashMap::new();
         let mut seen_intervals = HashSet::new();
 
@@ -88,7 +86,6 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             }
 
             timeframe_weights.insert(interval, weights[i]);
-            signals.insert(interval, Signal::Hold);
         }
 
         // 기본 전략 타입 파싱
@@ -172,62 +169,66 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
             confirmation_threshold,
             strategies,
             position_type,
-            signals,
         })
-    }
-
-    /// 각 타임프레임별 신호를 업데이트합니다.
-    ///
-    /// # Arguments
-    /// * `candle` - 최신 캔들 데이터
-    /// * `current_price` - 현재 가격
-    fn update_signals(&mut self, candle: &C, current_price: f64) {
-        // 각 타임프레임별로 신호 업데이트
-        for (interval, strategy) in &mut self.strategies {
-            // 해당 타임프레임의 캔들인지 확인
-            if candle.interval() != interval {
-                // 다른 타임프레임의 캔들은 해당 전략에 전달하지 않음
-                continue;
-            }
-
-            // 각 타임프레임에 맞게 신호 생성
-            let signal = if strategy.should_enter(current_price) {
-                Signal::Enter
-            } else if strategy.should_exit(current_price) {
-                Signal::Exit
-            } else {
-                Signal::Hold
-            };
-
-            // 신호 저장
-            self.signals.insert(*interval, signal);
-        }
     }
 
     /// 가중 평균 신호를 계산합니다.
     ///
+    /// # Arguments
+    /// * `current_price` - 현재 가격
+    ///
     /// # Returns
     /// * `f64` - 가중 평균 신호 점수 (1.0에 가까울수록 매수, -1.0에 가까울수록 매도)
-    fn calculate_weighted_signal(&self) -> f64 {
-        if self.signals.is_empty() {
+    fn calculate_weighted_signal(&self, current_price: f64) -> f64 {
+        if self.strategies.is_empty() {
             return 0.0;
         }
 
         let mut weighted_sum = 0.0;
 
-        for (interval, signal) in &self.signals {
-            let signal_value = match signal {
-                Signal::Enter => 1.0,
-                Signal::Exit => -1.0,
-                Signal::Hold => 0.0,
-            };
-
+        for (interval, strategy) in &self.strategies {
             if let Some(weight) = self.timeframe_weights.get(interval) {
+                let signal = Self::signal_for_strategy(strategy.as_ref(), current_price);
+                let signal_value = Self::signal_value(signal);
                 weighted_sum += signal_value * weight;
             }
         }
 
         weighted_sum
+    }
+
+    fn signal_for_strategy(strategy: &dyn Strategy<C>, current_price: f64) -> Signal {
+        if strategy.should_enter(current_price) {
+            Signal::Enter
+        } else if strategy.should_exit(current_price) {
+            Signal::Exit
+        } else {
+            Signal::Hold
+        }
+    }
+
+    fn signal_value(signal: Signal) -> f64 {
+        match signal {
+            Signal::Enter => 1.0,
+            Signal::Exit => -1.0,
+            Signal::Hold => 0.0,
+        }
+    }
+
+    fn should_enter_for_weighted_signal(&self, weighted_signal: f64) -> bool {
+        if self.position() == PositionType::Long {
+            weighted_signal >= self.confirmation_threshold
+        } else {
+            weighted_signal <= -self.confirmation_threshold
+        }
+    }
+
+    fn should_exit_for_weighted_signal(&self, weighted_signal: f64) -> bool {
+        if self.position() == PositionType::Long {
+            weighted_signal <= -self.confirmation_threshold
+        } else {
+            weighted_signal >= self.confirmation_threshold
+        }
     }
 
     /// 설정 파일로부터 전략 인스턴스를 생성합니다.
@@ -272,28 +273,17 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
             strategy.next(candle.clone());
         }
 
-        let current_price = candle.close_price();
-
-        // 신호 업데이트 (참조 사용으로 클론 최소화)
-        self.update_signals(&candle, current_price);
+        // 신호는 should_enter/should_exit 호출 시 전달받은 current_price로 즉시 평가합니다.
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
+    fn should_enter(&self, current_price: f64) -> bool {
         // 가중 평균 신호가 임계값보다 크면 매수(롱), 작으면 매도(숏)
-        if self.position() == PositionType::Long {
-            self.calculate_weighted_signal() >= self.confirmation_threshold
-        } else {
-            self.calculate_weighted_signal() <= -self.confirmation_threshold
-        }
+        self.should_enter_for_weighted_signal(self.calculate_weighted_signal(current_price))
     }
 
-    fn should_exit(&self, _current_price: f64) -> bool {
+    fn should_exit(&self, current_price: f64) -> bool {
         // 가중 평균 신호가 임계값보다 작으면 매도
-        if self.position() == PositionType::Long {
-            self.calculate_weighted_signal() <= -self.confirmation_threshold
-        } else {
-            self.calculate_weighted_signal() >= self.confirmation_threshold
-        }
+        self.should_exit_for_weighted_signal(self.calculate_weighted_signal(current_price))
     }
 
     fn position(&self) -> PositionType {
@@ -313,11 +303,19 @@ impl<C: Candle + 'static> std::fmt::Display for MultiTimeframeStrategy<C> {
 
 #[cfg(test)]
 impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
-    pub(crate) fn set_signal_for_test(&mut self, interval: CandleInterval, signal: Signal) {
-        self.signals.insert(interval, signal);
+    pub(crate) fn set_strategy_for_test(
+        &mut self,
+        interval: CandleInterval,
+        strategy: Box<dyn Strategy<C>>,
+    ) {
+        self.strategies.insert(interval, strategy);
     }
 
-    pub(crate) fn calculate_weighted_signal_for_test(&self) -> f64 {
-        self.calculate_weighted_signal()
+    pub(crate) fn should_enter_for_weighted_signal_for_test(&self, weighted_signal: f64) -> bool {
+        self.should_enter_for_weighted_signal(weighted_signal)
+    }
+
+    pub(crate) fn should_exit_for_weighted_signal_for_test(&self, weighted_signal: f64) -> bool {
+        self.should_exit_for_weighted_signal(weighted_signal)
     }
 }
