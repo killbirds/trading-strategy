@@ -134,7 +134,7 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
     fn config_ma_distance_threshold(&self) -> f64;
 
     /// 매수 신호 체크 - RSI 과매도 + 볼린저밴드 하단 터치 + 이평선 지지
-    fn check_buy_signal(&self, consecutive_n: usize) -> bool {
+    fn check_buy_signal(&self, consecutive_n: usize, current_price: f64) -> bool {
         // 1. RSI 과매도 신호 (RSI < 30)
         let rsi_oversold = self.context().is_all(
             |data| data.rsi.value() < self.config_rsi_lower(),
@@ -149,7 +149,7 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
                 .is_break_through_lower_band_from_below(1, 0);
 
         // 3. 이동평균선 지지선 역할 확인 (가격이 주요 이평선 근처에서 반등)
-        let ma_support = self.check_ma_support();
+        let ma_support = self.check_ma_support(current_price);
 
         // 세 조건 중 두 개 이상 만족하면 매수 신호
         let signal_count = [rsi_oversold, bband_support, ma_support]
@@ -160,7 +160,7 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
     }
 
     /// 매도 신호 체크 - RSI 과매수 + 볼린저밴드 상단 터치 + 이평선 저항
-    fn check_sell_signal(&self, consecutive_n: usize) -> bool {
+    fn check_sell_signal(&self, consecutive_n: usize, current_price: f64) -> bool {
         // 1. RSI 과매수 신호 (RSI > 70)
         let rsi_overbought = self.context().is_all(
             |data| data.rsi.value() > self.config_rsi_upper(),
@@ -172,7 +172,7 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
         let bband_resistance = self.bband_analyzer().is_above_upper_band(1, 0);
 
         // 3. 이동평균선 저항선 역할 확인 (가격이 주요 이평선 근처에서 반락)
-        let ma_resistance = self.check_ma_resistance();
+        let ma_resistance = self.check_ma_resistance(current_price);
 
         // 세 조건 중 두 개 이상 만족하면 매도 신호
         let signal_count = [rsi_overbought, bband_resistance, ma_resistance]
@@ -183,17 +183,20 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
     }
 
     /// 이동평균선 지지선 확인 (5, 20, 60, 120, 200, 240일선 중 하나라도 지지)
-    fn check_ma_support(&self) -> bool {
+    fn check_ma_support(&self, current_price: f64) -> bool {
         if self.context().items.is_empty() {
             return false;
         }
 
-        let current_price = self.context().items[0].candle.close_price();
         let threshold = self.config_ma_distance_threshold();
 
         // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 지지 가능)
         for i in 0..self.context().items[0].mas.len() {
             let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
+            if ma_value == 0.0 {
+                continue;
+            }
+
             let distance_percent = ((current_price - ma_value) / ma_value).abs();
 
             // 이평선과 설정된 임계값 이내 거리에 있고, 이평선 위에 있으면 지지로 판단
@@ -206,17 +209,20 @@ pub trait CopysStrategyCommon<C: Candle + 'static>: Strategy<C> {
     }
 
     /// 이동평균선 저항선 확인 (5, 20, 60, 120, 200, 240일선 중 하나라도 저항)
-    fn check_ma_resistance(&self) -> bool {
+    fn check_ma_resistance(&self, current_price: f64) -> bool {
         if self.context().items.is_empty() {
             return false;
         }
 
-        let current_price = self.context().items[0].candle.close_price();
         let threshold = self.config_ma_distance_threshold();
 
         // 주요 이평선들과의 거리 확인 (가격이 이평선 근처에 있으면 저항 가능)
         for i in 0..self.context().items[0].mas.len() {
             let ma_value = self.context().items[0].mas.get_by_key_index(i).get();
+            if ma_value == 0.0 {
+                continue;
+            }
+
             let distance_percent = ((current_price - ma_value) / ma_value).abs();
 
             // 이평선과 설정된 임계값 이내 거리에 있고, 이평선 아래에 있으면 저항으로 판단

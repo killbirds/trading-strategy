@@ -217,14 +217,14 @@ impl<C: Candle + 'static> Strategy<C> for CopysShortStrategy<C> {
         self.bband_analyzer.next(candle_clone);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
+    fn should_enter(&self, current_price: f64) -> bool {
         // 숏 포지션 진입: RSI 과매수 + 볼린저밴드 상단 + 이평선 저항
-        self.check_sell_signal(self.config.rsi_count)
+        self.check_sell_signal(self.config.rsi_count, current_price)
     }
 
-    fn should_exit(&self, _current_price: f64) -> bool {
+    fn should_exit(&self, current_price: f64) -> bool {
         // 숏 포지션 청산: RSI 과매도 + 볼린저밴드 하단 + 이평선 지지
-        self.check_buy_signal(self.config.rsi_count)
+        self.check_buy_signal(self.config.rsi_count, current_price)
     }
 
     fn position(&self) -> PositionType {

@@ -210,14 +210,14 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
         self.bband_analyzer.next(candle_clone);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
+    fn should_enter(&self, current_price: f64) -> bool {
         // 새로운 매수 신호: RSI 과매도 + 볼린저밴드 하단 + 이평선 지지
-        self.check_buy_signal(self.config_rsi_count())
+        self.check_buy_signal(self.config_rsi_count(), current_price)
     }
 
-    fn should_exit(&self, _current_price: f64) -> bool {
+    fn should_exit(&self, current_price: f64) -> bool {
         // 새로운 매도 신호: RSI 과매수 + 볼린저밴드 상단 + 이평선 저항
-        self.check_sell_signal(self.config_rsi_count())
+        self.check_sell_signal(self.config_rsi_count(), current_price)
     }
 
     fn position(&self) -> PositionType {
@@ -232,6 +232,23 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::candle_store::CandleStore;
+    use crate::tests::TestCandle;
+
+    fn create_flat_storage(price: f64, count: usize) -> CandleStore<TestCandle> {
+        let candles = (0..count)
+            .map(|index| TestCandle {
+                timestamp: index as i64,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+                volume: 100.0,
+            })
+            .collect();
+
+        CandleStore::new(candles, 1000, false)
+    }
 
     #[test]
     fn test_copys_strategy_config_from_json_uses_defaults() {
@@ -244,5 +261,23 @@ mod tests {
         assert_eq!(config.base.bband_multiplier, 2.0);
         assert_eq!(config.base.ma_distance_threshold, 0.02);
         assert_eq!(config.rsi_count, 3);
+    }
+
+    #[test]
+    fn test_copys_ma_support_uses_supplied_current_price() {
+        let storage = create_flat_storage(100.0, 260);
+        let strategy = CopysStrategy::new_with_config(&storage, None).unwrap();
+
+        assert!(strategy.check_ma_support(100.0));
+        assert!(!strategy.check_ma_support(150.0));
+    }
+
+    #[test]
+    fn test_copys_ma_resistance_uses_supplied_current_price() {
+        let storage = create_flat_storage(100.0, 260);
+        let strategy = CopysStrategy::new_with_config(&storage, None).unwrap();
+
+        assert!(strategy.check_ma_resistance(100.0));
+        assert!(!strategy.check_ma_resistance(50.0));
     }
 }

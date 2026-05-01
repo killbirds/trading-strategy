@@ -161,7 +161,12 @@ impl HybridShortStrategyConfig {
 
 /// 하이브리드 숏 전략 구현
 ///
-/// MACD, RSI, 이동평균선을 결합하여 시장 하락 상황에 적응적으로 대응하는 전략
+/// MACD, RSI, 이동평균선을 결합하여 시장 하락 상황에 적응적으로 대응하는 전략입니다.
+///
+/// 이 전략의 신호 강도는 `next(candle)` 로 갱신된 완료 캔들의 MACD/RSI/MA 상태와
+/// 최근 캔들 종가 흐름을 기준으로 계산합니다. 따라서 `should_enter`/`should_exit`의
+/// `current_price` 인자는 현재 구현에서 의도적으로 사용하지 않으며, 실시간 tick 가격보다
+/// 완료 캔들 종가 기준으로 평가되는 bar-close 전략입니다.
 pub struct HybridShortStrategy<C: Candle + Clone> {
     config: HybridShortStrategyConfig,
     ctx: HybridAnalyzer<C>,
