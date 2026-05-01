@@ -19,6 +19,7 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
     coin: &str,
     params: &RSIParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "RSI 필터 적용 - 기간: {}, 과매도: {}, 과매수: {}, 교차임계값: {}, 타입: {:?}, 연속성: {}",
@@ -253,7 +254,6 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
             if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[params.p].candle.close_price();
                 let previous_price = analyzer.items[params.p + 2].candle.close_price();
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 2].rsi.value();
@@ -264,7 +264,6 @@ pub(crate) fn filter_rsi<C: Candle + 'static>(
             if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[params.p].candle.close_price();
                 let previous_price = analyzer.items[params.p + 2].candle.close_price();
                 let current_rsi = analyzer.items[params.p].rsi.value();
                 let previous_rsi = analyzer.items[params.p + 2].rsi.value();
@@ -441,7 +440,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 과매수 임계값(70) 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -471,7 +470,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 현재 테스트는 하락 추세로 인해 RSI 값이 실제 과매도 상태가 아닐 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -491,7 +490,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 두 임계값 사이에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -510,7 +509,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 임계값을 위로 돌파했는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -549,7 +548,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 현재 테스트는 RSI 계산 로직에 따라 임계값 돌파 조건이 일치하지 않을 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -586,7 +585,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 현재 테스트는 RSI 계산 로직에 따라 연속 조건이 일치하지 않을 수 있음
         // 테스트 목적은 함수가 오류 없이 동작하는지 확인하는 것이므로 결과 값을 단언하지 않음
@@ -606,7 +605,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
     }
@@ -625,7 +624,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 40을 상향 돌파했는지 확인
         let is_breakthrough = result.unwrap();
@@ -646,7 +645,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 60을 하향 돌파했는지 확인
         let is_breakthrough = result.unwrap();
@@ -666,7 +665,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 횡보 중인지 확인
         let is_sideways = result.unwrap();
@@ -686,7 +685,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 50 근처에서 중립 상태인지 확인
         let is_neutral = result.unwrap();
@@ -706,7 +705,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI 다이버전스 패턴 확인
         let is_divergence = result.unwrap();
@@ -726,7 +725,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI 컨버전스 패턴 확인
         let is_convergence = result.unwrap();
@@ -746,7 +745,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 30-70 구간에서 안정적인지 확인
         let is_stable = result.unwrap();
@@ -766,7 +765,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 50을 중심으로 중립적 추세인지 확인
         let is_neutral_trend = result.unwrap();
@@ -786,7 +785,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 강세 구간(60-80)인지 확인
         let is_bullish = result.unwrap();
@@ -806,7 +805,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_rsi("TEST/USDT", &params, &candle_store);
+        let result = filter_rsi("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // RSI가 약세 구간(20-40)인지 확인
         let is_bearish = result.unwrap();

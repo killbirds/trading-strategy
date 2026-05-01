@@ -11,9 +11,10 @@ pub(crate) fn filter_three_rsi<C: Candle + 'static>(
     symbol: &str,
     params: &ThreeRSIParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
     ma_type: MAType,
 ) -> Result<bool> {
-    ThreeRSIFilter::matches_filter(symbol, candle_store, params, ma_type)
+    ThreeRSIFilter::matches_filter(symbol, candle_store, params, ma_type, current_price)
 }
 
 /// ThreeRSI 필터 구조체
@@ -26,6 +27,7 @@ impl ThreeRSIFilter {
         candle_store: &CandleStore<C>,
         params: &ThreeRSIParams,
         ma_type: MAType,
+        current_price: f64,
     ) -> Result<bool> {
         let rsi_periods = &params.rsi_periods;
         let ma_period = params.ma_period;
@@ -65,10 +67,10 @@ impl ThreeRSIFilter {
                 analyzer.is_rsi_regular_arrangement(consecutive_n, p)
             }
             ThreeRSIFilterType::CandleLowBelowMA => {
-                analyzer.is_candle_low_below_ma(consecutive_n, p)
+                analyzer.is_all(|ctx| current_price < ctx.ma.get(), consecutive_n, p)
             }
             ThreeRSIFilterType::CandleHighAboveMA => {
-                analyzer.is_candle_high_above_ma(consecutive_n, p)
+                analyzer.is_all(|ctx| current_price > ctx.ma.get(), consecutive_n, p)
             }
             ThreeRSIFilterType::ADXGreaterThan20 => {
                 analyzer.is_adx_greater_than_20(consecutive_n, p)
@@ -246,7 +248,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
     }
 
@@ -306,7 +309,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
     }
 
@@ -366,7 +370,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_oversold = result.unwrap();
@@ -429,7 +434,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_extreme_overbought = result.unwrap();
@@ -492,7 +498,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_stable_range = result.unwrap();
@@ -555,7 +562,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bullish_range = result.unwrap();
@@ -618,7 +626,8 @@ mod tests {
             p: 0,
             cross_threshold: 50.0,
         };
-        let result = ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA);
+        let result =
+            ThreeRSIFilter::matches_filter("TEST", &candle_store, &params, MAType::SMA, 0.0);
         assert!(result.is_ok());
         // 실제 결과에 따라 테스트 수정
         let is_bearish_range = result.unwrap();

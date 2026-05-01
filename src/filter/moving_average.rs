@@ -11,6 +11,7 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
     coin: &str,
     params: &MovingAverageParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     if params.periods.is_empty() {
         log::debug!("이동평균선 필터 적용 - 기간 목록이 비어 있음");
@@ -51,36 +52,32 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
     let result = match params.filter_type {
         MovingAverageFilterType::PriceAboveFirstMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let first_ma = data.mas.get_by_key_index(first_index).get();
-                price > first_ma
+                current_price > first_ma
             },
             params.consecutive_n,
             params.p,
         ),
         MovingAverageFilterType::PriceAboveLastMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
-                price > last_ma
+                current_price > last_ma
             },
             params.consecutive_n,
             params.p,
         ),
         MovingAverageFilterType::PriceBelowFirstMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let first_ma = data.mas.get_by_key_index(first_index).get();
-                price < first_ma
+                current_price < first_ma
             },
             params.consecutive_n,
             params.p,
         ),
         MovingAverageFilterType::PriceBelowLastMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
-                price < last_ma
+                current_price < last_ma
             },
             params.consecutive_n,
             params.p,
@@ -111,10 +108,10 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
         }
         MovingAverageFilterType::PriceBetweenMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let first_ma = data.mas.get_by_key_index(first_index).get();
                 let last_ma = data.mas.get_by_key_index(last_index).get();
-                (first_ma <= price && price <= last_ma) || (last_ma <= price && price <= first_ma)
+                (first_ma <= current_price && current_price <= last_ma)
+                    || (last_ma <= current_price && current_price <= first_ma)
             },
             params.consecutive_n,
             params.p,
@@ -171,10 +168,9 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
         }
         MovingAverageFilterType::AllMAAbove => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 for i in 0..params.periods.len() {
                     let ma = data.mas.get_by_key_index(i).get();
-                    if price <= ma {
+                    if current_price <= ma {
                         return false;
                     }
                 }
@@ -185,10 +181,9 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
         ),
         MovingAverageFilterType::AllMABelow => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 for i in 0..params.periods.len() {
                     let ma = data.mas.get_by_key_index(i).get();
-                    if price >= ma {
+                    if current_price >= ma {
                         return false;
                     }
                 }
@@ -219,27 +214,40 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
             if params.periods.is_empty() {
                 false
             } else {
-                analyzer.is_ma_greater_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
+                analyzer.is_all(
+                    |data| {
+                        let ma = data.mas.get_by_key_index(0).get();
+                        ma != 0.0 && (current_price - ma) / ma > 0.0
+                    },
+                    params.consecutive_n,
+                    params.p,
+                )
             }
         }
         MovingAverageFilterType::StrongDowntrend => {
             if params.periods.is_empty() {
                 false
             } else {
-                analyzer.is_ma_less_than_rate_of_return(0, 0.0, params.consecutive_n, params.p)
+                analyzer.is_all(
+                    |data| {
+                        let ma = data.mas.get_by_key_index(0).get();
+                        ma != 0.0 && (current_price - ma) / ma < 0.0
+                    },
+                    params.consecutive_n,
+                    params.p,
+                )
             }
         }
         MovingAverageFilterType::PriceCrossingMA => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let mut above_count = 0;
                 let mut below_count = 0;
 
                 for i in 0..params.periods.len() {
                     let ma = data.mas.get_by_key_index(i).get();
-                    if price > ma {
+                    if current_price > ma {
                         above_count += 1;
-                    } else if price < ma {
+                    } else if current_price < ma {
                         below_count += 1;
                     }
                 }
@@ -367,11 +375,10 @@ pub(crate) fn filter_moving_average<C: Candle + 'static>(
                         .get_by_key_index(last_index)
                         .get())
                 .abs();
-                let avg_price = analyzer.items[params.p].candle.close_price();
-                if avg_price == 0.0 {
+                if current_price == 0.0 {
                     false
                 } else {
-                    let gap_ratio = current_gap / avg_price;
+                    let gap_ratio = current_gap / current_price;
                     gap_ratio <= params.crossover_threshold
                 }
             }
@@ -508,7 +515,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 마지막 가격이 첫번째 MA(5) 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -525,7 +532,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 마지막 가격이 마지막 MA(20) 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -542,7 +549,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 마지막 가격이 모든 MA 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -559,7 +566,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 첫번째 MA(5)가 마지막 MA(20) 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -576,7 +583,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 첫번째 MA(5)가 마지막 MA(20) 아래에 있는지 확인
         assert!(result.unwrap()); // 하락 추세이므로 true
@@ -593,7 +600,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 골든 크로스가 발생했는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -610,7 +617,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 가격이 두 MA 사이에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -637,7 +644,7 @@ mod tests {
         };
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         let is_passed = result.unwrap();
         println!("하락 추세 테스트 결과 (1연속): {is_passed}");
@@ -654,7 +661,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
     }
@@ -670,7 +677,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 마지막 가격이 모든 MA 위에 있는지 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -687,7 +694,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 기간 목록이 비어 있으므로 false 반환
     }
@@ -703,7 +710,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 단일 MA만 있는 경우 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -720,7 +727,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 역배열 (단기 MA가 장기 MA 아래에 있음) 확인
         assert!(result.unwrap()); // 하락 추세이므로 true
@@ -737,7 +744,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 데드 크로스 발생 확인
         assert!(!result.unwrap()); // 단일 데이터로는 크로스 확인 불가
@@ -754,7 +761,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 이동평균선이 횡보 중인지 확인
         assert!(result.unwrap()); // 실제로는 횡보로 판단됨
@@ -771,7 +778,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 강한 상승 추세 확인
         assert!(!result.unwrap()); // 하락 추세이므로 false
@@ -788,7 +795,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 강한 하락 추세 확인
         assert!(result.unwrap()); // 하락 추세이므로 true
@@ -805,7 +812,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 가격이 이동평균선들과 교차 중인지 확인
         assert!(!result.unwrap()); // 가격이 모든 MA 아래에 있으므로 false
@@ -822,7 +829,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 수렴 후 발산 시작 확인
         assert!(!result.unwrap()); // 충분한 데이터가 없어서 false
@@ -839,7 +846,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 발산 후 수렴 시작 확인
         assert!(!result.unwrap()); // 충분한 데이터가 없어서 false
@@ -856,7 +863,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 이동평균선들이 평행 이동 중인지 확인
         assert!(result.unwrap()); // 실제로는 평행 이동으로 판단됨
@@ -873,7 +880,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_moving_average("TEST/USDT", &params, &candle_store);
+        let result = filter_moving_average("TEST/USDT", &params, &candle_store, 56.0);
         assert!(result.is_ok());
         // 이동평균선들이 교차점 근처인지 확인
         assert!(!result.unwrap()); // 간격이 넓어서 false

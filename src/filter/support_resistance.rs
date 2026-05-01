@@ -1,4 +1,5 @@
 use super::{FilterError, Result, SupportResistanceFilterType, SupportResistanceParams, utils};
+use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::support_resistance_analyzer::SupportResistanceAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;
@@ -8,8 +9,9 @@ pub(crate) fn filter_support_resistance<C: Candle + 'static>(
     symbol: &str,
     params: &SupportResistanceParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
-    SupportResistanceFilter::matches_filter(symbol, candle_store, params)
+    SupportResistanceFilter::matches_filter(symbol, candle_store, params, current_price)
 }
 
 /// SupportResistance 필터 구조체
@@ -21,6 +23,7 @@ impl SupportResistanceFilter {
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &SupportResistanceParams,
+        current_price: f64,
     ) -> Result<bool> {
         let lookback_period = params.lookback_period;
         let touch_threshold = params.touch_threshold;
@@ -50,36 +53,114 @@ impl SupportResistanceFilter {
 
         // analyzer 메서드들이 이미 consecutive_n을 처리하므로 직접 호출
         let result = match filter_type {
-            SupportResistanceFilterType::SupportBreakdown => {
-                analyzer.is_support_breakdown_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::ResistanceBreakout => {
-                analyzer.is_resistance_breakout_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::SupportBounce => {
-                analyzer.is_support_bounce_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::ResistanceRejection => {
-                analyzer.is_resistance_rejection_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::NearStrongSupport => {
-                analyzer.is_near_strong_support_signal(consecutive_n, 1, threshold, p)
-            }
-            SupportResistanceFilterType::NearStrongResistance => {
-                analyzer.is_near_strong_resistance_signal(consecutive_n, 1, threshold, p)
-            }
-            SupportResistanceFilterType::AboveSupport => {
-                analyzer.is_above_support_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::BelowResistance => {
-                analyzer.is_below_resistance_signal(consecutive_n, 1, p)
-            }
-            SupportResistanceFilterType::NearSupport => {
-                analyzer.is_near_support_signal(consecutive_n, 1, threshold, p)
-            }
-            SupportResistanceFilterType::NearResistance => {
-                analyzer.is_near_resistance_signal(consecutive_n, 1, threshold, p)
-            }
+            SupportResistanceFilterType::SupportBreakdown => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_support
+                            .as_ref()
+                            .is_some_and(|support| current_price < support.price)
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::ResistanceBreakout => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_resistance
+                            .as_ref()
+                            .is_some_and(|resistance| current_price > resistance.price)
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::SupportBounce => analyzer.is_break_through_by_satisfying(
+                |data| {
+                    data.nearest_support.as_ref().is_some_and(|support| {
+                        (current_price - support.price).abs() <= support.price * 0.002
+                    })
+                },
+                consecutive_n,
+                1,
+                p,
+            ),
+            SupportResistanceFilterType::ResistanceRejection => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_resistance.as_ref().is_some_and(|resistance| {
+                            (current_price - resistance.price).abs() <= resistance.price * 0.002
+                        })
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::NearStrongSupport => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_support.as_ref().is_some_and(|support| {
+                            (current_price - support.price).abs() <= threshold
+                                && support.touch_count >= 3
+                        })
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::NearStrongResistance => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_resistance.as_ref().is_some_and(|resistance| {
+                            (current_price - resistance.price).abs() <= threshold
+                                && resistance.touch_count >= 3
+                        })
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::AboveSupport => analyzer.is_break_through_by_satisfying(
+                |data| {
+                    data.nearest_support
+                        .as_ref()
+                        .is_some_and(|support| current_price > support.price)
+                },
+                consecutive_n,
+                1,
+                p,
+            ),
+            SupportResistanceFilterType::BelowResistance => analyzer
+                .is_break_through_by_satisfying(
+                    |data| {
+                        data.nearest_resistance
+                            .as_ref()
+                            .is_some_and(|resistance| current_price < resistance.price)
+                    },
+                    consecutive_n,
+                    1,
+                    p,
+                ),
+            SupportResistanceFilterType::NearSupport => analyzer.is_break_through_by_satisfying(
+                |data| {
+                    data.nearest_support
+                        .as_ref()
+                        .is_some_and(|support| (current_price - support.price).abs() <= threshold)
+                },
+                consecutive_n,
+                1,
+                p,
+            ),
+            SupportResistanceFilterType::NearResistance => analyzer.is_break_through_by_satisfying(
+                |data| {
+                    data.nearest_resistance.as_ref().is_some_and(|resistance| {
+                        (current_price - resistance.price).abs() <= threshold
+                    })
+                },
+                consecutive_n,
+                1,
+                p,
+            ),
         };
 
         Ok(result)
@@ -147,7 +228,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = SupportResistanceFilter::matches_filter("TEST", &candle_store, &params);
+        let result = SupportResistanceFilter::matches_filter("TEST", &candle_store, &params, 0.0);
         assert!(result.is_ok());
     }
 }

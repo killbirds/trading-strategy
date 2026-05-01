@@ -9,6 +9,7 @@ pub(crate) fn filter_slope<C: Candle + 'static + Clone>(
     coin: &str,
     params: &SlopeParams,
     candle_store: &CandleStore<C>,
+    _current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "기울기 필터 적용 - 지표 타입: {:?}, 분석 기간: {}, 필터 타입: {:?}, 연속성: {}",
@@ -254,7 +255,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_slope("TEST/USDT", &params, &candle_store);
+        let result = filter_slope("TEST/USDT", &params, &candle_store, 0.0);
         assert!(result.is_ok());
         assert!(result.unwrap());
     }
@@ -284,7 +285,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_slope("TEST/USDT", &params, &candle_store);
+        let result = filter_slope("TEST/USDT", &params, &candle_store, 0.0);
         assert!(result.is_ok());
         assert!(result.unwrap());
     }
@@ -301,7 +302,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_slope("TEST/USDT", &params, &candle_store);
+        let result = filter_slope("TEST/USDT", &params, &candle_store, 0.0);
         assert!(result.is_ok());
         assert!(!result.unwrap());
     }

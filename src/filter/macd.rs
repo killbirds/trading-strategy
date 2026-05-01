@@ -10,6 +10,7 @@ pub(crate) fn filter_macd<C: Candle + 'static>(
     coin: &str,
     params: &MACDParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "MACD 필터 적용 - 빠른 기간: {}, 느린 기간: {}, 시그널 기간: {}, 타입: {:?}, 연속성: {}",
@@ -206,7 +207,6 @@ pub(crate) fn filter_macd<C: Candle + 'static>(
             if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[params.p].candle.close_price();
                 let previous_price = analyzer.items[params.p + 2].candle.close_price();
                 let current_macd = analyzer.items[params.p].macd.macd_line;
                 let previous_macd = analyzer.items[params.p + 2].macd.macd_line;
@@ -217,7 +217,6 @@ pub(crate) fn filter_macd<C: Candle + 'static>(
             if analyzer.items.len() < params.p + 3 {
                 false
             } else {
-                let current_price = analyzer.items[params.p].candle.close_price();
                 let previous_price = analyzer.items[params.p + 2].candle.close_price();
                 let current_macd = analyzer.items[params.p].macd.macd_line;
                 let previous_macd = analyzer.items[params.p + 2].macd.macd_line;
@@ -229,11 +228,10 @@ pub(crate) fn filter_macd<C: Candle + 'static>(
                 false
             } else {
                 let current_macd = analyzer.items[params.p].macd.macd_line;
-                let avg_price = analyzer.items[params.p].candle.close_price();
-                if avg_price == 0.0 {
+                if current_price == 0.0 {
                     false
                 } else {
-                    let macd_ratio = current_macd / avg_price;
+                    let macd_ratio = current_macd / current_price;
                     macd_ratio >= params.overbought_threshold
                 }
             }
@@ -243,11 +241,10 @@ pub(crate) fn filter_macd<C: Candle + 'static>(
                 false
             } else {
                 let current_macd = analyzer.items[params.p].macd.macd_line;
-                let avg_price = analyzer.items[params.p].candle.close_price();
-                if avg_price == 0.0 {
+                if current_price == 0.0 {
                     false
                 } else {
-                    let macd_ratio = current_macd / avg_price;
+                    let macd_ratio = current_macd / current_price;
                     macd_ratio <= -params.oversold_threshold
                 }
             }

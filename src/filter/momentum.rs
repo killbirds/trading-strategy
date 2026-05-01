@@ -10,8 +10,9 @@ pub(crate) fn filter_momentum<C: Candle + Clone + 'static>(
     symbol: &str,
     params: &MomentumParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
-    MomentumFilter::matches_filter(symbol, candle_store, params)
+    MomentumFilter::matches_filter(symbol, candle_store, params, current_price)
 }
 
 /// Momentum 필터 구조체
@@ -23,6 +24,7 @@ impl MomentumFilter {
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &MomentumParams,
+        _current_price: f64,
     ) -> Result<bool> {
         let rsi_period = params.rsi_period;
         let stoch_period = params.stoch_period;
@@ -206,7 +208,7 @@ mod tests {
             consecutive_n: 1,
             p: 0,
         };
-        let result = MomentumFilter::matches_filter("TEST", &candle_store, &params);
+        let result = MomentumFilter::matches_filter("TEST", &candle_store, &params, 0.0);
         assert!(result.is_ok());
     }
 }

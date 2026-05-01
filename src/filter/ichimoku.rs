@@ -20,6 +20,7 @@ pub(crate) fn filter_ichimoku<C: Candle + 'static>(
     coin: &str,
     params: &IchimokuParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "이치모쿠 필터 적용 - 전환선: {}, 기준선: {}, 선행스팬B: {}, 타입: {:?}, 연속성: {}",
@@ -55,12 +56,24 @@ pub(crate) fn filter_ichimoku<C: Candle + 'static>(
     log::debug!("코인 {coin} 이치모쿠 분석기 생성 완료");
 
     let result = match params.filter_type {
-        IchimokuFilterType::PriceAboveCloud => {
-            analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n, params.p)
-        }
-        IchimokuFilterType::PriceBelowCloud => {
-            analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n, params.p)
-        }
+        IchimokuFilterType::PriceAboveCloud => analyzer.is_all(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_above_cloud(current_price)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        IchimokuFilterType::PriceBelowCloud => analyzer.is_all(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_below_cloud(current_price)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
         IchimokuFilterType::TenkanAboveKijun => {
             analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n, params.p)
         }
@@ -70,39 +83,79 @@ pub(crate) fn filter_ichimoku<C: Candle + 'static>(
         IchimokuFilterType::DeadCross => {
             analyzer.is_dead_cross_signal(params.consecutive_n, 1, &ichimoku_params, params.p)
         }
-        IchimokuFilterType::CloudBreakoutUp => analyzer.is_cloud_breakout_up_signal(
+        IchimokuFilterType::CloudBreakoutUp => analyzer.is_break_through_by_satisfying(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_above_cloud(current_price)
+            },
             params.consecutive_n,
             1,
-            &ichimoku_params,
             params.p,
         ),
-        IchimokuFilterType::CloudBreakdown => {
-            analyzer.is_cloud_breakdown_signal(params.consecutive_n, 1, &ichimoku_params, params.p)
-        }
-        IchimokuFilterType::BuySignal => {
-            analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n, params.p)
-        }
-        IchimokuFilterType::SellSignal => {
-            analyzer.is_sell_signal(&ichimoku_params, params.consecutive_n, params.p)
-        }
+        IchimokuFilterType::CloudBreakdown => analyzer.is_break_through_by_satisfying(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_below_cloud(current_price)
+            },
+            params.consecutive_n,
+            1,
+            params.p,
+        ),
+        IchimokuFilterType::BuySignal => analyzer.is_all(
+            |data| {
+                let ichimoku = data.ichimokus.get(&ichimoku_params);
+                ichimoku.is_price_above_cloud(current_price)
+                    && ichimoku.is_bullish_cloud()
+                    && ichimoku.is_tenkan_above_kijun()
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        IchimokuFilterType::SellSignal => analyzer.is_all(
+            |data| {
+                let ichimoku = data.ichimokus.get(&ichimoku_params);
+                ichimoku.is_price_below_cloud(current_price)
+                    && ichimoku.is_bearish_cloud()
+                    && ichimoku.is_tenkan_below_kijun()
+            },
+            params.consecutive_n,
+            params.p,
+        ),
         IchimokuFilterType::CloudThickening => {
             analyzer.is_cloud_thickening(&ichimoku_params, params.consecutive_n, params.p)
         }
-        IchimokuFilterType::PerfectAlignment => {
-            analyzer.is_price_above_cloud(&ichimoku_params, params.consecutive_n, params.p)
-                && analyzer.is_tenkan_above_kijun(&ichimoku_params, params.consecutive_n, params.p)
-        }
-        IchimokuFilterType::PerfectReverseAlignment => {
-            analyzer.is_price_below_cloud(&ichimoku_params, params.consecutive_n, params.p)
-                && analyzer.is_all(
-                    |data| data.is_tenkan_below_kijun(&ichimoku_params),
-                    params.consecutive_n,
-                    params.p,
-                )
-        }
-        IchimokuFilterType::StrongBuySignal => {
-            analyzer.is_buy_signal(&ichimoku_params, params.consecutive_n, params.p)
-        }
+        IchimokuFilterType::PerfectAlignment => analyzer.is_all(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_above_cloud(current_price)
+                    && data.is_tenkan_above_kijun(&ichimoku_params)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        IchimokuFilterType::PerfectReverseAlignment => analyzer.is_all(
+            |data| {
+                data.ichimokus
+                    .get(&ichimoku_params)
+                    .is_price_below_cloud(current_price)
+                    && data.is_tenkan_below_kijun(&ichimoku_params)
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        IchimokuFilterType::StrongBuySignal => analyzer.is_all(
+            |data| {
+                let ichimoku = data.ichimokus.get(&ichimoku_params);
+                ichimoku.is_price_above_cloud(current_price)
+                    && ichimoku.is_bullish_cloud()
+                    && ichimoku.is_tenkan_above_kijun()
+            },
+            params.consecutive_n,
+            params.p,
+        ),
     };
 
     Ok(result)

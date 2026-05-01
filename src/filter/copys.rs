@@ -118,6 +118,7 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
     symbol: &str,
     params: &CopysParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     if candle_store.len() < 60 {
         log::warn!(
@@ -157,8 +158,34 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
 
     // 전략 신호 체크
     let result = match params.filter_type {
-        CopysFilterType::BasicBuySignal => filter.check_buy_signal(params.consecutive_n),
-        CopysFilterType::BasicSellSignal => filter.check_sell_signal(params.consecutive_n),
+        CopysFilterType::BasicBuySignal => {
+            let rsi_oversold = filter.context().is_all(
+                |data| data.rsi.value() < filter.config_rsi_lower(),
+                params.consecutive_n,
+                params.p,
+            );
+            let bband_support = is_bband_lower_touch(&filter, current_price, params.p);
+            let ma_support = is_ma_support(&filter, current_price, params.p);
+            [rsi_oversold, bband_support, ma_support]
+                .iter()
+                .filter(|&&passed| passed)
+                .count()
+                >= 2
+        }
+        CopysFilterType::BasicSellSignal => {
+            let rsi_overbought = filter.context().is_all(
+                |data| data.rsi.value() > filter.config_rsi_upper(),
+                params.consecutive_n,
+                params.p,
+            );
+            let bband_resistance = is_bband_upper_touch(&filter, current_price, params.p);
+            let ma_resistance = is_ma_resistance(&filter, current_price, params.p);
+            [rsi_overbought, bband_resistance, ma_resistance]
+                .iter()
+                .filter(|&&passed| passed)
+                .count()
+                >= 2
+        }
         CopysFilterType::RSIOversold => filter.context().is_all(
             |data| data.rsi.value() < filter.config_rsi_lower(),
             params.consecutive_n,
@@ -169,28 +196,18 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
             params.consecutive_n,
             params.p,
         ),
-        CopysFilterType::BBandLowerTouch => {
-            filter.bband_analyzer().is_below_lower_band(1, params.p)
-                || filter
-                    .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1, params.p)
-        }
-        CopysFilterType::BBandUpperTouch => {
-            filter.bband_analyzer().is_above_upper_band(1, params.p)
-        }
-        CopysFilterType::MASupport => filter.check_ma_support(),
-        CopysFilterType::MAResistance => filter.check_ma_resistance(),
+        CopysFilterType::BBandLowerTouch => is_bband_lower_touch(&filter, current_price, params.p),
+        CopysFilterType::BBandUpperTouch => is_bband_upper_touch(&filter, current_price, params.p),
+        CopysFilterType::MASupport => is_ma_support(&filter, current_price, params.p),
+        CopysFilterType::MAResistance => is_ma_resistance(&filter, current_price, params.p),
         CopysFilterType::StrongBuySignal => {
             let rsi_oversold = filter.context().is_all(
                 |data| data.rsi.value() < filter.config_rsi_lower(),
                 params.consecutive_n,
                 params.p,
             );
-            let bband_support = filter.bband_analyzer().is_below_lower_band(1, params.p)
-                || filter
-                    .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1, params.p);
-            let ma_support = filter.check_ma_support();
+            let bband_support = is_bband_lower_touch(&filter, current_price, params.p);
+            let ma_support = is_ma_support(&filter, current_price, params.p);
             rsi_oversold && bband_support && ma_support
         }
         CopysFilterType::StrongSellSignal => {
@@ -199,8 +216,8 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
                 params.consecutive_n,
                 params.p,
             );
-            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1, params.p);
-            let ma_resistance = filter.check_ma_resistance();
+            let bband_resistance = is_bband_upper_touch(&filter, current_price, params.p);
+            let ma_resistance = is_ma_resistance(&filter, current_price, params.p);
             rsi_overbought && bband_resistance && ma_resistance
         }
         CopysFilterType::WeakBuySignal => {
@@ -209,11 +226,8 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
                 params.consecutive_n,
                 params.p,
             );
-            let bband_support = filter.bband_analyzer().is_below_lower_band(1, params.p)
-                || filter
-                    .bband_analyzer()
-                    .is_break_through_lower_band_from_below(1, params.p);
-            let ma_support = filter.check_ma_support();
+            let bband_support = is_bband_lower_touch(&filter, current_price, params.p);
+            let ma_support = is_ma_support(&filter, current_price, params.p);
             let signal_count = [rsi_oversold, bband_support, ma_support]
                 .iter()
                 .filter(|&&x| x)
@@ -226,8 +240,8 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
                 params.consecutive_n,
                 params.p,
             );
-            let bband_resistance = filter.bband_analyzer().is_above_upper_band(1, params.p);
-            let ma_resistance = filter.check_ma_resistance();
+            let bband_resistance = is_bband_upper_touch(&filter, current_price, params.p);
+            let ma_resistance = is_ma_resistance(&filter, current_price, params.p);
             let signal_count = [rsi_overbought, bband_resistance, ma_resistance]
                 .iter()
                 .filter(|&&x| x)
@@ -243,8 +257,13 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
             params.p,
         ),
         CopysFilterType::BBandInside => {
-            !filter.bband_analyzer().is_above_upper_band(1, params.p)
-                && !filter.bband_analyzer().is_below_lower_band(1, params.p)
+            filter
+                .bband_analyzer()
+                .items
+                .get(params.p)
+                .is_some_and(|data| {
+                    current_price <= data.bband.upper() && current_price >= data.bband.lower()
+                })
         }
         CopysFilterType::MARegularArrangement => {
             if filter.context().items.len() <= params.p {
@@ -277,6 +296,66 @@ pub(crate) fn filter_copys<C: Candle + 'static>(
     };
 
     Ok(result)
+}
+
+fn is_bband_lower_touch<C: Candle + 'static>(
+    filter: &CopysFilter<C>,
+    current_price: f64,
+    p: usize,
+) -> bool {
+    filter
+        .bband_analyzer()
+        .items
+        .get(p)
+        .is_some_and(|data| current_price <= data.bband.lower())
+}
+
+fn is_bband_upper_touch<C: Candle + 'static>(
+    filter: &CopysFilter<C>,
+    current_price: f64,
+    p: usize,
+) -> bool {
+    filter
+        .bband_analyzer()
+        .items
+        .get(p)
+        .is_some_and(|data| current_price >= data.bband.upper())
+}
+
+fn is_ma_support<C: Candle + 'static>(
+    filter: &CopysFilter<C>,
+    current_price: f64,
+    p: usize,
+) -> bool {
+    let Some(item) = filter.context().items.get(p) else {
+        return false;
+    };
+
+    let threshold = filter.config_ma_distance_threshold();
+    (0..item.mas.len()).any(|index| {
+        let ma_value = item.mas.get_by_key_index(index).get();
+        ma_value != 0.0
+            && ((current_price - ma_value) / ma_value).abs() <= threshold
+            && current_price >= ma_value
+    })
+}
+
+fn is_ma_resistance<C: Candle + 'static>(
+    filter: &CopysFilter<C>,
+    current_price: f64,
+    p: usize,
+) -> bool {
+    let Some(item) = filter.context().items.get(p) else {
+        return false;
+    };
+
+    let threshold = filter.config_ma_distance_threshold();
+    (0..item.mas.len()).any(|index| {
+        let ma_value = item.mas.get_by_key_index(index).get();
+        ma_value != 0.0
+            && ((current_price - ma_value) / ma_value).abs() <= threshold
+            && current_price <= ma_value
+    })
 }
 
 #[cfg(test)]

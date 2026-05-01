@@ -9,16 +9,9 @@ pub(crate) fn filter_atr<C: Candle + 'static>(
     symbol: &str,
     params: &ATRParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
-    ATRFilter::matches_filter(
-        symbol,
-        candle_store,
-        params.period,
-        params.threshold,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    ATRFilter::matches_filter(symbol, candle_store, params, current_price)
 }
 
 /// ATR 필터 구조체
@@ -29,12 +22,15 @@ impl ATRFilter {
     pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        period: usize,
-        threshold: f64,
-        filter_type: ATRFilterType,
-        consecutive_n: usize,
-        p: usize,
+        params: &ATRParams,
+        _current_price: f64,
     ) -> Result<bool> {
+        let period = params.period;
+        let threshold = params.threshold;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
+
         // 파라미터 검증
         utils::validate_period(period, "ATR")?;
 
@@ -136,15 +132,14 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = ATRFilter::matches_filter(
-            "TEST",
-            &candle_store,
-            2,
-            5.0,
-            ATRFilterType::AboveThreshold,
-            1,
-            0,
-        );
+        let params = ATRParams {
+            period: 2,
+            threshold: 5.0,
+            filter_type: ATRFilterType::AboveThreshold,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = ATRFilter::matches_filter("TEST", &candle_store, &params, 0.0);
         assert!(result.is_ok());
     }
 }

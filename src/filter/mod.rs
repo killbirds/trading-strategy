@@ -2474,16 +2474,57 @@ pub use ichimoku::IchimokuValues;
 /// 기술적 지표 필터링 적용
 pub struct TechnicalFilter;
 
+/// 캔들 기반 필터 상태를 재사용하면서 현재가만 바꿔 평가하는 컨텍스트
+pub struct TechnicalFilterContext<C: Candle + 'static> {
+    candle_store: crate::candle_store::CandleStore<C>,
+}
+
+impl<C: Candle + 'static> TechnicalFilterContext<C> {
+    pub fn new(candles: &[C]) -> Self {
+        Self {
+            candle_store: utils::create_candle_store(candles),
+        }
+    }
+
+    pub fn from_candle_store(candle_store: crate::candle_store::CandleStore<C>) -> Self {
+        Self { candle_store }
+    }
+
+    pub fn matches_filter(
+        &self,
+        symbol: &str,
+        filter: &TechnicalFilterConfig,
+        current_price: f64,
+    ) -> Result<bool> {
+        TechnicalFilter::matches_filter_internal(symbol, filter, &self.candle_store, current_price)
+    }
+
+    pub fn matches_filters(
+        &self,
+        symbol: &str,
+        filters: &[TechnicalFilterConfig],
+        current_price: f64,
+    ) -> Result<bool> {
+        TechnicalFilter::matches_filters_internal(
+            symbol,
+            filters,
+            &self.candle_store,
+            current_price,
+        )
+    }
+}
+
 impl TechnicalFilter {
     /// 개별 코인에 대한 기술적 필터 적용
     pub fn matches_filter<C: Candle + 'static>(
         symbol: &str,
         filter: &TechnicalFilterConfig,
         candles: &[C],
+        current_price: f64,
     ) -> Result<bool> {
         // CandleStore를 생성하고 내부 matches_filter_internal 사용
         let candle_store = utils::create_candle_store(candles);
-        Self::matches_filter_internal(symbol, filter, &candle_store)
+        Self::matches_filter_internal(symbol, filter, &candle_store, current_price)
     }
 
     /// 개별 코인에 여러 기술적 필터 적용
@@ -2491,10 +2532,19 @@ impl TechnicalFilter {
         symbol: &str,
         filters: &[TechnicalFilterConfig],
         candles: &[C],
+        current_price: f64,
     ) -> Result<bool> {
         // CandleStore를 한 번만 생성하여 재사용
         let candle_store = utils::create_candle_store(candles);
+        Self::matches_filters_internal(symbol, filters, &candle_store, current_price)
+    }
 
+    fn matches_filters_internal<C: Candle + 'static>(
+        symbol: &str,
+        filters: &[TechnicalFilterConfig],
+        candle_store: &crate::candle_store::CandleStore<C>,
+        current_price: f64,
+    ) -> Result<bool> {
         for filter in filters {
             log::debug!(
                 "코인 {} 기술적 필터 적용 중: {:?}",
@@ -2503,7 +2553,7 @@ impl TechnicalFilter {
             );
 
             // 각 필터 적용 결과 확인 (CandleStore 재사용)
-            match Self::matches_filter_internal(symbol, filter, &candle_store) {
+            match Self::matches_filter_internal(symbol, filter, candle_store, current_price) {
                 Ok(true) => {
                     // 필터 통과, 다음 필터로 진행
                     log::debug!("코인 {} 필터 {} 통과", symbol, filter.filter_type());
@@ -2537,35 +2587,51 @@ impl TechnicalFilter {
         symbol: &str,
         filter: &TechnicalFilterConfig,
         candle_store: &crate::candle_store::CandleStore<C>,
+        current_price: f64,
     ) -> Result<bool> {
         filter.validate()?;
 
         match filter {
-            TechnicalFilterConfig::RSI(params) => rsi::filter_rsi(symbol, params, candle_store),
-            TechnicalFilterConfig::MACD(params) => macd::filter_macd(symbol, params, candle_store),
-            TechnicalFilterConfig::BollingerBand(params) => {
-                bollinger_band::filter_bollinger_band(symbol, params, candle_store)
+            TechnicalFilterConfig::RSI(params) => {
+                rsi::filter_rsi(symbol, params, candle_store, current_price)
             }
-            TechnicalFilterConfig::ADX(params) => adx::filter_adx(symbol, params, candle_store),
+            TechnicalFilterConfig::MACD(params) => {
+                macd::filter_macd(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::BollingerBand(params) => {
+                bollinger_band::filter_bollinger_band(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::ADX(params) => {
+                adx::filter_adx(symbol, params, candle_store, current_price)
+            }
             TechnicalFilterConfig::MovingAverage(params) => {
-                moving_average::filter_moving_average(symbol, params, candle_store)
+                moving_average::filter_moving_average(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::PriceReferenceGap(params) => {
-                price_reference_gap::filter_price_reference_gap(symbol, params, candle_store)
+                price_reference_gap::filter_price_reference_gap(
+                    symbol,
+                    params,
+                    candle_store,
+                    current_price,
+                )
             }
             TechnicalFilterConfig::Ichimoku(params) => {
-                ichimoku::filter_ichimoku(symbol, params, candle_store)
+                ichimoku::filter_ichimoku(symbol, params, candle_store, current_price)
             }
-            TechnicalFilterConfig::VWAP(params) => vwap::filter_vwap(symbol, params, candle_store),
+            TechnicalFilterConfig::VWAP(params) => {
+                vwap::filter_vwap(symbol, params, candle_store, current_price)
+            }
             TechnicalFilterConfig::Copys(params) => {
-                copys::filter_copys(symbol, params, candle_store)
+                copys::filter_copys(symbol, params, candle_store, current_price)
             }
-            TechnicalFilterConfig::ATR(params) => atr::filter_atr(symbol, params, candle_store),
+            TechnicalFilterConfig::ATR(params) => {
+                atr::filter_atr(symbol, params, candle_store, current_price)
+            }
             TechnicalFilterConfig::SuperTrend(params) => {
-                supertrend::filter_supertrend(symbol, params, candle_store)
+                supertrend::filter_supertrend(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::Volume(params) => {
-                volume::filter_volume(symbol, params, candle_store)
+                volume::filter_volume(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::ThreeRSI(params) => {
                 let ma_type = match params.ma_type.as_str() {
@@ -2573,19 +2639,24 @@ impl TechnicalFilter {
                     "WMA" => crate::indicator::ma::MAType::WMA,
                     _ => crate::indicator::ma::MAType::SMA,
                 };
-                three_rsi::filter_three_rsi(symbol, params, candle_store, ma_type)
+                three_rsi::filter_three_rsi(symbol, params, candle_store, current_price, ma_type)
             }
             TechnicalFilterConfig::CandlePattern(params) => {
-                candle_pattern::filter_candle_pattern(symbol, params, candle_store)
+                candle_pattern::filter_candle_pattern(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::SupportResistance(params) => {
-                support_resistance::filter_support_resistance(symbol, params, candle_store)
+                support_resistance::filter_support_resistance(
+                    symbol,
+                    params,
+                    candle_store,
+                    current_price,
+                )
             }
             TechnicalFilterConfig::Momentum(params) => {
-                momentum::filter_momentum(symbol, params, candle_store)
+                momentum::filter_momentum(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::Slope(params) => {
-                slope::filter_slope(symbol, params, candle_store)
+                slope::filter_slope(symbol, params, candle_store, current_price)
             }
         }
     }
@@ -3518,9 +3589,34 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
             p: 0,
         });
 
-        let result = TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles).unwrap();
+        let result =
+            TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles, 130.0).unwrap();
 
         assert!(result);
+    }
+
+    #[test]
+    fn test_technical_filter_context_reuses_candle_state_with_external_current_price() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 100.0, 101.0, 99.0),
+            test_candle(3, 100.0, 101.0, 99.0),
+            test_candle(4, 100.0, 101.0, 99.0),
+        ];
+        let filter = TechnicalFilterConfig::PriceReferenceGap(PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: crate::indicator::ma::MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapAboveReferenceThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        });
+        let context = TechnicalFilterContext::new(&candles);
+
+        assert!(!context.matches_filter("TEST/USDT", &filter, 100.0).unwrap());
+        assert!(context.matches_filter("TEST/USDT", &filter, 130.0).unwrap());
     }
 
     #[test]
@@ -3542,7 +3638,7 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
             p: 0,
         });
 
-        let result = TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles).unwrap();
+        let result = TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles, 70.0).unwrap();
 
         assert!(result);
     }
@@ -3579,9 +3675,11 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
             });
 
         let above_result =
-            TechnicalFilter::matches_filter("TEST/USDT", &above_or_equal_filter, &candles).unwrap();
+            TechnicalFilter::matches_filter("TEST/USDT", &above_or_equal_filter, &candles, 100.0)
+                .unwrap();
         let below_result =
-            TechnicalFilter::matches_filter("TEST/USDT", &below_or_equal_filter, &candles).unwrap();
+            TechnicalFilter::matches_filter("TEST/USDT", &below_or_equal_filter, &candles, 100.0)
+                .unwrap();
 
         assert!(above_result);
         assert!(below_result);
@@ -3634,7 +3732,8 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
             }),
         ];
 
-        let result = TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles).unwrap();
+        let result =
+            TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles, 101.0).unwrap();
 
         assert!(result);
     }
@@ -3687,7 +3786,8 @@ reference_source = { type = "HIGHEST_HIGH", lookback_period = 20, include_curren
             }),
         ];
 
-        let result = TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles).unwrap();
+        let result =
+            TechnicalFilter::matches_filters("TEST/USDT", &filters, &candles, 103.0).unwrap();
 
         assert!(!result);
     }

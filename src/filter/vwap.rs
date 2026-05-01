@@ -1,5 +1,6 @@
 use super::Result;
 use super::{VWAPFilterType, VWAPParams, utils};
+use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::vwap_analyzer::VWAPAnalyzer;
 use crate::candle_store::CandleStore;
 use crate::indicator::vwap::VWAPParams as IndicatorVWAPParams;
@@ -10,6 +11,7 @@ pub(crate) fn filter_vwap<C: Candle + 'static>(
     coin: &str,
     params: &VWAPParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "VWAP 필터 적용 - 기간: {}, 타입: {:?}, 연속성: {}, 임계값: {:.2}%",
@@ -39,66 +41,168 @@ pub(crate) fn filter_vwap<C: Candle + 'static>(
     log::debug!("코인 {coin} VWAP 분석기 생성 완료");
 
     let result = match params.filter_type {
-        VWAPFilterType::PriceAboveVWAP => {
-            analyzer.is_price_above_vwap(&vwap_params, params.consecutive_n, params.p)
-        }
-        VWAPFilterType::PriceBelowVWAP => {
-            analyzer.is_price_below_vwap(&vwap_params, params.consecutive_n, params.p)
-        }
-        VWAPFilterType::PriceNearVWAP => analyzer.is_price_near_vwap(
+        VWAPFilterType::PriceAboveVWAP => analyzer.is_all(
+            |data| data.vwaps.get(&vwap_params).is_price_above(current_price),
             params.consecutive_n,
+            params.p,
+        ),
+        VWAPFilterType::PriceBelowVWAP => analyzer.is_all(
+            |data| data.vwaps.get(&vwap_params).is_price_below(current_price),
+            params.consecutive_n,
+            params.p,
+        ),
+        VWAPFilterType::PriceNearVWAP => analyzer.is_all(
+            |data| {
+                data.vwaps
+                    .get(&vwap_params)
+                    .price_to_vwap_percent(current_price)
+                    .abs()
+                    < params.threshold
+            },
+            params.consecutive_n,
+            params.p,
+        ),
+        VWAPFilterType::VWAPBreakoutUp => analyzer.is_break_through_by_satisfying(
+            |data| data.vwaps.get(&vwap_params).is_price_above(current_price),
+            params.consecutive_n,
+            1,
+            params.p,
+        ),
+        VWAPFilterType::VWAPBreakdown => analyzer.is_break_through_by_satisfying(
+            |data| data.vwaps.get(&vwap_params).is_price_below(current_price),
+            params.consecutive_n,
+            1,
+            params.p,
+        ),
+        VWAPFilterType::VWAPRebound => is_vwap_rebound_with_current_price(
+            &analyzer,
             &vwap_params,
+            current_price,
             params.threshold,
             params.p,
         ),
-        VWAPFilterType::VWAPBreakoutUp => {
-            analyzer.is_vwap_breakout_up_signal(params.consecutive_n, 1, &vwap_params, params.p)
-        }
-        VWAPFilterType::VWAPBreakdown => {
-            analyzer.is_vwap_breakdown_signal(params.consecutive_n, 1, &vwap_params, params.p)
-        }
-        VWAPFilterType::VWAPRebound => analyzer.is_vwap_rebound_signal(
-            params.consecutive_n,
-            1,
+        VWAPFilterType::DivergingFromVWAP => is_vwap_distance_diverging(
+            &analyzer,
             &vwap_params,
-            params.threshold,
-            params.p,
-        ),
-        VWAPFilterType::DivergingFromVWAP => analyzer.is_diverging_from_vwap_signal(
-            params.consecutive_n,
-            1,
-            &vwap_params,
+            current_price,
             params.consecutive_n,
             params.p,
         ),
-        VWAPFilterType::ConvergingToVWAP => analyzer.is_converging_to_vwap_signal(
-            params.consecutive_n,
-            1,
+        VWAPFilterType::ConvergingToVWAP => is_vwap_distance_converging(
+            &analyzer,
             &vwap_params,
+            current_price,
             params.consecutive_n,
             params.p,
         ),
-        VWAPFilterType::StrongUptrend => {
-            analyzer.is_price_above_vwap(&vwap_params, params.consecutive_n, params.p)
-        }
-        VWAPFilterType::StrongDowntrend => {
-            analyzer.is_price_below_vwap(&vwap_params, params.consecutive_n, params.p)
-        }
-        VWAPFilterType::TrendStrengthening => analyzer.is_diverging_from_vwap_signal(
-            params.consecutive_n,
-            1,
-            &vwap_params,
+        VWAPFilterType::StrongUptrend => analyzer.is_all(
+            |data| data.vwaps.get(&vwap_params).is_price_above(current_price),
             params.consecutive_n,
             params.p,
         ),
-        VWAPFilterType::TrendWeakening => analyzer.is_converging_to_vwap_signal(
+        VWAPFilterType::StrongDowntrend => analyzer.is_all(
+            |data| data.vwaps.get(&vwap_params).is_price_below(current_price),
             params.consecutive_n,
-            1,
+            params.p,
+        ),
+        VWAPFilterType::TrendStrengthening => is_vwap_distance_diverging(
+            &analyzer,
             &vwap_params,
+            current_price,
+            params.consecutive_n,
+            params.p,
+        ),
+        VWAPFilterType::TrendWeakening => is_vwap_distance_converging(
+            &analyzer,
+            &vwap_params,
+            current_price,
             params.consecutive_n,
             params.p,
         ),
     };
 
     Ok(result)
+}
+
+fn vwap_percent<C: Candle>(
+    analyzer: &VWAPAnalyzer<C>,
+    params: &IndicatorVWAPParams,
+    current_price: f64,
+    index: usize,
+) -> Option<f64> {
+    analyzer
+        .items
+        .get(index)
+        .map(|data| data.vwaps.get(params).price_to_vwap_percent(current_price))
+}
+
+fn is_vwap_rebound_with_current_price<C: Candle>(
+    analyzer: &VWAPAnalyzer<C>,
+    params: &IndicatorVWAPParams,
+    current_price: f64,
+    threshold: f64,
+    p: usize,
+) -> bool {
+    let Some(current_percent) = vwap_percent(analyzer, params, current_price, p) else {
+        return false;
+    };
+    let Some(previous_percent) = vwap_percent(analyzer, params, current_price, p + 1) else {
+        return false;
+    };
+    let Some(more_previous_percent) = vwap_percent(analyzer, params, current_price, p + 2) else {
+        return false;
+    };
+
+    let up_rebound = current_percent > previous_percent
+        && previous_percent.abs() < threshold
+        && more_previous_percent < previous_percent;
+    let down_rebound = current_percent < previous_percent
+        && previous_percent.abs() < threshold
+        && more_previous_percent > previous_percent;
+
+    up_rebound || down_rebound
+}
+
+fn is_vwap_distance_diverging<C: Candle>(
+    analyzer: &VWAPAnalyzer<C>,
+    params: &IndicatorVWAPParams,
+    current_price: f64,
+    n: usize,
+    p: usize,
+) -> bool {
+    if n < 2 || analyzer.items.len() < p + n + 1 {
+        return false;
+    }
+
+    (0..n - 1).all(|i| {
+        let current = vwap_percent(analyzer, params, current_price, p + i)
+            .map(f64::abs)
+            .unwrap_or_default();
+        let next = vwap_percent(analyzer, params, current_price, p + i + 1)
+            .map(f64::abs)
+            .unwrap_or_default();
+        current > next
+    })
+}
+
+fn is_vwap_distance_converging<C: Candle>(
+    analyzer: &VWAPAnalyzer<C>,
+    params: &IndicatorVWAPParams,
+    current_price: f64,
+    n: usize,
+    p: usize,
+) -> bool {
+    if n < 2 || analyzer.items.len() < p + n + 1 {
+        return false;
+    }
+
+    (0..n - 1).all(|i| {
+        let current = vwap_percent(analyzer, params, current_price, p + i)
+            .map(f64::abs)
+            .unwrap_or_default();
+        let next = vwap_percent(analyzer, params, current_price, p + i + 1)
+            .map(f64::abs)
+            .unwrap_or_default();
+        current < next
+    })
 }

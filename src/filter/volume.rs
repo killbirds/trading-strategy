@@ -10,8 +10,9 @@ pub(crate) fn filter_volume<C: Candle + 'static>(
     symbol: &str,
     params: &VolumeParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
-    VolumeFilter::matches_filter(symbol, candle_store, params)
+    VolumeFilter::matches_filter(symbol, candle_store, params, current_price)
 }
 
 /// Volume 필터 구조체
@@ -23,6 +24,7 @@ impl VolumeFilter {
         _symbol: &str,
         candle_store: &CandleStore<C>,
         params: &VolumeParams,
+        current_price: f64,
     ) -> Result<bool> {
         let period = params.period;
         let threshold = params.threshold;
@@ -54,17 +56,41 @@ impl VolumeFilter {
             VolumeFilterType::VolumeSignificantlyAbove => {
                 analyzer.is_volume_significantly_above(consecutive_n, threshold, p)
             }
-            VolumeFilterType::BullishWithIncreasedVolume => {
-                analyzer.is_bullish_with_increased_volume(consecutive_n, period, p)
-            }
-            VolumeFilterType::BearishWithIncreasedVolume => {
-                analyzer.is_bearish_with_increased_volume(consecutive_n, period, p)
-            }
-            VolumeFilterType::IncreasingVolumeInUptrend => {
-                analyzer.is_increasing_volume_in_uptrend(period, consecutive_n)
-            }
+            VolumeFilterType::BullishWithIncreasedVolume => is_directional_volume_above_average(
+                &analyzer,
+                period,
+                consecutive_n,
+                p,
+                current_price,
+                Direction::Bullish,
+            ),
+            VolumeFilterType::BearishWithIncreasedVolume => is_directional_volume_above_average(
+                &analyzer,
+                period,
+                consecutive_n,
+                p,
+                current_price,
+                Direction::Bearish,
+            ),
+            VolumeFilterType::IncreasingVolumeInUptrend => is_volume_trending_with_price_direction(
+                &analyzer,
+                period,
+                consecutive_n,
+                p,
+                current_price,
+                Direction::Bullish,
+                VolumeTrend::Increasing,
+            ),
             VolumeFilterType::DecreasingVolumeInDowntrend => {
-                analyzer.is_decreasing_volume_in_downtrend(period, consecutive_n)
+                is_volume_trending_with_price_direction(
+                    &analyzer,
+                    period,
+                    consecutive_n,
+                    p,
+                    current_price,
+                    Direction::Bearish,
+                    VolumeTrend::Decreasing,
+                )
             }
             VolumeFilterType::VolumeSharpDecline => analyzer.is_volume_decline(period, threshold),
             VolumeFilterType::VolumeStable => {
@@ -82,8 +108,7 @@ impl VolumeFilter {
                 if analyzer.items.len() <= p {
                     false
                 } else {
-                    let is_bullish = analyzer.items[p].candle.close_price()
-                        > analyzer.items[p].candle.open_price();
+                    let is_bullish = current_price > analyzer.items[p].candle.open_price();
                     let is_decreased = analyzer.is_volume_below_average(consecutive_n, p);
                     is_bullish && is_decreased
                 }
@@ -92,8 +117,7 @@ impl VolumeFilter {
                 if analyzer.items.len() <= p {
                     false
                 } else {
-                    let is_bearish = analyzer.items[p].candle.close_price()
-                        < analyzer.items[p].candle.open_price();
+                    let is_bearish = current_price < analyzer.items[p].candle.open_price();
                     let is_decreased = analyzer.is_volume_below_average(consecutive_n, p);
                     is_bearish && is_decreased
                 }
@@ -178,6 +202,102 @@ impl VolumeFilter {
     }
 }
 
+#[derive(Clone, Copy)]
+enum Direction {
+    Bullish,
+    Bearish,
+}
+
+#[derive(Clone, Copy)]
+enum VolumeTrend {
+    Increasing,
+    Decreasing,
+}
+
+fn is_directional_volume_above_average<C: Candle + 'static>(
+    analyzer: &VolumeAnalyzer<C>,
+    period: usize,
+    consecutive_n: usize,
+    p: usize,
+    current_price: f64,
+    direction: Direction,
+) -> bool {
+    if analyzer.items.len() < p + consecutive_n {
+        return false;
+    }
+
+    (0..consecutive_n).all(|i| {
+        analyzer.items.get(p + i).is_some_and(|item| {
+            let price_matches = if i == 0 {
+                price_matches_direction(current_price, item.candle.open_price(), direction)
+            } else {
+                price_matches_direction(
+                    item.candle.close_price(),
+                    item.candle.open_price(),
+                    direction,
+                )
+            };
+
+            price_matches && item.is_current_volume_above_average(period)
+        })
+    })
+}
+
+fn is_volume_trending_with_price_direction<C: Candle + 'static>(
+    analyzer: &VolumeAnalyzer<C>,
+    period: usize,
+    consecutive_n: usize,
+    p: usize,
+    current_price: f64,
+    direction: Direction,
+    volume_trend: VolumeTrend,
+) -> bool {
+    if analyzer.items.len() < p + consecutive_n || consecutive_n < 2 {
+        return false;
+    }
+
+    let prices_match = (0..consecutive_n).all(|i| {
+        analyzer.items.get(p + i).is_some_and(|item| {
+            if i == 0 {
+                price_matches_direction(current_price, item.candle.open_price(), direction)
+            } else {
+                price_matches_direction(
+                    item.candle.close_price(),
+                    item.candle.open_price(),
+                    direction,
+                )
+            }
+        })
+    });
+
+    if !prices_match {
+        return false;
+    }
+
+    (0..consecutive_n - 1).all(|i| {
+        let Some(current) = analyzer.items.get(p + i) else {
+            return false;
+        };
+        let Some(next) = analyzer.items.get(p + i + 1) else {
+            return false;
+        };
+
+        let current_ratio = current.get_volume_ratio(period);
+        let next_ratio = next.get_volume_ratio(period);
+        match volume_trend {
+            VolumeTrend::Increasing => current_ratio > next_ratio,
+            VolumeTrend::Decreasing => current_ratio < next_ratio,
+        }
+    })
+}
+
+fn price_matches_direction(price: f64, open_price: f64, direction: Direction) -> bool {
+    match direction {
+        Direction::Bullish => price > open_price,
+        Direction::Bearish => price < open_price,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,7 +358,50 @@ mod tests {
             p: 0,
             stable_min_threshold: 0.1,
         };
-        let result = VolumeFilter::matches_filter("TEST", &candle_store, &params);
+        let result = VolumeFilter::matches_filter("TEST", &candle_store, &params, 0.0);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_volume_bullish_with_increased_volume_uses_external_current_price() {
+        let candles = vec![
+            TestCandle {
+                timestamp: 1,
+                open: 100.0,
+                high: 101.0,
+                low: 99.0,
+                close: 100.0,
+                volume: 100.0,
+            },
+            TestCandle {
+                timestamp: 2,
+                open: 100.0,
+                high: 101.0,
+                low: 99.0,
+                close: 100.0,
+                volume: 100.0,
+            },
+            TestCandle {
+                timestamp: 3,
+                open: 100.0,
+                high: 101.0,
+                low: 89.0,
+                close: 90.0,
+                volume: 1_000.0,
+            },
+        ];
+
+        let candle_store = utils::create_candle_store(&candles);
+        let params = VolumeParams {
+            period: 2,
+            threshold: 1.5,
+            filter_type: VolumeFilterType::BullishWithIncreasedVolume,
+            consecutive_n: 1,
+            p: 0,
+            stable_min_threshold: 0.1,
+        };
+
+        assert!(VolumeFilter::matches_filter("TEST", &candle_store, &params, 120.0).unwrap());
+        assert!(!VolumeFilter::matches_filter("TEST", &candle_store, &params, 90.0).unwrap());
     }
 }

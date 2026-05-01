@@ -12,6 +12,7 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
     symbol: &str,
     params: &PriceReferenceGapParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     let required_length = required_candle_count(params);
     if !utils::check_sufficient_candles(candle_store.len(), required_length, symbol) {
@@ -22,7 +23,7 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
 
     let result = match &params.reference_source {
         PriceReferenceSource::MovingAverage { ma_type, period } => {
-            matches_reference_gap(&ascending_items, params, |window| {
+            matches_reference_gap(&ascending_items, params, current_price, |window| {
                 let mut builder = MABuilderFactory::build::<C>(ma_type, *period);
                 let mut value = 0.0;
 
@@ -35,7 +36,7 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
         }
         PriceReferenceSource::VWAP { period } => {
             let mut builder = VWAPBuilder::<C>::new(IndicatorVWAPParams { period: *period });
-            matches_reference_gap(&ascending_items, params, |window| {
+            matches_reference_gap(&ascending_items, params, current_price, |window| {
                 Some(builder.build(window).value)
             })
         }
@@ -44,7 +45,7 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
             include_current_candle,
         } => {
             let mut builder = MAXBuilder::<C>::new(*lookback_period);
-            matches_reference_gap(&ascending_items, params, |window| {
+            matches_reference_gap(&ascending_items, params, current_price, |window| {
                 high_low_reference_window(window, *include_current_candle)
                     .map(|reference_window| builder.build(reference_window).max)
             })
@@ -54,7 +55,7 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
             include_current_candle,
         } => {
             let mut builder = MINBuilder::<C>::new(*lookback_period);
-            matches_reference_gap(&ascending_items, params, |window| {
+            matches_reference_gap(&ascending_items, params, current_price, |window| {
                 high_low_reference_window(window, *include_current_candle)
                     .map(|reference_window| builder.build(reference_window).min)
             })
@@ -84,6 +85,7 @@ fn required_candle_count(params: &PriceReferenceGapParams) -> usize {
 fn matches_reference_gap<C: Candle>(
     ascending_items: &[C],
     params: &PriceReferenceGapParams,
+    current_price: f64,
     mut reference_value: impl FnMut(&[C]) -> Option<f64>,
 ) -> bool {
     for offset in params.p..params.p + params.consecutive_n {
@@ -96,11 +98,6 @@ fn matches_reference_gap<C: Candle>(
         }
 
         let window = &ascending_items[..window_end];
-        let Some(current_candle) = window.last() else {
-            return false;
-        };
-
-        let current_price = current_candle.close_price();
         let Some(reference_price) = reference_value(window) else {
             return false;
         };
@@ -180,8 +177,22 @@ mod tests {
     }
 
     fn run_filter(params: PriceReferenceGapParams, candles: &[TestCandle]) -> bool {
+        let current_price = candles
+            .len()
+            .checked_sub(params.p + 1)
+            .and_then(|index| candles.get(index))
+            .map(|candle| candle.close)
+            .unwrap_or_default();
+        run_filter_with_current_price(params, candles, current_price)
+    }
+
+    fn run_filter_with_current_price(
+        params: PriceReferenceGapParams,
+        candles: &[TestCandle],
+        current_price: f64,
+    ) -> bool {
         let candle_store = utils::create_candle_store(candles);
-        filter_price_reference_gap("TEST/USDT", &params, &candle_store).unwrap()
+        filter_price_reference_gap("TEST/USDT", &params, &candle_store, current_price).unwrap()
     }
 
     #[test]
@@ -204,6 +215,28 @@ mod tests {
         };
 
         assert!(run_filter(params, &candles));
+    }
+
+    #[test]
+    fn test_filter_price_reference_gap_uses_external_current_price() {
+        let candles = build_candles(&[
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+            (100.0, 101.0, 99.0),
+        ]);
+        let params = PriceReferenceGapParams {
+            reference_source: PriceReferenceSource::MovingAverage {
+                ma_type: MAType::SMA,
+                period: 3,
+            },
+            filter_type: PriceReferenceGapFilterType::GapAboveReferenceThreshold,
+            gap_threshold: 0.10,
+            consecutive_n: 1,
+            p: 0,
+        };
+
+        assert!(run_filter_with_current_price(params, &candles, 130.0));
     }
 
     #[test]

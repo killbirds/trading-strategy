@@ -98,6 +98,8 @@ PriceReferenceGap 최소 필요 캔들 수:
 - `HIGHEST_HIGH`, `LOWEST_LOW` + `include_current_candle = true`: `lookback_period + p + consecutive_n - 1`
 - `HIGHEST_HIGH`, `LOWEST_LOW` + `include_current_candle = false`: `lookback_period + 1 + p + consecutive_n - 1`
 
+실시간 가격 비교가 필요한 필터는 캔들 저장소의 최신 `close` 를 현재가로 사용하지 않습니다. 필터 평가 시 외부에서 전달한 `current_price` 로 가격 조건을 판단하고, `p` 는 캔들/지표 기준값을 선택하는 오프셋으로만 사용합니다.
+
 ---
 
 ## 3. 필터별 레퍼런스
@@ -253,13 +255,16 @@ GapBelowReferenceUpperThreshold, GapAboveReferenceLowerThreshold
 - `GapBelowReferenceThreshold` 는 `gap_ratio <= -threshold` 입니다.
 - `GapBelowReferenceUpperThreshold` 는 `gap_ratio <= threshold` 입니다.
 - `GapAboveReferenceLowerThreshold` 는 `gap_ratio >= -threshold` 입니다.
-- `p` 는 reference window 만이 아니라 **평가 캔들 자체도 과거로 이동**시킵니다.
+- `current_price` 는 필터 평가자가 외부에서 전달하는 실시간 가격입니다. 캔들 저장소의 최신 `close` 값을 현재가로 대체해서 쓰지 않습니다.
+- `p` 는 reference window 와 지표/캔들 기준값 선택에만 영향을 줍니다. `p` 값이 바뀌어도 가격 비교에 쓰는 `current_price` 자체는 이동하지 않습니다.
 
 `gap_ratio` 계산식:
 
 ```text
 gap_ratio = (current_price - reference_price) / reference_price
 ```
+
+여기서 `reference_price` 는 `p` 와 `reference_source` 로 선택한 캔들/지표 기준값이고, `current_price` 는 호출자가 매 평가마다 전달하는 외부 현재가입니다.
 
 `filter_type` 판단식:
 
@@ -470,7 +475,9 @@ MomentumCrossover, MomentumSupportTest, MomentumResistanceTest
 2. sample 문서(`ta_filter_sample/`)는 `filter_type` 에 숫자를 쓰는 경우가 많지만, 이 문서는 enum 문자열 기준으로 설명합니다.
 3. `PriceReferenceGap` 은 절대 괴리와 방향성 괴리가 섞여 있으므로 이름을 정확히 구분해서 써야 합니다.
 4. `MovingAverage`, `CopyS`, `ThreeRSI`, `CandlePattern`, `Momentum`, `VWAP` 은 일부 enum 이름이 내부적으로 같은 체크를 공유합니다.
-5. 새 필터 타입이 추가되면 **반드시 `src/filter/mod.rs` 와 실제 `src/filter/*.rs` 구현을 함께 기준으로 문서를 갱신**해야 합니다.
+5. `TechnicalFilter::matches_filter`, `TechnicalFilter::matches_filters`, 각 필터의 내부 `matches_filter` 는 외부 `current_price` 를 마지막 인자로 받습니다. `filter_*` 래퍼는 모듈별 추가 인자 때문에 순서가 다를 수 있지만, `matches_filter` 계열 API 에서는 마지막 인자 규칙을 유지합니다.
+6. 같은 캔들 상태를 반복 평가할 때는 `TechnicalFilterContext` 로 `CandleStore` 기반 상태를 유지하고, 매 tick 마다 바뀌는 `current_price` 만 전달해서 재평가할 수 있습니다.
+7. 새 필터 타입이 추가되면 **반드시 `src/filter/mod.rs` 와 실제 `src/filter/*.rs` 구현을 함께 기준으로 문서를 갱신**해야 합니다.
 
 ---
 

@@ -1,5 +1,6 @@
 use super::Result;
 use super::{SuperTrendFilterType, SuperTrendParams, utils};
+use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::supertrend_analyzer::SuperTrendAnalyzer;
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;
@@ -9,16 +10,9 @@ pub(crate) fn filter_supertrend<C: Candle + 'static>(
     symbol: &str,
     params: &SuperTrendParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
-    SuperTrendFilter::matches_filter(
-        symbol,
-        candle_store,
-        params.period,
-        params.multiplier,
-        params.filter_type,
-        params.consecutive_n,
-        params.p,
-    )
+    SuperTrendFilter::matches_filter(symbol, candle_store, params, current_price)
 }
 
 /// SuperTrend 필터 구조체
@@ -29,12 +23,15 @@ impl SuperTrendFilter {
     pub(crate) fn matches_filter<C: Candle + 'static>(
         _symbol: &str,
         candle_store: &CandleStore<C>,
-        period: usize,
-        multiplier: f64,
-        filter_type: SuperTrendFilterType,
-        consecutive_n: usize,
-        p: usize,
+        params: &SuperTrendParams,
+        current_price: f64,
     ) -> Result<bool> {
+        let period = params.period;
+        let multiplier = params.multiplier;
+        let filter_type = params.filter_type;
+        let consecutive_n = params.consecutive_n;
+        let p = params.p;
+
         // 파라미터 검증
         utils::validate_period(period, "SuperTrend")?;
 
@@ -52,16 +49,28 @@ impl SuperTrendFilter {
             SuperTrendFilterType::AllDowntrend => {
                 analyzer.is_all_downtrend_signal(consecutive_n, 1, p)
             }
-            SuperTrendFilterType::PriceAboveSupertrend => {
-                analyzer.is_price_above_supertrend_continuous(consecutive_n, period, multiplier, p)
-            }
-            SuperTrendFilterType::PriceBelowSupertrend => {
-                analyzer.is_price_below_supertrend_continuous(consecutive_n, period, multiplier, p)
-            }
-            SuperTrendFilterType::PriceCrossingAbove => analyzer
-                .is_price_crossing_above_supertrend_signal(consecutive_n, 1, period, multiplier, p),
-            SuperTrendFilterType::PriceCrossingBelow => analyzer
-                .is_price_crossing_below_supertrend_signal(consecutive_n, 1, period, multiplier, p),
+            SuperTrendFilterType::PriceAboveSupertrend => analyzer.is_all(
+                |data| current_price > data.get_supertrend(&period, &multiplier).value,
+                consecutive_n,
+                p,
+            ),
+            SuperTrendFilterType::PriceBelowSupertrend => analyzer.is_all(
+                |data| current_price < data.get_supertrend(&period, &multiplier).value,
+                consecutive_n,
+                p,
+            ),
+            SuperTrendFilterType::PriceCrossingAbove => analyzer.is_break_through_by_satisfying(
+                |data| current_price > data.get_supertrend(&period, &multiplier).value,
+                consecutive_n,
+                1,
+                p,
+            ),
+            SuperTrendFilterType::PriceCrossingBelow => analyzer.is_break_through_by_satisfying(
+                |data| current_price < data.get_supertrend(&period, &multiplier).value,
+                consecutive_n,
+                1,
+                p,
+            ),
             SuperTrendFilterType::TrendChanged => analyzer.is_trend_changed_signal(
                 consecutive_n,
                 1,
@@ -134,15 +143,14 @@ mod tests {
         ];
 
         let candle_store = utils::create_candle_store(&candles);
-        let result = SuperTrendFilter::matches_filter(
-            "TEST",
-            &candle_store,
-            2,
-            2.0,
-            SuperTrendFilterType::AllUptrend,
-            1,
-            0,
-        );
+        let params = SuperTrendParams {
+            period: 2,
+            multiplier: 2.0,
+            filter_type: SuperTrendFilterType::AllUptrend,
+            consecutive_n: 1,
+            p: 0,
+        };
+        let result = SuperTrendFilter::matches_filter("TEST", &candle_store, &params, 0.0);
         assert!(result.is_ok());
     }
 }

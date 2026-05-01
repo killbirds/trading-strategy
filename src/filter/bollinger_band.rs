@@ -10,6 +10,7 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
     coin: &str,
     params: &BollingerBandParams,
     candle_store: &CandleStore<C>,
+    current_price: f64,
 ) -> Result<bool> {
     log::debug!(
         "볼린저 밴드 필터 적용 - 기간: {}, 편차 배수: {}, 타입: {:?}, 연속성: {}",
@@ -36,39 +37,68 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
     log::debug!("코인 {coin} 볼린저 밴드 - 상단: {upper:.2}, 중간: {middle:.2}, 하단: {lower:.2}");
 
     let result = match params.filter_type {
-        BollingerBandFilterType::AboveUpperBand => {
-            analyzer.is_above_upper_band(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::BelowLowerBand => {
-            analyzer.is_below_lower_band(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::InsideBand => {
-            !analyzer.is_above_upper_band(params.consecutive_n, params.p)
-                && !analyzer.is_below_lower_band(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::OutsideBand => {
-            analyzer.is_above_upper_band(params.consecutive_n, params.p)
-                || analyzer.is_below_lower_band(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::AboveMiddleBand => {
-            analyzer.is_above_middle_band(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::BelowMiddleBand => {
-            analyzer.is_below_middle_band(params.consecutive_n, params.p)
-        }
+        BollingerBandFilterType::AboveUpperBand => analyzer.is_all(
+            |data| current_price > data.bband.upper(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::BelowLowerBand => analyzer.is_all(
+            |data| current_price < data.bband.lower(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::InsideBand => analyzer.is_all(
+            |data| current_price <= data.bband.upper() && current_price >= data.bband.lower(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::OutsideBand => analyzer.is_all(
+            |data| current_price > data.bband.upper() || current_price < data.bband.lower(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::AboveMiddleBand => analyzer.is_all(
+            |data| current_price > data.bband.middle(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::BelowMiddleBand => analyzer.is_all(
+            |data| current_price < data.bband.middle(),
+            params.consecutive_n,
+            params.p,
+        ),
         BollingerBandFilterType::BandWidthSufficient => analyzer.is_band_width_sufficient(params.p),
-        BollingerBandFilterType::BreakThroughLowerBand => {
-            analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p)
-        }
+        BollingerBandFilterType::BreakThroughLowerBand => analyzer.is_all(
+            |data| current_price > data.bband.lower(),
+            params.consecutive_n,
+            params.p,
+        ),
         BollingerBandFilterType::SqueezeBreakout => {
-            analyzer.is_squeeze_breakout_with_close_above_upper(params.squeeze_breakout_period)
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                current_price > analyzer.items[params.p].bband.upper()
+                    && is_band_width_narrowing_from_index(
+                        &analyzer,
+                        params.p + 1,
+                        params.squeeze_breakout_period,
+                    )
+            }
         }
-        BollingerBandFilterType::EnhancedSqueezeBreakout => analyzer
-            .is_enhanced_squeeze_breakout_with_close_above_upper(
-                params.enhanced_narrowing_period,
-                params.enhanced_squeeze_period,
-                params.squeeze_threshold,
-            ),
+        BollingerBandFilterType::EnhancedSqueezeBreakout => {
+            if analyzer.items.len() <= params.p {
+                false
+            } else {
+                current_price > analyzer.items[params.p].bband.upper()
+                    && is_narrowing_then_squeeze_pattern_from_index(
+                        &analyzer,
+                        params.p + 1,
+                        params.enhanced_narrowing_period,
+                        params.enhanced_squeeze_period,
+                        params.squeeze_threshold,
+                    )
+            }
+        }
         BollingerBandFilterType::SqueezeState => {
             analyzer.is_band_width_squeeze(params.consecutive_n, params.squeeze_threshold, params.p)
         }
@@ -78,12 +108,16 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
         BollingerBandFilterType::SqueezeExpansionStart => {
             analyzer.is_squeeze_expansion_start(params.squeeze_threshold)
         }
-        BollingerBandFilterType::BreakThroughUpperBand => {
-            analyzer.is_break_through_upper_band_from_below(params.consecutive_n, params.p)
-        }
-        BollingerBandFilterType::BreakThroughLowerBandFromBelow => {
-            analyzer.is_break_through_lower_band_from_below(params.consecutive_n, params.p)
-        }
+        BollingerBandFilterType::BreakThroughUpperBand => analyzer.is_all(
+            |data| current_price > data.bband.upper(),
+            params.consecutive_n,
+            params.p,
+        ),
+        BollingerBandFilterType::BreakThroughLowerBandFromBelow => analyzer.is_all(
+            |data| current_price > data.bband.lower(),
+            params.consecutive_n,
+            params.p,
+        ),
         BollingerBandFilterType::BandWidthExpanding => {
             !analyzer.is_band_width_narrowing(params.consecutive_n)
         }
@@ -115,7 +149,7 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
                 let previous = &analyzer.items[params.p + 1];
                 previous.candle.close_price()
                     >= previous.bband.upper() * params.upper_touch_threshold
-                    && current.candle.close_price() < current.bband.upper()
+                    && current_price < current.bband.upper()
             }
         }
         BollingerBandFilterType::LowerBandTouch => {
@@ -126,7 +160,7 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
                 let previous = &analyzer.items[params.p + 1];
                 previous.candle.close_price()
                     <= previous.bband.lower() * params.lower_touch_threshold
-                    && current.candle.close_price() > current.bband.lower()
+                    && current_price > current.bband.lower()
             }
         }
         BollingerBandFilterType::BandWidthThresholdBreakthrough => analyzer
@@ -144,8 +178,7 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
                 let previous = &analyzer.items[params.p + 1];
                 let prev_middle_dist =
                     (previous.candle.close_price() - previous.bband.middle()).abs();
-                let current_upper_dist =
-                    (current.candle.close_price() - current.bband.upper()).abs();
+                let current_upper_dist = (current_price - current.bband.upper()).abs();
                 let band_width = previous.bband.upper() - previous.bband.lower();
                 let threshold = params.large_threshold;
                 prev_middle_dist < band_width * threshold
@@ -160,8 +193,7 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
                 let previous = &analyzer.items[params.p + 1];
                 let prev_middle_dist =
                     (previous.candle.close_price() - previous.bband.middle()).abs();
-                let current_lower_dist =
-                    (current.candle.close_price() - current.bband.lower()).abs();
+                let current_lower_dist = (current_price - current.bband.lower()).abs();
                 let band_width = previous.bband.upper() - previous.bband.lower();
                 let threshold = params.large_threshold;
                 prev_middle_dist < band_width * threshold
@@ -196,20 +228,18 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
         }
         BollingerBandFilterType::PriceMovingToUpperWithinBand => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let middle = data.bband.middle();
                 let upper = data.bband.upper();
-                price > middle && price < upper
+                current_price > middle && current_price < upper
             },
             params.consecutive_n,
             params.p,
         ),
         BollingerBandFilterType::PriceMovingToLowerWithinBand => analyzer.is_all(
             |data| {
-                let price = data.candle.close_price();
                 let middle = data.bband.middle();
                 let lower = data.bband.lower();
-                price < middle && price > lower
+                current_price < middle && current_price > lower
             },
             params.consecutive_n,
             params.p,
@@ -220,11 +250,10 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
             } else {
                 let current_width =
                     analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
-                let avg_price = analyzer.items[params.p].candle.close_price();
-                if avg_price == 0.0 {
+                if current_price == 0.0 {
                     false
                 } else {
-                    let width_ratio = current_width / avg_price;
+                    let width_ratio = current_width / current_price;
                     width_ratio <= params.squeeze_threshold
                 }
             }
@@ -235,11 +264,10 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
             } else {
                 let current_width =
                     analyzer.items[params.p].bband.upper() - analyzer.items[params.p].bband.lower();
-                let avg_price = analyzer.items[params.p].candle.close_price();
-                if avg_price == 0.0 {
+                if current_price == 0.0 {
                     false
                 } else {
-                    let width_ratio = current_width / avg_price;
+                    let width_ratio = current_width / current_price;
                     width_ratio >= params.medium_threshold
                 }
             }
@@ -247,6 +275,55 @@ pub(crate) fn filter_bollinger_band<C: Candle + 'static>(
     };
 
     Ok(result)
+}
+
+fn is_band_width_narrowing_from_index<C: Candle>(
+    analyzer: &BBandAnalyzer<C>,
+    start_index: usize,
+    n: usize,
+) -> bool {
+    if analyzer.items.len() < start_index + n + 1 {
+        return false;
+    }
+
+    for i in 0..n {
+        let current_idx = start_index + i;
+        let previous_idx = start_index + i + 1;
+        let current_width =
+            analyzer.items[current_idx].bband.upper() - analyzer.items[current_idx].bband.lower();
+        let previous_width =
+            analyzer.items[previous_idx].bband.upper() - analyzer.items[previous_idx].bband.lower();
+
+        if current_width >= previous_width {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn is_narrowing_then_squeeze_pattern_from_index<C: Candle>(
+    analyzer: &BBandAnalyzer<C>,
+    start_index: usize,
+    narrowing_period: usize,
+    squeeze_period: usize,
+    threshold: f64,
+) -> bool {
+    if !is_band_width_narrowing_from_index(analyzer, start_index, narrowing_period) {
+        return false;
+    }
+
+    let squeeze_start = start_index + narrowing_period;
+    if analyzer.items.len() < squeeze_start + squeeze_period {
+        return false;
+    }
+
+    analyzer.items[squeeze_start..squeeze_start + squeeze_period]
+        .iter()
+        .all(|data| {
+            let middle = data.bband.middle();
+            middle != 0.0 && (data.bband.upper() - data.bband.lower()) / middle <= threshold
+        })
 }
 
 #[cfg(test)]
@@ -375,7 +452,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 가격이 상단 밴드 위에 있는지 확인
         let is_above = result.unwrap();
@@ -394,7 +471,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 가격이 하단 밴드 아래에 있는지 확인
         let is_below = result.unwrap();
@@ -413,7 +490,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 상단 밴드 돌파 확인
         let is_breakthrough = result.unwrap();
@@ -432,7 +509,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 하단 밴드 돌파 확인
         let is_breakthrough = result.unwrap();
@@ -451,7 +528,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 밴드 확장 확인
         let is_expanding = result.unwrap();
@@ -470,7 +547,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 중간 밴드 횡보 확인
         let is_sideways = result.unwrap();
@@ -489,7 +566,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 상단 밴드 터치 후 하락 확인
         let is_touch = result.unwrap();
@@ -508,7 +585,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 하단 밴드 터치 후 상승 확인
         let is_touch = result.unwrap();
@@ -527,7 +604,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 저변동성 확인
         let is_low_vol = result.unwrap();
@@ -546,7 +623,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         // 고변동성 확인
         let is_high_vol = result.unwrap();
@@ -565,7 +642,7 @@ mod tests {
             ..Default::default()
         };
         let candle_store = utils::create_candle_store(&candles);
-        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store);
+        let result = filter_bollinger_band("TEST/USDT", &params, &candle_store, 103.0);
         assert!(result.is_ok());
         assert!(!result.unwrap()); // 캔들 데이터 부족으로 false 반환
     }
