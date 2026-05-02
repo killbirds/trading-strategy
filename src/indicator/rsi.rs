@@ -234,7 +234,10 @@ where
         self.previous_avg_loss = Some(avg_loss);
 
         // RSI 계산
-        // avg_loss가 0에 가까우면 RSI는 100에 가까워짐
+        // 등락이 모두 없으면 중립으로 처리하고, 손실만 0이면 RSI는 100에 가까워짐
+        if avg_loss < 0.000001 && avg_gain < 0.000001 {
+            return 50.0;
+        }
         if avg_loss < 0.000001 {
             return 100.0;
         }
@@ -517,6 +520,25 @@ mod tests {
         let rsi = builder.build(&candles);
         assert!(rsi.value() < 50.0);
         assert!(rsi.value() >= 0.0);
+    }
+
+    #[test]
+    fn test_rsi_flat_prices_are_neutral() {
+        let mut builder = RSIBuilder::<TestCandle>::new(14);
+        let candles: Vec<TestCandle> = (0..20)
+            .map(|i| TestCandle {
+                timestamp: 1 + i,
+                open: 100.0,
+                high: 100.0,
+                low: 100.0,
+                close: 100.0,
+                volume: 1000.0,
+            })
+            .collect();
+
+        let rsi = builder.build(&candles);
+
+        assert_eq!(rsi.value(), 50.0);
     }
 
     #[test]
