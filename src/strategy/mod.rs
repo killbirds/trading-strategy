@@ -1,6 +1,9 @@
 pub mod bband_common;
 pub mod bband_short_strategy;
 pub mod bband_strategy;
+pub mod box_range_common;
+pub mod box_range_short_strategy;
+pub mod box_range_strategy;
 pub mod copys_common;
 pub mod copys_short_strategy;
 pub mod copys_strategy;
@@ -56,6 +59,10 @@ pub enum StrategyType {
     BBand,
     /// 볼린저밴드(Bollinger Band) 기반 숏 전략
     BBandShort,
+    /// 박스권(Box Range) 기반 롱 전략
+    BoxRange,
+    /// 박스권(Box Range) 기반 숏 전략
+    BoxRangeShort,
     /// MACD 기반 롱 전략
     MACD,
     /// MACD 기반 숏 전략
@@ -86,6 +93,8 @@ impl Display for StrategyType {
             StrategyType::RSIShort => write!(f, "rsi_short"),
             StrategyType::BBand => write!(f, "bband"),
             StrategyType::BBandShort => write!(f, "bband_short"),
+            StrategyType::BoxRange => write!(f, "box_range"),
+            StrategyType::BoxRangeShort => write!(f, "box_range_short"),
             StrategyType::MACD => write!(f, "macd"),
             StrategyType::MACDShort => write!(f, "macd_short"),
             StrategyType::Copys => write!(f, "copys"),
@@ -206,6 +215,16 @@ impl StrategyFactory {
                 bband_short_strategy::BBandShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
+            StrategyType::BoxRange => {
+                debug!("박스권 전략 초기화 시작");
+                box_range_strategy::BoxRangeStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::BoxRangeShort => {
+                debug!("박스권 숏 전략 초기화 시작");
+                box_range_short_strategy::BoxRangeShortStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::MACD => {
                 debug!("MACD 전략 초기화 시작");
                 macd_strategy::MACDStrategy::new_with_config(storage, config)
@@ -296,6 +315,8 @@ impl StrategyFactory {
             StrategyType::RSIShort => PositionType::Short,
             StrategyType::BBand => PositionType::Long,
             StrategyType::BBandShort => PositionType::Short,
+            StrategyType::BoxRange => PositionType::Long,
+            StrategyType::BoxRangeShort => PositionType::Short,
             StrategyType::MACD => PositionType::Long,
             StrategyType::MACDShort => PositionType::Short,
             StrategyType::Copys => PositionType::Long,
