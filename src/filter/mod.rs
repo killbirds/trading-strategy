@@ -49,6 +49,8 @@ pub enum FilterError {
     UnknownMacdFilterType { input: String },
     #[error("알 수 없는 BollingerBand 필터 타입: {input}")]
     UnknownBollingerBandFilterType { input: String },
+    #[error("알 수 없는 BoxRange 필터 타입: {input}")]
+    UnknownBoxRangeFilterType { input: String },
     #[error("알 수 없는 ADX 필터 타입: {input}")]
     UnknownAdxFilterType { input: String },
     #[error("알 수 없는 MovingAverage 필터 타입: {input}")]
@@ -216,6 +218,7 @@ macro_rules! impl_filter_type_fromstr {
 mod adx;
 mod atr;
 mod bollinger_band;
+mod box_range;
 mod candle_pattern;
 mod copys;
 mod ichimoku;
@@ -355,6 +358,8 @@ pub enum TechnicalFilterType {
     MACD,
     /// 볼린저밴드 기반 필터 (변동성)
     BollingerBand,
+    /// 박스권 기반 필터 (횡보/돌파)
+    BoxRange,
     /// ADX 기반 필터 (추세 강도)
     ADX,
     /// 이동평균선 기반 필터 (추세)
@@ -390,6 +395,7 @@ impl fmt::Display for TechnicalFilterType {
             TechnicalFilterType::RSI => write!(f, "RSI"),
             TechnicalFilterType::MACD => write!(f, "MACD"),
             TechnicalFilterType::BollingerBand => write!(f, "볼린저밴드"),
+            TechnicalFilterType::BoxRange => write!(f, "BoxRange"),
             TechnicalFilterType::ADX => write!(f, "ADX"),
             TechnicalFilterType::MovingAverage => write!(f, "이동평균선"),
             TechnicalFilterType::Ichimoku => write!(f, "이치모쿠"),
@@ -416,6 +422,7 @@ impl FromStr for TechnicalFilterType {
             "RSI" => Ok(TechnicalFilterType::RSI),
             "MACD" => Ok(TechnicalFilterType::MACD),
             "BOLLINGERBAND" | "BOLLINGER_BAND" => Ok(TechnicalFilterType::BollingerBand),
+            "BOXRANGE" | "BOX_RANGE" => Ok(TechnicalFilterType::BoxRange),
             "ADX" => Ok(TechnicalFilterType::ADX),
             "MOVINGAVERAGE" | "MOVING_AVERAGE" => Ok(TechnicalFilterType::MovingAverage),
             "ICHIMOKU" => Ok(TechnicalFilterType::Ichimoku),
@@ -637,6 +644,45 @@ impl_filter_type_deserialize!(
     BollingerBandFilterTypeVisitor,
     "BollingerBand"
 );
+
+/// 박스권 필터 타입
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum BoxRangeFilterType {
+    IsBoxRange,
+    InsideBox,
+    OutsideBox,
+    AboveUpperBox,
+    BelowLowerBox,
+    BoxRangeStart,
+    BreakoutAbove,
+    BreakoutBelow,
+    HighBreakThroughUpperBox,
+    LowBreakThroughLowerBox,
+    WidthRatioBelowThreshold,
+    WidthRatioAboveThreshold,
+}
+
+impl_filter_type_fromstr!(
+    BoxRangeFilterType,
+    UnknownBoxRangeFilterType,
+    parse_i32,
+    [
+        IsBoxRange,
+        InsideBox,
+        OutsideBox,
+        AboveUpperBox,
+        BelowLowerBox,
+        BoxRangeStart,
+        BreakoutAbove,
+        BreakoutBelow,
+        HighBreakThroughUpperBox,
+        LowBreakThroughLowerBox,
+        WidthRatioBelowThreshold,
+        WidthRatioAboveThreshold,
+    ]
+);
+
+impl_filter_type_deserialize!(BoxRangeFilterType, BoxRangeFilterTypeVisitor, "BoxRange");
 
 /// ADX 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -1519,6 +1565,52 @@ impl Default for BollingerBandParams {
     }
 }
 
+/// 박스권 필터 파라미터
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BoxRangeParams {
+    /// 박스권 계산 기간 (기본값: 20)
+    pub period: usize,
+    /// 박스권 판정 최대 폭 비율 (기본값: 0.05 = 5%)
+    pub max_width_ratio: f64,
+    /// 필터 유형
+    pub filter_type: BoxRangeFilterType,
+    /// 연속 캔들 수 (기본값: 1)
+    pub consecutive_n: usize,
+    /// 과거 시점 확인을 위한 오프셋 (기본값: 0)
+    pub p: usize,
+    /// 박스권 시작/돌파 확인 시 직전 박스권 확인 개수 (기본값: 1)
+    pub prior_box_count: usize,
+    /// 폭 비율 임계값 필터용 값 (기본값: 0.05 = 5%)
+    pub width_ratio_threshold: f64,
+}
+
+fn default_box_range_max_width_ratio() -> f64 {
+    0.05
+}
+
+fn default_box_range_prior_box_count() -> usize {
+    1
+}
+
+fn default_box_range_width_ratio_threshold() -> f64 {
+    0.05
+}
+
+impl Default for BoxRangeParams {
+    fn default() -> Self {
+        Self {
+            period: 20,
+            max_width_ratio: default_box_range_max_width_ratio(),
+            filter_type: BoxRangeFilterType::IsBoxRange,
+            consecutive_n: 1,
+            p: 0,
+            prior_box_count: default_box_range_prior_box_count(),
+            width_ratio_threshold: default_box_range_width_ratio_threshold(),
+        }
+    }
+}
+
 /// ADX 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -2037,6 +2129,7 @@ impl_filter_type_display!(
     RSIFilterType,
     MACDFilterType,
     BollingerBandFilterType,
+    BoxRangeFilterType,
     ADXFilterType,
     MovingAverageFilterType,
     IchimokuFilterType,
@@ -2104,6 +2197,9 @@ pub enum TechnicalFilterConfig {
     /// 볼린저 밴드 필터 설정
     #[serde(rename = "BOLLINGER_BAND")]
     BollingerBand(BollingerBandParams),
+    /// 박스권 필터 설정
+    #[serde(rename = "BOX_RANGE")]
+    BoxRange(BoxRangeParams),
     /// ADX 필터 설정
     ADX(ADXParams),
     /// 이동평균선 필터 설정
@@ -2151,6 +2247,7 @@ impl TechnicalFilterConfig {
             Self::RSI(_) => TechnicalFilterType::RSI,
             Self::MACD(_) => TechnicalFilterType::MACD,
             Self::BollingerBand(_) => TechnicalFilterType::BollingerBand,
+            Self::BoxRange(_) => TechnicalFilterType::BoxRange,
             Self::ADX(_) => TechnicalFilterType::ADX,
             Self::MovingAverage(_) => TechnicalFilterType::MovingAverage,
             Self::PriceReferenceGap(_) => TechnicalFilterType::PriceReferenceGap,
@@ -2245,6 +2342,19 @@ impl TechnicalFilterConfig {
                 utils::validate_positive_number(
                     params.lower_touch_threshold,
                     "BollingerBand lower_touch_threshold",
+                )
+            }
+            Self::BoxRange(params) => {
+                utils::validate_period(params.period, "BoxRange")?;
+                utils::validate_positive_number(
+                    params.max_width_ratio,
+                    "BoxRange max_width_ratio",
+                )?;
+                utils::validate_consecutive_n(params.consecutive_n, "BoxRange consecutive_n")?;
+                utils::validate_period(params.prior_box_count, "BoxRange prior_box_count")?;
+                utils::validate_non_negative_number(
+                    params.width_ratio_threshold,
+                    "BoxRange width_ratio_threshold",
                 )
             }
             Self::ADX(params) => {
@@ -2601,6 +2711,9 @@ impl TechnicalFilter {
             TechnicalFilterConfig::BollingerBand(params) => {
                 bollinger_band::filter_bollinger_band(symbol, params, candle_store, current_price)
             }
+            TechnicalFilterConfig::BoxRange(params) => {
+                box_range::filter_box_range(symbol, params, candle_store, current_price)
+            }
             TechnicalFilterConfig::ADX(params) => {
                 adx::filter_adx(symbol, params, candle_store, current_price)
             }
@@ -2735,6 +2848,22 @@ mod tests {
         })
     }
 
+    pub fn create_box_range_filter(
+        period: usize,
+        max_width_ratio: f64,
+        filter_type: BoxRangeFilterType,
+        consecutive_n: usize,
+    ) -> TechnicalFilterConfig {
+        TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            period,
+            max_width_ratio,
+            filter_type,
+            consecutive_n,
+            p: 0,
+            ..Default::default()
+        })
+    }
+
     /// ADX 필터 생성 유틸리티 함수
     pub fn create_adx_filter(
         period: usize,
@@ -2860,6 +2989,12 @@ mod tests {
         let bb_filter =
             create_bollinger_band_filter(20, 2.0, BollingerBandFilterType::BelowLowerBand, 1);
         assert_eq!(bb_filter.filter_type(), TechnicalFilterType::BollingerBand);
+
+        let box_range_filter = create_box_range_filter(20, 0.05, BoxRangeFilterType::IsBoxRange, 1);
+        assert_eq!(
+            box_range_filter.filter_type(),
+            TechnicalFilterType::BoxRange
+        );
 
         let price_gap_filter = create_price_reference_gap_filter(
             PriceReferenceSource::MovingAverage {
@@ -3053,6 +3188,72 @@ mod tests {
     }
 
     #[test]
+    fn test_box_range_validate_rejects_invalid_params() {
+        let zero_period = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            period: 0,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            zero_period.validate(),
+            Err(FilterError::InvalidPeriod { .. })
+        ));
+
+        let zero_max_width = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            max_width_ratio: 0.0,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            zero_max_width.validate(),
+            Err(FilterError::InvalidPositiveNumber { .. })
+        ));
+
+        let negative_max_width = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            max_width_ratio: -0.01,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            negative_max_width.validate(),
+            Err(FilterError::InvalidPositiveNumber { .. })
+        ));
+
+        let non_finite_max_width = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            max_width_ratio: f64::INFINITY,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            non_finite_max_width.validate(),
+            Err(FilterError::InvalidPositiveNumber { .. })
+        ));
+
+        let zero_consecutive_n = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            consecutive_n: 0,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            zero_consecutive_n.validate(),
+            Err(FilterError::InvalidConsecutiveN { .. })
+        ));
+
+        let zero_prior_box_count = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            prior_box_count: 0,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            zero_prior_box_count.validate(),
+            Err(FilterError::InvalidPeriod { .. })
+        ));
+
+        let non_finite_width_threshold = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            width_ratio_threshold: f64::NAN,
+            ..BoxRangeParams::default()
+        });
+        assert!(matches!(
+            non_finite_width_threshold.validate(),
+            Err(FilterError::InvalidNonNegativeNumber { .. })
+        ));
+    }
+
+    #[test]
     fn test_filter_combination() {
         // 여러 필터 조합 테스트
         let filters = [
@@ -3128,6 +3329,29 @@ mod tests {
         assert_eq!(price_gap_params.gap_threshold, 0.02);
         assert_eq!(price_gap_params.consecutive_n, 1);
         assert_eq!(price_gap_params.p, 0);
+
+        let box_range_params = BoxRangeParams::default();
+        assert_eq!(box_range_params.period, 20);
+        assert_eq!(box_range_params.max_width_ratio, 0.05);
+        assert_eq!(box_range_params.filter_type, BoxRangeFilterType::IsBoxRange);
+        assert_eq!(box_range_params.consecutive_n, 1);
+        assert_eq!(box_range_params.p, 0);
+        assert_eq!(box_range_params.prior_box_count, 1);
+        assert_eq!(box_range_params.width_ratio_threshold, 0.05);
+    }
+
+    #[test]
+    fn test_box_range_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: BoxRangeParams =
+            serde_json::from_str(r#"{"filter_type":"BreakoutAbove"}"#).unwrap();
+
+        assert_eq!(params.period, 20);
+        assert_eq!(params.max_width_ratio, 0.05);
+        assert_eq!(params.filter_type, BoxRangeFilterType::BreakoutAbove);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.p, 0);
+        assert_eq!(params.prior_box_count, 1);
+        assert_eq!(params.width_ratio_threshold, 0.05);
     }
 
     #[test]
@@ -3251,6 +3475,61 @@ mod tests {
             lower_bound_params.filter_type,
             PriceReferenceGapFilterType::GapAboveReferenceLowerThreshold
         );
+    }
+
+    #[test]
+    fn test_box_range_filter_type_deserialize_supports_numeric_values() {
+        let params: BoxRangeParams = serde_json::from_str(r#"{"filter_type":6}"#).unwrap();
+
+        assert_eq!(params.filter_type, BoxRangeFilterType::BreakoutAbove);
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_box_range_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "BOX_RANGE",
+                "period": 5,
+                "max_width_ratio": 0.05,
+                "filter_type": "BreakoutAbove",
+                "consecutive_n": 1,
+                "prior_box_count": 1
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::BoxRange(params) => {
+                assert_eq!(params.period, 5);
+                assert_eq!(params.max_width_ratio, 0.05);
+                assert_eq!(params.filter_type, BoxRangeFilterType::BreakoutAbove);
+                assert_eq!(params.consecutive_n, 1);
+                assert_eq!(params.prior_box_count, 1);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_matches_box_range() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 101.0, 102.0, 98.5),
+            test_candle(3, 100.5, 101.5, 99.5),
+            test_candle(4, 99.5, 102.0, 98.0),
+            test_candle(5, 100.0, 101.0, 99.0),
+        ];
+        let filter = TechnicalFilterConfig::BoxRange(BoxRangeParams {
+            period: 5,
+            max_width_ratio: 0.05,
+            filter_type: BoxRangeFilterType::IsBoxRange,
+            ..Default::default()
+        });
+
+        let result =
+            TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles, 100.0).unwrap();
+
+        assert!(result);
     }
 
     #[test]
