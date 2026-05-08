@@ -17,6 +17,7 @@ pub mod adx_analyzer;
 pub mod atr_analyzer;
 pub mod base;
 pub mod bband_analyzer;
+pub mod box_range_analyzer;
 pub mod candle_pattern_analyzer;
 pub mod hybrid_analyzer;
 pub mod ichimoku_analyzer;
@@ -40,6 +41,7 @@ pub use adx_analyzer::{ADXAnalyzer, ADXAnalyzerData};
 pub use atr_analyzer::{ATRAnalyzer, ATRAnalyzerData};
 pub use base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 pub use bband_analyzer::{BBandAnalyzer, BBandAnalyzerData};
+pub use box_range_analyzer::{BoxRangeAnalyzer, BoxRangeAnalyzerData};
 pub use candle_pattern_analyzer::{
     CandlePatternAnalyzer, CandlePatternAnalyzerData, MultiCandlePattern, PatternAnalysis,
     PatternReliability, PatternSignal, SingleCandlePattern,
