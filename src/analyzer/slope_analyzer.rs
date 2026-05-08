@@ -2,85 +2,11 @@ use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::analyzer::{MAAnalyzer, MACDAnalyzer, RSIAnalyzer};
 use crate::candle_store::CandleStore;
 use crate::indicator::ma::MAType;
+pub use crate::indicator::slope::{SlopeAnalysis, SlopeDirection};
+use crate::indicator::slope::{calculate_linear_regression_slope, calculate_simple_slope};
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use trading_chart::Candle;
-
-/// 기울기 분석 결과
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SlopeDirection {
-    /// 상승 기울기
-    Upward,
-    /// 하락 기울기
-    Downward,
-    /// 횡보 (기울기가 거의 없음)
-    Sideways,
-}
-
-/// 기울기 분석 데이터
-#[derive(Debug, Clone)]
-pub struct SlopeAnalysis {
-    /// 기울기 값 (양수: 상승, 음수: 하락)
-    pub slope: f64,
-    /// 기울기 방향
-    pub direction: SlopeDirection,
-    /// 기울기 강도 (절대값)
-    pub strength: f64,
-    /// 선형 회귀의 결정계수 (R²) - 기울기의 신뢰도 (0.0 ~ 1.0)
-    pub r_squared: f64,
-    /// 시작 값
-    pub start_value: f64,
-    /// 종료 값
-    pub end_value: f64,
-    /// 분석 기간
-    pub period: usize,
-}
-
-impl SlopeAnalysis {
-    /// 새 기울기 분석 결과 생성
-    pub fn new(
-        slope: f64,
-        r_squared: f64,
-        start_value: f64,
-        end_value: f64,
-        period: usize,
-        threshold: f64,
-    ) -> Self {
-        let strength = slope.abs();
-        let direction = if strength < threshold {
-            SlopeDirection::Sideways
-        } else if slope > 0.0 {
-            SlopeDirection::Upward
-        } else {
-            SlopeDirection::Downward
-        };
-
-        SlopeAnalysis {
-            slope,
-            direction,
-            strength,
-            r_squared,
-            start_value,
-            end_value,
-            period,
-        }
-    }
-
-    /// 기울기가 상승인지 확인
-    pub fn is_upward(&self) -> bool {
-        matches!(self.direction, SlopeDirection::Upward)
-    }
-
-    /// 기울기가 하락인지 확인
-    pub fn is_downward(&self) -> bool {
-        matches!(self.direction, SlopeDirection::Downward)
-    }
-
-    /// 기울기가 횡보인지 확인
-    pub fn is_sideways(&self) -> bool {
-        matches!(self.direction, SlopeDirection::Sideways)
-    }
-}
 
 /// 분석할 지표 타입
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -415,68 +341,8 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
     /// # Returns
     /// * `Option<SlopeAnalysis>` - 기울기 분석 결과
     pub fn calculate_slope(&self, period: usize, offset: usize) -> Option<SlopeAnalysis> {
-        if self.items.len() < period + offset {
-            return None;
-        }
-
-        // 시간 순서대로 정렬 (오래된 것부터 최신 순서)
-        let values: Vec<f64> = self
-            .items
-            .iter()
-            .skip(offset)
-            .take(period)
-            .map(|data| data.value)
-            .rev() // 시간 순서대로 (오래된 것부터)
-            .collect();
-
-        if values.len() < period {
-            return None;
-        }
-
-        let start_value = *values.first().unwrap(); // 가장 오래된 값
-        let end_value = *values.last().unwrap(); // 가장 최신 값
-
-        let n = values.len() as f64;
-        let sum_x: f64 = (0..values.len()).map(|i| i as f64).sum();
-        let sum_y: f64 = values.iter().sum();
-        let sum_xy: f64 = values.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
-        let sum_x2: f64 = (0..values.len()).map(|i| (i as f64).powi(2)).sum();
-
-        let mean_x = sum_x / n;
-        let mean_y = sum_y / n;
-
-        let slope = if sum_x2 - n * mean_x * mean_x != 0.0 {
-            (sum_xy - n * mean_x * mean_y) / (sum_x2 - n * mean_x * mean_x)
-        } else {
-            0.0
-        };
-
-        let ss_res: f64 = values
-            .iter()
-            .enumerate()
-            .map(|(i, &y)| {
-                let predicted = mean_y + slope * (i as f64 - mean_x);
-                (y - predicted).powi(2)
-            })
-            .sum();
-
-        let ss_tot: f64 = values.iter().map(|&y| (y - mean_y).powi(2)).sum();
-
-        let r_squared = if ss_tot != 0.0 {
-            1.0 - (ss_res / ss_tot)
-        } else {
-            0.0
-        };
-
-        let threshold = (end_value.abs() * 0.01).max(0.0001);
-        Some(SlopeAnalysis::new(
-            slope,
-            r_squared,
-            start_value,
-            end_value,
-            period,
-            threshold,
-        ))
+        let values: Vec<f64> = self.items.iter().map(|data| data.value).collect();
+        calculate_linear_regression_slope(&values, period, offset)
     }
 
     /// 단순 차이 기반 기울기 계산
@@ -488,35 +354,8 @@ impl<C: Candle + 'static> SlopeAnalyzer<C> {
     /// # Returns
     /// * `Option<SlopeAnalysis>` - 기울기 분석 결과
     pub fn calculate_simple_slope(&self, period: usize, offset: usize) -> Option<SlopeAnalysis> {
-        if self.items.len() < period + offset {
-            return None;
-        }
-
-        // items는 최신이 앞에 있으므로, 오래된 값이 뒤에 있음
-        let start_value = self.items.get(offset + period - 1)?.value; // 가장 오래된 값
-        let end_value = self.items.get(offset)?.value; // 가장 최신 값
-
-        let slope = (end_value - start_value) / period as f64;
-        let strength = slope.abs();
-        let threshold = (end_value.abs() * 0.01).max(0.0001);
-
-        let direction = if strength < threshold {
-            SlopeDirection::Sideways
-        } else if slope > 0.0 {
-            SlopeDirection::Upward
-        } else {
-            SlopeDirection::Downward
-        };
-
-        Some(SlopeAnalysis {
-            slope,
-            direction,
-            strength,
-            r_squared: 0.0,
-            start_value,
-            end_value,
-            period,
-        })
+        let values: Vec<f64> = self.items.iter().map(|data| data.value).collect();
+        calculate_simple_slope(&values, period, offset)
     }
 
     /// 기울기가 상승인지 확인

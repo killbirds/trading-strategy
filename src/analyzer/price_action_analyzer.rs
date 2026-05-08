@@ -1,71 +1,9 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
+use crate::indicator::price_action as indicator_price_action;
+pub use crate::indicator::price_action::{CandlePattern, PriceTrend, SwingPoint, SwingType};
 use std::fmt::Display;
 use trading_chart::Candle;
-
-/// 캔들 패턴 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum CandlePattern {
-    /// 망치 패턴
-    Hammer,
-    /// 역망치 패턴
-    InvertedHammer,
-    /// 도지 패턴
-    Doji,
-    /// 엔걸핑 패턴 (불리시)
-    BullishEngulfing,
-    /// 엔걸핑 패턴 (베어리시)
-    BearishEngulfing,
-    /// 피어싱 패턴
-    PiercingPattern,
-    /// 다크 클라우드 커버
-    DarkCloudCover,
-    /// 모닝 스타
-    MorningStar,
-    /// 이브닝 스타
-    EveningStar,
-    /// 롱 불리시 캔들
-    LongBullish,
-    /// 롱 베어리시 캔들
-    LongBearish,
-    /// 일반 캔들
-    Normal,
-}
-
-/// 가격 추세 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum PriceTrend {
-    /// 강한 상승 추세
-    StrongUptrend,
-    /// 약한 상승 추세
-    WeakUptrend,
-    /// 횡보
-    Sideways,
-    /// 약한 하락 추세
-    WeakDowntrend,
-    /// 강한 하락 추세
-    StrongDowntrend,
-}
-
-/// 스윙 포인트 타입
-#[derive(Debug, Clone)]
-pub struct SwingPoint {
-    /// 스윙 포인트 인덱스
-    pub index: usize,
-    /// 스윙 포인트 가격
-    pub price: f64,
-    /// 스윙 타입 (하이/로우)
-    pub swing_type: SwingType,
-    /// 강도 (주변 캔들 수)
-    pub strength: usize,
-}
-
-/// 스윙 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum SwingType {
-    High,
-    Low,
-}
 
 /// Price Action 분석기 데이터
 #[derive(Debug)]
@@ -372,250 +310,37 @@ impl<C: Candle + Clone + 'static> PriceActionAnalyzer<C> {
 
     /// 캔들 패턴 식별
     fn identify_candle_pattern(&self, candles: &[C]) -> CandlePattern {
-        let current = match candles.first() {
-            Some(c) => c,
-            None => return CandlePattern::Normal,
-        };
-        let body_size = (current.close_price() - current.open_price()).abs();
-        let total_size = current.high_price() - current.low_price();
-        let upper_shadow = current.high_price() - current.close_price().max(current.open_price());
-        let lower_shadow = current.close_price().min(current.open_price()) - current.low_price();
-
-        let body_ratio = if total_size > 0.0 {
-            body_size / total_size
-        } else {
-            0.0
-        };
-        let upper_shadow_ratio = if total_size > 0.0 {
-            upper_shadow / total_size
-        } else {
-            0.0
-        };
-        let lower_shadow_ratio = if total_size > 0.0 {
-            lower_shadow / total_size
-        } else {
-            0.0
-        };
-
-        // 도지 패턴 - 몸통이 매우 작음
-        if body_ratio < 0.1 {
-            return CandlePattern::Doji;
-        }
-
-        // 망치 패턴 - 긴 아래꼬리, 짧은 위꼬리, 작은 몸통
-        if lower_shadow_ratio > 0.6 && upper_shadow_ratio < 0.1 && body_ratio < 0.3 {
-            return CandlePattern::Hammer;
-        }
-
-        // 역망치 패턴 - 긴 위꼬리, 짧은 아래꼬리, 작은 몸통
-        if upper_shadow_ratio > 0.6 && lower_shadow_ratio < 0.1 && body_ratio < 0.3 {
-            return CandlePattern::InvertedHammer;
-        }
-
-        // 엔걸핑 패턴 확인
-        if let Some(previous) = candles.get(1) {
-            let current_bullish = current.close_price() > current.open_price();
-            let previous_bullish = previous.close_price() > previous.open_price();
-
-            // 불리시 엔걸핑
-            if current_bullish
-                && !previous_bullish
-                && current.open_price() < previous.close_price()
-                && current.close_price() > previous.open_price()
-            {
-                return CandlePattern::BullishEngulfing;
-            }
-
-            // 베어리시 엔걸핑
-            if !current_bullish
-                && previous_bullish
-                && current.open_price() > previous.close_price()
-                && current.close_price() < previous.open_price()
-            {
-                return CandlePattern::BearishEngulfing;
-            }
-
-            // 피어싱 패턴
-            if current_bullish
-                && !previous_bullish
-                && current.open_price() < previous.close_price()
-                && current.close_price() > (previous.open_price() + previous.close_price()) / 2.0
-            {
-                return CandlePattern::PiercingPattern;
-            }
-
-            // 다크 클라우드 커버
-            if !current_bullish
-                && previous_bullish
-                && current.open_price() > previous.close_price()
-                && current.close_price() < (previous.open_price() + previous.close_price()) / 2.0
-            {
-                return CandlePattern::DarkCloudCover;
-            }
-        }
-
-        // 긴 캔들 패턴
-        if body_ratio > 0.7 {
-            if current.close_price() > current.open_price() {
-                return CandlePattern::LongBullish;
-            } else {
-                return CandlePattern::LongBearish;
-            }
-        }
-
-        CandlePattern::Normal
+        indicator_price_action::identify_candle_pattern(candles)
     }
 
     /// 가격 추세 분석
     fn analyze_price_trend(&self, candles: &[C]) -> PriceTrend {
-        if candles.len() < self.trend_period {
-            return PriceTrend::Sideways;
-        }
-
-        let recent_candles = &candles[..self.trend_period];
-        let first_price = recent_candles
-            .last()
-            .map(|c| c.close_price())
-            .unwrap_or(0.0);
-        let last_price = recent_candles
-            .first()
-            .map(|c| c.close_price())
-            .unwrap_or(0.0);
-        let price_change = (last_price - first_price) / first_price;
-
-        // 가격 변화의 강도에 따라 추세 분류
-        if price_change > 0.05 {
-            PriceTrend::StrongUptrend
-        } else if price_change > 0.02 {
-            PriceTrend::WeakUptrend
-        } else if price_change < -0.05 {
-            PriceTrend::StrongDowntrend
-        } else if price_change < -0.02 {
-            PriceTrend::WeakDowntrend
-        } else {
-            PriceTrend::Sideways
-        }
+        indicator_price_action::analyze_price_trend(candles, self.trend_period)
     }
 
     /// 스윙 포인트 식별
     fn identify_swing_points(&self, candles: &[C]) -> Vec<SwingPoint> {
-        let mut swing_points = Vec::new();
-        let strength = self.swing_strength;
-
-        if candles.len() < strength * 2 + 1 {
-            return swing_points;
-        }
-
-        for i in strength..candles.len() - strength {
-            let current = &candles[i];
-            let is_swing_high = (i.saturating_sub(strength)..i)
-                .chain((i + 1)..(i + strength + 1).min(candles.len()))
-                .all(|j| current.high_price() > candles[j].high_price());
-
-            let is_swing_low = (i.saturating_sub(strength)..i)
-                .chain((i + 1)..(i + strength + 1).min(candles.len()))
-                .all(|j| current.low_price() < candles[j].low_price());
-
-            if is_swing_high {
-                swing_points.push(SwingPoint {
-                    index: i,
-                    price: current.high_price(),
-                    swing_type: SwingType::High,
-                    strength,
-                });
-            }
-
-            if is_swing_low {
-                swing_points.push(SwingPoint {
-                    index: i,
-                    price: current.low_price(),
-                    swing_type: SwingType::Low,
-                    strength,
-                });
-            }
-        }
-
-        // 최근 스윙 포인트들만 유지 (최대 10개)
-        swing_points.sort_by(|a, b| a.index.cmp(&b.index));
-        swing_points.truncate(10);
-
-        swing_points
+        indicator_price_action::identify_swing_points(candles, self.swing_strength)
     }
 
     /// 평균 캔들 크기 계산
     fn calculate_avg_candle_size(&self, candles: &[C]) -> f64 {
-        if candles.is_empty() {
-            return 0.0;
-        }
-
-        let total_size: f64 = candles
-            .iter()
-            .map(|c| (c.high_price() - c.low_price()).abs())
-            .sum();
-        total_size / candles.len() as f64
+        indicator_price_action::calculate_avg_candle_size(candles)
     }
 
     /// VWAP 계산
     fn calculate_vwap(&self, candles: &[C]) -> f64 {
-        if candles.is_empty() {
-            return 0.0;
-        }
-
-        let total_volume: f64 = candles.iter().map(|c| c.volume()).sum();
-        if total_volume == 0.0 {
-            return match candles.first() {
-                Some(c) => c.close_price(),
-                None => 0.0,
-            };
-        }
-
-        let vwap: f64 = candles
-            .iter()
-            .map(|c| {
-                let typical_price = (c.high_price() + c.low_price() + c.close_price()) / 3.0;
-                typical_price * c.volume()
-            })
-            .sum();
-
-        vwap / total_volume
+        indicator_price_action::calculate_vwap(candles)
     }
 
     /// 모멘텀 계산
     fn calculate_momentum(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.momentum_period {
-            return 0.0;
-        }
-
-        let current_price = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-        let past_price = match candles.get(self.momentum_period - 1) {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-        if past_price == 0.0 {
-            return 0.0;
-        }
-        (current_price - past_price) / past_price
+        indicator_price_action::calculate_momentum(candles, self.momentum_period)
     }
 
     /// 캔들 바디 및 꼬리 비율 계산
     fn calculate_candle_ratios(&self, candle: &C) -> (f64, f64, f64) {
-        let body_size = (candle.close_price() - candle.open_price()).abs();
-        let total_size = candle.high_price() - candle.low_price();
-        let upper_shadow = candle.high_price() - candle.close_price().max(candle.open_price());
-        let lower_shadow = candle.close_price().min(candle.open_price()) - candle.low_price();
-
-        if total_size == 0.0 {
-            return (0.0, 0.0, 0.0);
-        }
-
-        let body_ratio = body_size / total_size;
-        let upper_shadow_ratio = upper_shadow / total_size;
-        let lower_shadow_ratio = lower_shadow / total_size;
-
-        (body_ratio, upper_shadow_ratio, lower_shadow_ratio)
+        indicator_price_action::calculate_candle_ratios(candle)
     }
 
     /// 불리시 반전 신호 확인

@@ -1,105 +1,12 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
+use crate::indicator::market_structure as indicator_market_structure;
+pub use crate::indicator::market_structure::{
+    FVGType, FairValueGap, LiquidityPool, LiquidityPoolType, MarketStructure, OrderBlock,
+    OrderBlockType, StructureChange,
+};
 use std::fmt::Display;
 use trading_chart::Candle;
-
-/// 시장 구조 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum MarketStructure {
-    /// 상승 추세 (Higher Highs, Higher Lows)
-    Uptrend,
-    /// 하락 추세 (Lower Highs, Lower Lows)
-    Downtrend,
-    /// 횡보 (Sideways)
-    Sideways,
-    /// 불확실 (Uncertain)
-    Uncertain,
-}
-
-/// 구조 변화 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum StructureChange {
-    /// 구조 변화 없음
-    None,
-    /// 상승 구조 파괴 (Break of Structure - BOS to Downtrend)
-    BullishBOS,
-    /// 하락 구조 파괴 (Break of Structure - BOS to Uptrend)
-    BearishBOS,
-    /// 상승 성격 변화 (Change of Character - CHoCH to Uptrend)
-    BullishCHoCH,
-    /// 하락 성격 변화 (Change of Character - CHoCH to Downtrend)
-    BearishCHoCH,
-}
-
-/// Fair Value Gap (FVG) 타입
-#[derive(Debug, Clone)]
-pub struct FairValueGap {
-    /// 갭 시작 가격
-    pub start_price: f64,
-    /// 갭 종료 가격
-    pub end_price: f64,
-    /// 갭 타입 (불리시/베어리시)
-    pub gap_type: FVGType,
-    /// 갭 생성 인덱스
-    pub index: usize,
-    /// 갭 크기
-    pub size: f64,
-}
-
-/// Fair Value Gap 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum FVGType {
-    /// 불리시 FVG (상승 갭)
-    Bullish,
-    /// 베어리시 FVG (하락 갭)
-    Bearish,
-}
-
-/// 오더 블록 타입
-#[derive(Debug, Clone)]
-pub struct OrderBlock {
-    /// 오더 블록 시작 가격
-    pub start_price: f64,
-    /// 오더 블록 종료 가격
-    pub end_price: f64,
-    /// 오더 블록 타입
-    pub block_type: OrderBlockType,
-    /// 오더 블록 생성 인덱스
-    pub index: usize,
-    /// 강도 (터치 횟수)
-    pub strength: usize,
-}
-
-/// 오더 블록 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum OrderBlockType {
-    /// 불리시 오더 블록 (수요 구역)
-    Bullish,
-    /// 베어리시 오더 블록 (공급 구역)
-    Bearish,
-}
-
-/// 유동성 풀 타입
-#[derive(Debug, Clone)]
-pub struct LiquidityPool {
-    /// 유동성 풀 가격
-    pub price: f64,
-    /// 유동성 풀 타입
-    pub pool_type: LiquidityPoolType,
-    /// 유동성 풀 생성 인덱스
-    pub index: usize,
-    /// 유동성 양
-    pub liquidity_amount: f64,
-}
-
-/// 유동성 풀 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum LiquidityPoolType {
-    /// 매수 유동성 풀 (Buy Side Liquidity)
-    BuyLiquidity,
-    /// 매도 유동성 풀 (Sell Side Liquidity)
-    SellLiquidity,
-}
 
 /// Market Structure 분석기 데이터
 #[derive(Debug)]
@@ -361,40 +268,11 @@ impl<C: Candle + Clone + 'static> MarketStructureAnalyzer<C> {
 
     /// 시장 구조 분석
     fn analyze_market_structure(&self, candles: &[C]) -> MarketStructure {
-        if candles.len() < self.structure_period {
-            return MarketStructure::Uncertain;
-        }
-
-        let swing_points = self.identify_swing_points(candles);
-        if swing_points.len() < 4 {
-            return MarketStructure::Uncertain;
-        }
-
-        let highs: Vec<f64> = swing_points
-            .iter()
-            .filter_map(|(_, price, is_high)| if *is_high { Some(*price) } else { None })
-            .collect();
-        let lows: Vec<f64> = swing_points
-            .iter()
-            .filter_map(|(_, price, is_high)| if !*is_high { Some(*price) } else { None })
-            .collect();
-
-        if highs.len() < 2 || lows.len() < 2 {
-            return MarketStructure::Uncertain;
-        }
-
-        let higher_highs = highs.windows(2).all(|w| w[0] > w[1]);
-        let higher_lows = lows.windows(2).all(|w| w[0] > w[1]);
-        let lower_highs = highs.windows(2).all(|w| w[0] < w[1]);
-        let lower_lows = lows.windows(2).all(|w| w[0] < w[1]);
-
-        if higher_highs && higher_lows {
-            MarketStructure::Uptrend
-        } else if lower_highs && lower_lows {
-            MarketStructure::Downtrend
-        } else {
-            MarketStructure::Sideways
-        }
+        indicator_market_structure::analyze_market_structure(
+            candles,
+            self.swing_strength,
+            self.structure_period,
+        )
     }
 
     /// 구조 변화 감지
@@ -403,293 +281,46 @@ impl<C: Candle + Clone + 'static> MarketStructureAnalyzer<C> {
         candles: &[C],
         current_structure: MarketStructure,
     ) -> StructureChange {
-        if self.items.is_empty() {
-            return StructureChange::None;
-        }
-
-        let previous_structure = match self.items.first() {
-            Some(item) => &item.market_structure,
-            None => return StructureChange::None,
-        };
-
-        match (previous_structure, current_structure) {
-            (MarketStructure::Uptrend, MarketStructure::Downtrend) => {
-                // 상승 추세에서 하락 추세로 전환
-                if self.is_strong_reversal(candles) {
-                    StructureChange::BullishBOS
-                } else {
-                    StructureChange::BearishCHoCH
-                }
-            }
-            (MarketStructure::Downtrend, MarketStructure::Uptrend) => {
-                // 하락 추세에서 상승 추세로 전환
-                if self.is_strong_reversal(candles) {
-                    StructureChange::BearishBOS
-                } else {
-                    StructureChange::BullishCHoCH
-                }
-            }
-            _ => StructureChange::None,
-        }
-    }
-
-    /// 강한 반전인지 확인
-    fn is_strong_reversal(&self, candles: &[C]) -> bool {
-        if candles.len() < 10 {
-            return false;
-        }
-
-        let recent_volume: f64 = candles.iter().take(5).map(|c| c.volume()).sum();
-        let avg_volume: f64 = candles
-            .iter()
-            .skip(5)
-            .take(10)
-            .map(|c| c.volume())
-            .sum::<f64>()
-            / 10.0;
-
-        recent_volume > avg_volume * 1.5
-    }
-
-    /// 스윙 포인트 식별
-    fn identify_swing_points(&self, candles: &[C]) -> Vec<(usize, f64, bool)> {
-        let mut swing_points = Vec::new();
-        let strength = self.swing_strength;
-
-        if candles.len() < strength * 2 + 1 {
-            return swing_points;
-        }
-
-        for i in strength..candles.len() - strength {
-            let current = &candles[i];
-
-            // 스윙 하이 확인
-            let is_swing_high = (i.saturating_sub(strength)..i)
-                .chain((i + 1)..(i + strength + 1).min(candles.len()))
-                .all(|j| current.high_price() > candles[j].high_price());
-
-            // 스윙 로우 확인
-            let is_swing_low = (i.saturating_sub(strength)..i)
-                .chain((i + 1)..(i + strength + 1).min(candles.len()))
-                .all(|j| current.low_price() < candles[j].low_price());
-
-            if is_swing_high {
-                swing_points.push((i, current.high_price(), true));
-            }
-            if is_swing_low {
-                swing_points.push((i, current.low_price(), false));
-            }
-        }
-
-        swing_points
+        let previous_structure = self.items.first().map(|item| &item.market_structure);
+        indicator_market_structure::detect_structure_change(
+            candles,
+            previous_structure,
+            current_structure,
+        )
     }
 
     /// Fair Value Gap 식별
     fn identify_fair_value_gaps(&self, candles: &[C]) -> Vec<FairValueGap> {
-        let mut fvgs = Vec::new();
-
-        if candles.len() < 3 {
-            return fvgs;
-        }
-
-        for i in 0..candles.len() - 2 {
-            let candle1 = &candles[i + 2];
-            let _candle2 = &candles[i + 1];
-            let candle3 = &candles[i];
-
-            // 불리시 FVG 확인
-            if candle1.high_price() < candle3.low_price() {
-                let gap_size = candle3.low_price() - candle1.high_price();
-                if gap_size >= self.min_fvg_size {
-                    fvgs.push(FairValueGap {
-                        start_price: candle1.high_price(),
-                        end_price: candle3.low_price(),
-                        gap_type: FVGType::Bullish,
-                        index: i,
-                        size: gap_size,
-                    });
-                }
-            }
-
-            // 베어리시 FVG 확인
-            if candle1.low_price() > candle3.high_price() {
-                let gap_size = candle1.low_price() - candle3.high_price();
-                if gap_size >= self.min_fvg_size {
-                    fvgs.push(FairValueGap {
-                        start_price: candle1.low_price(),
-                        end_price: candle3.high_price(),
-                        gap_type: FVGType::Bearish,
-                        index: i,
-                        size: gap_size,
-                    });
-                }
-            }
-        }
-
-        fvgs
+        indicator_market_structure::identify_fair_value_gaps(candles, self.min_fvg_size)
     }
 
     /// 오더 블록 식별
     fn identify_order_blocks(&self, candles: &[C]) -> Vec<OrderBlock> {
-        let mut order_blocks = Vec::new();
-        let swing_points = self.identify_swing_points(candles);
-
-        for (index, _price, is_high) in swing_points {
-            if index >= candles.len() {
-                continue;
-            }
-
-            let candle = &candles[index];
-            let block_size = candle.high_price() - candle.low_price();
-
-            if block_size >= self.min_order_block_size {
-                let block_type = if is_high {
-                    OrderBlockType::Bearish
-                } else {
-                    OrderBlockType::Bullish
-                };
-
-                order_blocks.push(OrderBlock {
-                    start_price: candle.low_price(),
-                    end_price: candle.high_price(),
-                    block_type,
-                    index,
-                    strength: 1,
-                });
-            }
-        }
-
-        order_blocks
+        indicator_market_structure::identify_order_blocks(
+            candles,
+            self.swing_strength,
+            self.min_order_block_size,
+        )
     }
 
     /// 유동성 풀 식별
     fn identify_liquidity_pools(&self, candles: &[C]) -> Vec<LiquidityPool> {
-        let mut liquidity_pools = Vec::new();
-        let swing_points = self.identify_swing_points(candles);
-
-        for (index, price, is_high) in swing_points {
-            if index >= candles.len() {
-                continue;
-            }
-
-            let candle = &candles[index];
-            let pool_type = if is_high {
-                LiquidityPoolType::SellLiquidity
-            } else {
-                LiquidityPoolType::BuyLiquidity
-            };
-
-            liquidity_pools.push(LiquidityPool {
-                price,
-                pool_type,
-                index,
-                liquidity_amount: candle.volume(),
-            });
-        }
-
-        liquidity_pools
+        indicator_market_structure::identify_liquidity_pools(candles, self.swing_strength)
     }
 
     /// 시장 흐름 강도 계산
     fn calculate_market_flow_strength(&self, candles: &[C]) -> f64 {
-        if candles.len() < 10 {
-            return 0.0;
-        }
-
-        let recent_candles = &candles[..10];
-        let bullish_count = recent_candles
-            .iter()
-            .filter(|c| c.close_price() > c.open_price())
-            .count();
-
-        let volume_trend = self.calculate_volume_trend(recent_candles);
-        let price_momentum = self.calculate_price_momentum(recent_candles);
-
-        let bullish_ratio = bullish_count as f64 / recent_candles.len() as f64;
-
-        (bullish_ratio + volume_trend + price_momentum) / 3.0
-    }
-
-    /// 볼륨 트렌드 계산
-    fn calculate_volume_trend(&self, candles: &[C]) -> f64 {
-        if candles.len() < 2 {
-            return 0.0;
-        }
-
-        let recent_volume: f64 = candles.iter().take(5).map(|c| c.volume()).sum();
-        let past_volume: f64 = candles.iter().skip(5).map(|c| c.volume()).sum();
-
-        if past_volume == 0.0 {
-            return 0.0;
-        }
-
-        ((recent_volume - past_volume) / past_volume).clamp(-1.0, 1.0)
-    }
-
-    /// 가격 모멘텀 계산
-    fn calculate_price_momentum(&self, candles: &[C]) -> f64 {
-        if candles.len() < 2 {
-            return 0.0;
-        }
-
-        let current_price = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-        let past_price = match candles.last() {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-
-        if past_price == 0.0 {
-            return 0.0;
-        }
-
-        ((current_price - past_price) / past_price).clamp(-1.0, 1.0)
+        indicator_market_structure::calculate_market_flow_strength(candles)
     }
 
     /// 임밸런스 정도 계산
     fn calculate_imbalance_degree(&self, candles: &[C]) -> f64 {
-        if candles.len() < 5 {
-            return 0.0;
-        }
-
-        let recent_candles = &candles[..5];
-        let mut imbalance_score = 0.0;
-
-        for candle in recent_candles {
-            let body_size = (candle.close_price() - candle.open_price()).abs();
-            let total_size = candle.high_price() - candle.low_price();
-            let upper_shadow = candle.high_price() - candle.close_price().max(candle.open_price());
-            let lower_shadow = candle.close_price().min(candle.open_price()) - candle.low_price();
-
-            if total_size > 0.0 {
-                let body_ratio = body_size / total_size;
-                let shadow_imbalance = (upper_shadow - lower_shadow).abs() / total_size;
-                imbalance_score += body_ratio + shadow_imbalance;
-            }
-        }
-
-        (imbalance_score / recent_candles.len() as f64).clamp(0.0, 1.0)
+        indicator_market_structure::calculate_imbalance_degree(candles)
     }
 
     /// 최근 스윙 포인트 반환
     fn get_recent_swing_points(&self, candles: &[C]) -> (Option<f64>, Option<f64>) {
-        let swing_points = self.identify_swing_points(candles);
-
-        let recent_high = swing_points
-            .iter()
-            .filter(|(_, _, is_high)| *is_high)
-            .map(|(_, price, _)| *price)
-            .next();
-
-        let recent_low = swing_points
-            .iter()
-            .filter(|(_, _, is_high)| !*is_high)
-            .map(|(_, price, _)| *price)
-            .next();
-
-        (recent_high, recent_low)
+        indicator_market_structure::get_recent_swing_points(candles, self.swing_strength)
     }
 
     /// 시장 구조 강도 확인
