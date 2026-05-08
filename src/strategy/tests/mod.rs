@@ -2,6 +2,7 @@
 // 각 전략별 테스트를 위한 모듈 정의
 
 pub mod bband_strategy_tests;
+pub mod box_range_strategy_tests;
 pub mod common;
 pub mod hybrid_short_strategy_tests;
 pub mod hybrid_strategy_tests;
