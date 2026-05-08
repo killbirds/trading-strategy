@@ -5,6 +5,7 @@ pub mod adx;
 pub mod atr;
 pub mod bband;
 pub mod box_range;
+pub mod cci;
 pub mod ichimoku;
 pub mod ma;
 pub mod macd;
@@ -12,11 +13,15 @@ pub mod max;
 pub mod min;
 pub mod momentum;
 pub mod orderbook;
+pub mod roc;
 pub mod rsi;
+pub mod stochastic;
 pub mod supertrend;
+pub mod ultimate_oscillator;
 pub mod utils;
 pub mod volume;
 pub mod vwap;
+pub mod williams_r;
 
 // 이 모듈은 이전의 ta 모듈을 대체합니다.
 // 더 명확한 이름으로 기술적 지표를 표현합니다.
