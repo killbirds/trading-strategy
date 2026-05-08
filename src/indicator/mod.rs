@@ -2,19 +2,29 @@
 // 각종 기술적 분석 지표를 제공합니다.
 
 pub mod adx;
+pub mod aroon;
 pub mod atr;
 pub mod bband;
 pub mod box_range;
 pub mod candle_pattern;
 pub mod cci;
+pub mod chaikin;
+pub mod choppiness;
+pub mod donchian;
 pub mod ichimoku;
+pub mod kama;
+pub mod keltner;
 pub mod ma;
 pub mod macd;
 pub mod market_structure;
 pub mod max;
+pub mod mfi;
 pub mod min;
 pub mod momentum;
+pub mod obv;
 pub mod orderbook;
+pub mod parabolic_sar;
+pub mod ppo;
 pub mod price_action;
 pub mod price_reference_gap;
 pub mod roc;
@@ -41,6 +51,26 @@ use std::fmt::Display;
 use trading_chart::Candle;
 
 pub type IndicatorResult<T> = std::result::Result<T, String>;
+
+pub(crate) const MAX_INDICATOR_CAPACITY: usize = 1_000_000;
+
+pub(crate) fn checked_indicator_capacity(
+    indicator_name: &str,
+    base: usize,
+    multiplier: usize,
+    addend: usize,
+) -> IndicatorResult<usize> {
+    let capacity = base
+        .checked_mul(multiplier)
+        .and_then(|value| value.checked_add(addend))
+        .ok_or_else(|| format!("{indicator_name} 기간이 너무 큽니다"))?;
+
+    if capacity > MAX_INDICATOR_CAPACITY {
+        return Err(format!("{indicator_name} 기간이 너무 큽니다"));
+    }
+
+    Ok(capacity)
+}
 
 /// 기술적 지표(TA)의 컬렉션을 관리하는 구조체
 ///
