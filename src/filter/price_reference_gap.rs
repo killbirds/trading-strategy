@@ -5,6 +5,7 @@ use crate::candle_store::CandleStore;
 use crate::indicator::ma::MABuilderFactory;
 use crate::indicator::max::MAXBuilder;
 use crate::indicator::min::MINBuilder;
+use crate::indicator::price_reference_gap as indicator_price_reference_gap;
 use crate::indicator::vwap::{VWAPBuilder, VWAPParams as IndicatorVWAPParams};
 use trading_chart::Candle;
 
@@ -66,72 +67,50 @@ pub(crate) fn filter_price_reference_gap<C: Candle + 'static>(
 }
 
 fn required_candle_count(params: &PriceReferenceGapParams) -> usize {
-    let reference_period = match &params.reference_source {
-        PriceReferenceSource::MovingAverage { period, .. } => *period,
-        PriceReferenceSource::VWAP { period } => *period,
+    match &params.reference_source {
+        PriceReferenceSource::MovingAverage { period, .. }
+        | PriceReferenceSource::VWAP { period } => {
+            indicator_price_reference_gap::required_candle_count(
+                *period,
+                false,
+                params.p,
+                params.consecutive_n,
+            )
+        }
         PriceReferenceSource::HighestHigh {
             lookback_period,
             include_current_candle,
-        } => *lookback_period + usize::from(!include_current_candle),
-        PriceReferenceSource::LowestLow {
+        }
+        | PriceReferenceSource::LowestLow {
             lookback_period,
             include_current_candle,
-        } => *lookback_period + usize::from(!include_current_candle),
-    };
-
-    reference_period + params.p + params.consecutive_n.saturating_sub(1)
+        } => indicator_price_reference_gap::required_candle_count(
+            *lookback_period,
+            !include_current_candle,
+            params.p,
+            params.consecutive_n,
+        ),
+    }
 }
 
 fn matches_reference_gap<C: Candle>(
     ascending_items: &[C],
     params: &PriceReferenceGapParams,
     current_price: f64,
-    mut reference_value: impl FnMut(&[C]) -> Option<f64>,
+    reference_value: impl FnMut(&[C]) -> Option<f64>,
 ) -> bool {
-    for offset in params.p..params.p + params.consecutive_n {
-        let Some(window_end) = ascending_items.len().checked_sub(offset) else {
-            return false;
-        };
-
-        if window_end == 0 {
-            return false;
-        }
-
-        let window = &ascending_items[..window_end];
-        let Some(reference_price) = reference_value(window) else {
-            return false;
-        };
-
-        let Some(gap_ratio) = compute_gap_ratio(current_price, reference_price) else {
-            return false;
-        };
-
-        if !matches_gap_threshold(gap_ratio, params.filter_type, params.gap_threshold) {
-            return false;
-        }
-    }
-
-    true
+    indicator_price_reference_gap::matches_reference_gap(
+        ascending_items,
+        current_price,
+        params.p,
+        params.consecutive_n,
+        reference_value,
+        |gap_ratio| matches_gap_threshold(gap_ratio, params.filter_type, params.gap_threshold),
+    )
 }
 
 fn high_low_reference_window<C>(window: &[C], include_current_candle: bool) -> Option<&[C]> {
-    if include_current_candle {
-        return Some(window);
-    }
-
-    if window.len() < 2 {
-        return None;
-    }
-
-    Some(&window[..window.len() - 1])
-}
-
-fn compute_gap_ratio(current_price: f64, reference_price: f64) -> Option<f64> {
-    if reference_price == 0.0 {
-        return None;
-    }
-
-    Some((current_price - reference_price) / reference_price)
+    indicator_price_reference_gap::high_low_reference_window(window, include_current_candle)
 }
 
 fn matches_gap_threshold(
