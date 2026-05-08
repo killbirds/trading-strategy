@@ -1,5 +1,7 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
+use crate::indicator::momentum::MomentumBuilder;
+pub use crate::indicator::momentum::MomentumIndicators;
 use std::fmt::Display;
 use trading_chart::Candle;
 
@@ -20,27 +22,6 @@ pub enum MomentumState {
     Stable,
     Decelerating,
     Reverting,
-}
-
-/// 모멘텀 지표 데이터
-#[derive(Debug, Clone)]
-pub struct MomentumIndicators {
-    /// RSI (Relative Strength Index)
-    pub rsi: f64,
-    /// 스토캐스틱 %K
-    pub stoch_k: f64,
-    /// 스토캐스틱 %D
-    pub stoch_d: f64,
-    /// 윌리엄스 %R
-    pub williams_r: f64,
-    /// Rate of Change (ROC)
-    pub roc: f64,
-    /// Commodity Channel Index (CCI)
-    pub cci: f64,
-    /// 모멘텀 지표 (단순 가격 변화)
-    pub momentum: f64,
-    /// Ultimate Oscillator
-    pub ultimate_oscillator: f64,
 }
 
 /// 모멘텀 다이버전스 분석
@@ -379,225 +360,6 @@ impl<C: Candle + Clone + 'static> MomentumAnalyzer<C> {
                 history_length: 20,
             },
         )
-    }
-
-    /// RSI 계산
-    fn calculate_rsi(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.rsi_period {
-            return 50.0;
-        }
-
-        let price_changes: Vec<f64> = candles
-            .windows(2)
-            .map(|w| w[0].close_price() - w[1].close_price())
-            .collect();
-
-        let gains: Vec<f64> = price_changes
-            .iter()
-            .map(|&x| if x > 0.0 { x } else { 0.0 })
-            .collect();
-        let losses: Vec<f64> = price_changes
-            .iter()
-            .map(|&x| if x < 0.0 { -x } else { 0.0 })
-            .collect();
-
-        let avg_gain = gains.iter().sum::<f64>() / gains.len() as f64;
-        let avg_loss = losses.iter().sum::<f64>() / losses.len() as f64;
-
-        if avg_loss == 0.0 {
-            return 100.0;
-        }
-
-        let rs = avg_gain / avg_loss;
-        100.0 - (100.0 / (1.0 + rs))
-    }
-
-    /// 스토캐스틱 %K 계산
-    fn calculate_stochastic_k(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.stoch_period {
-            return 50.0;
-        }
-
-        let recent_candles = &candles[..self.stoch_period];
-        let highest_high = recent_candles
-            .iter()
-            .map(|c| c.high_price())
-            .fold(0.0, f64::max);
-        let lowest_low = recent_candles
-            .iter()
-            .map(|c| c.low_price())
-            .fold(f64::MAX, f64::min);
-        let current_close = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 50.0,
-        };
-
-        if highest_high == lowest_low {
-            return 50.0;
-        }
-
-        ((current_close - lowest_low) / (highest_high - lowest_low)) * 100.0
-    }
-
-    /// 스토캐스틱 %D 계산 (3일 %K의 이동평균)
-    fn calculate_stochastic_d(&self, k_values: &[f64]) -> f64 {
-        if k_values.len() < 3 {
-            return k_values.first().copied().unwrap_or(50.0);
-        }
-
-        k_values[..3].iter().sum::<f64>() / 3.0
-    }
-
-    /// 윌리엄스 %R 계산
-    fn calculate_williams_r(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.williams_period {
-            return -50.0;
-        }
-
-        let recent_candles = &candles[..self.williams_period];
-        let highest_high = recent_candles
-            .iter()
-            .map(|c| c.high_price())
-            .fold(0.0, f64::max);
-        let lowest_low = recent_candles
-            .iter()
-            .map(|c| c.low_price())
-            .fold(f64::MAX, f64::min);
-        let current_close = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 50.0,
-        };
-
-        if highest_high == lowest_low {
-            return -50.0;
-        }
-
-        -((highest_high - current_close) / (highest_high - lowest_low)) * 100.0
-    }
-
-    /// ROC (Rate of Change) 계산
-    fn calculate_roc(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.roc_period {
-            return 0.0;
-        }
-
-        let current_price = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-        let past_price = match candles.get(self.roc_period - 1) {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-
-        if past_price == 0.0 {
-            return 0.0;
-        }
-
-        ((current_price - past_price) / past_price) * 100.0
-    }
-
-    /// CCI (Commodity Channel Index) 계산
-    fn calculate_cci(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.cci_period {
-            return 0.0;
-        }
-
-        let recent_candles = &candles[..self.cci_period];
-        let typical_prices: Vec<f64> = recent_candles
-            .iter()
-            .map(|c| (c.high_price() + c.low_price() + c.close_price()) / 3.0)
-            .collect();
-
-        let sma = typical_prices.iter().sum::<f64>() / typical_prices.len() as f64;
-        let current_typical = match typical_prices.first() {
-            Some(&tp) => tp,
-            None => return 0.0,
-        };
-
-        let mad = typical_prices
-            .iter()
-            .map(|&tp| (tp - sma).abs())
-            .sum::<f64>()
-            / typical_prices.len() as f64;
-
-        if mad == 0.0 {
-            return 0.0;
-        }
-
-        (current_typical - sma) / (0.015 * mad)
-    }
-
-    /// 모멘텀 계산
-    fn calculate_momentum(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.momentum_period {
-            return 0.0;
-        }
-
-        let current_price = match candles.first() {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-        let past_price = match candles.get(self.momentum_period - 1) {
-            Some(c) => c.close_price(),
-            None => return 0.0,
-        };
-
-        current_price - past_price
-    }
-
-    /// Ultimate Oscillator 계산
-    fn calculate_ultimate_oscillator(&self, candles: &[C]) -> f64 {
-        if candles.len() < 28 {
-            return 50.0;
-        }
-
-        let calculate_bp_tr = |current: &C, previous: &C| -> (f64, f64) {
-            let bp = current.close_price() - current.low_price().min(previous.close_price());
-            let tr = current.high_price().max(previous.close_price())
-                - current.low_price().min(previous.close_price());
-            (bp, tr)
-        };
-
-        let mut bp_sum_7 = 0.0;
-        let mut tr_sum_7 = 0.0;
-        let mut bp_sum_14 = 0.0;
-        let mut tr_sum_14 = 0.0;
-        let mut bp_sum_28 = 0.0;
-        let mut tr_sum_28 = 0.0;
-
-        for i in 0..28.min(candles.len() - 1) {
-            let (bp, tr) = calculate_bp_tr(&candles[i], &candles[i + 1]);
-
-            if i < 7 {
-                bp_sum_7 += bp;
-                tr_sum_7 += tr;
-            }
-            if i < 14 {
-                bp_sum_14 += bp;
-                tr_sum_14 += tr;
-            }
-            bp_sum_28 += bp;
-            tr_sum_28 += tr;
-        }
-
-        let avg_7 = if tr_sum_7 != 0.0 {
-            bp_sum_7 / tr_sum_7
-        } else {
-            0.0
-        };
-        let avg_14 = if tr_sum_14 != 0.0 {
-            bp_sum_14 / tr_sum_14
-        } else {
-            0.0
-        };
-        let avg_28 = if tr_sum_28 != 0.0 {
-            bp_sum_28 / tr_sum_28
-        } else {
-            0.0
-        };
-
-        ((4.0 * avg_7) + (2.0 * avg_14) + avg_28) / 7.0 * 100.0
     }
 
     /// 모멘텀 방향 결정
@@ -982,32 +744,16 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<MomentumAnalyzerData<C>, C> for Mo
         }
 
         // 모멘텀 지표들 계산
-        let rsi = self.calculate_rsi(&recent_candles);
-        let stoch_k = self.calculate_stochastic_k(&recent_candles);
-
-        // 이전 %K 값들 수집하여 %D 계산
-        let mut k_values = vec![stoch_k];
-        for item in self.items.iter().take(2) {
-            k_values.push(item.momentum_indicators.stoch_k);
-        }
-        let stoch_d = self.calculate_stochastic_d(&k_values);
-
-        let williams_r = self.calculate_williams_r(&recent_candles);
-        let roc = self.calculate_roc(&recent_candles);
-        let cci = self.calculate_cci(&recent_candles);
-        let momentum = self.calculate_momentum(&recent_candles);
-        let ultimate_oscillator = self.calculate_ultimate_oscillator(&recent_candles);
-
-        let momentum_indicators = MomentumIndicators {
-            rsi,
-            stoch_k,
-            stoch_d,
-            williams_r,
-            roc,
-            cci,
-            momentum,
-            ultimate_oscillator,
-        };
+        let chronological_candles: Vec<C> = recent_candles.iter().rev().cloned().collect();
+        let momentum_indicators = MomentumBuilder::new(
+            self.rsi_period,
+            self.stoch_period,
+            self.williams_period,
+            self.roc_period,
+            self.cci_period,
+            self.momentum_period,
+        )
+        .build(&chronological_candles);
 
         // 모멘텀 분석
         let momentum_direction = self.determine_momentum_direction(&momentum_indicators);

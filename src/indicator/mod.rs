@@ -10,6 +10,7 @@ pub mod ma;
 pub mod macd;
 pub mod max;
 pub mod min;
+pub mod momentum;
 pub mod orderbook;
 pub mod rsi;
 pub mod supertrend;
