@@ -50,6 +50,7 @@ src/
 ├── indicator/         # 기술적 지표 계산
 │   ├── bband.rs
 │   ├── box_range.rs
+│   ├── candle_pattern.rs
 │   ├── cci.rs
 │   ├── macd.rs
 │   ├── market_structure.rs

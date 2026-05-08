@@ -5,6 +5,7 @@ pub mod adx;
 pub mod atr;
 pub mod bband;
 pub mod box_range;
+pub mod candle_pattern;
 pub mod cci;
 pub mod ichimoku;
 pub mod ma;
