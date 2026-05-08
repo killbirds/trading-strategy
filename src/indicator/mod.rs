@@ -4,6 +4,7 @@
 pub mod adx;
 pub mod atr;
 pub mod bband;
+pub mod box_range;
 pub mod ichimoku;
 pub mod ma;
 pub mod macd;
