@@ -52,10 +52,15 @@ src/
 │   ├── box_range.rs
 │   ├── cci.rs
 │   ├── macd.rs
+│   ├── market_structure.rs
 │   ├── momentum.rs
+│   ├── price_action.rs
+│   ├── price_reference_gap.rs
 │   ├── roc.rs
 │   ├── rsi.rs
+│   ├── slope.rs
 │   ├── stochastic.rs
+│   ├── support_resistance.rs
 │   ├── ultimate_oscillator.rs
 │   ├── williams_r.rs
 │   └── ...
