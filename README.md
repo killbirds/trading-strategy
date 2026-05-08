@@ -4,7 +4,7 @@ Rust로 구현된 포괄적인 트레이딩 전략 라이브러리입니다. 다
 
 ## 주요 특징
 
-- **다양한 트레이딩 전략**: 이동평균, RSI, 볼린저 밴드, MACD 등 다양한 기술적 지표 기반 전략
+- **다양한 트레이딩 전략**: 이동평균, RSI, 볼린저 밴드, 박스권, MACD 등 다양한 기술적 지표 기반 전략
 - **롱/숏 전략 지원**: 각 전략의 롱 및 숏 버전 제공
 - **고급 분석 도구**: 여러 지표를 결합한 하이브리드 전략 및 멀티 타임프레임 분석
 - **유연한 설정**: TOML 및 JSON 형식의 설정 파일 지원
@@ -17,6 +17,7 @@ Rust로 구현된 포괄적인 트레이딩 전략 라이브러리입니다. 다
 - **MA (Moving Average)**: 이동평균선 기반 전략
 - **RSI**: 상대강도지수 기반 전략
 - **BBand (Bollinger Band)**: 볼린저 밴드 기반 전략
+- **BoxRange**: 박스권 상·하단 돌파 기반 전략
 - **MACD**: MACD 지표 기반 전략
 - **ThreeRSI**: 3개의 RSI 지표를 조합한 전략
 - **Copys**: 커스텀 복합 전략
@@ -36,21 +37,27 @@ src/
 │   ├── adx_analyzer.rs
 │   ├── atr_analyzer.rs
 │   ├── bband_analyzer.rs
+│   ├── box_range_analyzer.rs
 │   ├── macd_analyzer.rs
 │   ├── rsi_analyzer.rs
 │   └── ...
 ├── filter/            # 기술적 필터링 기준
 │   ├── adx.rs
 │   ├── bollinger_band.rs
+│   ├── box_range.rs
 │   ├── macd.rs
 │   └── ...
 ├── indicator/         # 기술적 지표 계산
 │   ├── bband.rs
+│   ├── box_range.rs
 │   ├── macd.rs
+│   ├── momentum.rs
 │   ├── rsi.rs
 │   └── ...
 ├── strategy/          # 트레이딩 전략 구현
 │   ├── bband_strategy.rs
+│   ├── box_range_strategy.rs
+│   ├── box_range_short_strategy.rs
 │   ├── macd_strategy.rs
 │   ├── rsi_strategy.rs
 │   └── ...
@@ -175,6 +182,21 @@ squeeze_threshold = 0.015
 - `is_enhanced_squeeze_breakout_with_close_above_upper(narrowing_period, squeeze_period, threshold)`: 향상된 스퀴즈 돌파 패턴 확인
 - `is_squeeze_expansion_start(threshold)`: 스퀴즈 상태에서 밴드 폭 확대 시작 확인
 
+## 박스권 돌파 전략
+
+BoxRange 전략은 최근 `period`개 캔들의 최고가/최저가로 박스 상단·중간·하단을 계산하고, 폭 비율이 `max_width_ratio` 이하인 구간을 박스권으로 판정합니다. 전략 신호는 캔들 종가가 아니라 호출자가 전달한 `current_price` 기준으로 평가하므로, 같은 캔들 상태에서 실시간 가격만 바꿔 tick 단위 돌파 여부를 확인할 수 있습니다.
+
+### 설정 파라미터
+
+- `count`: 돌파 전 확인할 직전 박스권 데이터 수 (기본: 1)
+- `period`: 박스권 계산 기간 (기본: 20)
+- `max_width_ratio`: 박스권 판정 최대 폭 비율 (기본: 0.05 = 5%)
+
+### 신호 기준
+
+- `BoxRangeStrategy`: 직전 박스권 상단을 `current_price` 가 돌파하면 롱 진입, 직전 박스 중간선 아래로 내려오면 청산
+- `BoxRangeShortStrategy`: 직전 박스권 하단을 `current_price` 가 이탈하면 숏 진입, 직전 박스 중간선 위로 회복하면 청산
+
 ## 기술적 분석기
 
 라이브러리는 다양한 기술적 지표 분석기를 제공합니다:
@@ -182,7 +204,9 @@ squeeze_threshold = 0.015
 - **ADX Analyzer**: 추세 강도 분석
 - **ATR Analyzer**: 평균 진폭 분석
 - **BBand Analyzer**: 볼린저 밴드 분석
+- **BoxRange Analyzer**: 박스권 범위와 돌파 분석
 - **MACD Analyzer**: MACD 지표 분석
+- **Momentum Analyzer**: RSI, 스토캐스틱, Williams %R, ROC, CCI 등을 조합한 모멘텀 분석
 - **RSI Analyzer**: 상대강도지수 분석
 - **MA Analyzer**: 이동평균 분석
 - **Ichimoku Analyzer**: 이치모쿠 분석
@@ -195,7 +219,7 @@ squeeze_threshold = 0.015
 
 다음과 같은 기술적 필터를 제공합니다:
 
-- RSI, MACD, 볼린저 밴드, ADX, 이동평균선
+- RSI, MACD, 볼린저 밴드, 박스권, ADX, 이동평균선
 - 이치모쿠, VWAP, PriceReferenceGap, CopyS
 - ATR, SuperTrend, 거래량, ThreeRSI
 - 캔들 패턴, 지지/저항, 모멘텀, Slope

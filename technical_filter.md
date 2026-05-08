@@ -3,8 +3,8 @@
 이 문서는 `src/filter/` 실제 구현을 기준으로 다시 정리한 **구현 기준 레퍼런스**입니다.
 
 - 기준 소스: `src/filter/mod.rs`, `src/filter/*.rs`, `src/analyzer/slope_analyzer.rs`, `src/indicator/ma/mod.rs`, `src/strategy/copys_common.rs`
-- 지원 필터 종류: **17개**
-- 전체 `filter_type` variant 수: **320개**
+- 지원 필터 종류: **18개**
+- 전체 `filter_type` variant 수: **332개**
 - 실제 조합 예시는 `ta_filter_sample/` 문서를 참고하세요.
 
 이전 문서에 있던 장세 해석/전략 추천 성격의 설명은 코드와 1:1로 대응되지 않는 부분이 많아서, 여기서는 **코드가 실제로 허용하는 설정면**만 정리합니다.
@@ -30,6 +30,7 @@ p = 0
 - `RSI`
 - `MACD`
 - `BOLLINGER_BAND`
+- `BOX_RANGE`
 - `ADX`
 - `MOVING_AVERAGE`
 - `PRICE_REFERENCE_GAP`
@@ -77,6 +78,7 @@ p = 0
 | RSI               | `RSI`                 |               23 | `period + consecutive_n`                              |
 | MACD              | `MACD`                |               21 | `slow_period + signal_period + consecutive_n`         |
 | BollingerBand     | `BOLLINGER_BAND`      |               31 | `period`                                              |
+| BoxRange          | `BOX_RANGE`           |               12 | 필터 타입에 따라 다름                                 |
 | ADX               | `ADX`                 |               31 | `period * 2 + consecutive_n`                          |
 | MovingAverage     | `MOVING_AVERAGE`      |               23 | `max(periods)`                                        |
 | Ichimoku          | `ICHIMOKU`            |               13 | `senkou_span_b_period + kijun_period + consecutive_n` |
@@ -97,6 +99,12 @@ PriceReferenceGap 최소 필요 캔들 수:
 - `MOVING_AVERAGE`, `VWAP`: `period + p + consecutive_n - 1`
 - `HIGHEST_HIGH`, `LOWEST_LOW` + `include_current_candle = true`: `lookback_period + p + consecutive_n - 1`
 - `HIGHEST_HIGH`, `LOWEST_LOW` + `include_current_candle = false`: `lookback_period + 1 + p + consecutive_n - 1`
+
+BoxRange 최소 필요 캔들 수:
+
+- 일반 박스권/현재 박스 비교/폭 비율 필터: `period + p + consecutive_n - 1`
+- `BreakoutAbove`, `BreakoutBelow`, `HighBreakThroughUpperBox`, `LowBreakThroughLowerBox`: `period + p + consecutive_n`
+- `BoxRangeStart`: `period + p + consecutive_n - 1 + prior_box_count`
 
 실시간 가격 비교가 필요한 필터는 캔들 저장소의 최신 `close` 를 현재가로 사용하지 않습니다. 필터 평가 시 외부에서 전달한 `current_price` 로 가격 조건을 판단하고, `p` 는 캔들/지표 기준값을 선택하는 오프셋으로만 사용합니다.
 
@@ -161,6 +169,28 @@ LowVolatility, HighVolatility
 ```
 
 메모: `BreakThroughLowerBand` 와 `BreakThroughLowerBandFromBelow` 는 현재 같은 구현을 사용합니다.
+
+### BoxRange
+
+- 기본값: `period=20`, `max_width_ratio=0.05`, `filter_type="IsBoxRange"`, `consecutive_n=1`, `p=0`, `prior_box_count=1`, `width_ratio_threshold=0.05`
+- `max_width_ratio` 검증: 유한한 양수
+- `width_ratio_threshold` 검증: 유한한 0 이상 숫자
+- 최소 필요 캔들 수: 필터 타입에 따라 위 빠른 참조의 BoxRange 계산식 참고
+- `filter_type`:
+
+```text
+IsBoxRange, InsideBox, OutsideBox, AboveUpperBox, BelowLowerBox,
+BoxRangeStart, BreakoutAbove, BreakoutBelow, HighBreakThroughUpperBox,
+LowBreakThroughLowerBox, WidthRatioBelowThreshold, WidthRatioAboveThreshold
+```
+
+메모:
+
+- 박스권은 최근 `period`개 캔들의 `max(high)` / `min(low)` 로 상단과 하단을 만들고, 폭 비율이 `max_width_ratio` 이하이면 박스권으로 봅니다.
+- `InsideBox`, `OutsideBox`, `AboveUpperBox`, `BelowLowerBox`, `BreakoutAbove`, `BreakoutBelow` 는 외부에서 전달한 `current_price` 기준으로 평가합니다.
+- `BreakoutAbove` / `BreakoutBelow` 는 직전 박스권 경계와 `current_price` 를 비교합니다.
+- `HighBreakThroughUpperBox` / `LowBreakThroughLowerBox` 는 현재 캔들의 `high` / `low` 가 직전 박스권 경계를 돌파했는지 확인하는 캔들 기반 필터입니다.
+- `BoxRangeStart` 는 현재 구간이 박스권 조건을 만족하고, 그 이전 `prior_box_count` 구간은 박스권이 아니었는지 확인합니다.
 
 ### ADX
 
