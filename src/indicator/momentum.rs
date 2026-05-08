@@ -1,4 +1,9 @@
 use crate::candle_store::CandleStore;
+use crate::indicator::cci::CCIBuilder;
+use crate::indicator::roc::ROCBuilder;
+use crate::indicator::stochastic::StochasticBuilder;
+use crate::indicator::ultimate_oscillator::UltimateOscillatorBuilder;
+use crate::indicator::williams_r::WilliamsRBuilder;
 use crate::indicator::{IndicatorResult, TABuilder};
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -6,8 +11,6 @@ use trading_chart::Candle;
 
 #[derive(Clone, Debug)]
 struct MomentumInput {
-    high: f64,
-    low: f64,
     close: f64,
 }
 
@@ -62,7 +65,11 @@ pub struct MomentumBuilder<C: Candle> {
     cci_period: usize,
     momentum_period: usize,
     values: Vec<MomentumInput>,
-    stoch_k_values: Vec<f64>,
+    stochastic_builder: StochasticBuilder<C>,
+    williams_r_builder: WilliamsRBuilder<C>,
+    roc_builder: ROCBuilder<C>,
+    cci_builder: CCIBuilder<C>,
+    ultimate_oscillator_builder: UltimateOscillatorBuilder<C>,
     _phantom: PhantomData<C>,
 }
 
@@ -125,7 +132,11 @@ where
             cci_period,
             momentum_period,
             values: Vec::with_capacity(max_period * 2),
-            stoch_k_values: Vec::with_capacity(4),
+            stochastic_builder: StochasticBuilder::new(stoch_period),
+            williams_r_builder: WilliamsRBuilder::new(williams_period),
+            roc_builder: ROCBuilder::new(roc_period),
+            cci_builder: CCIBuilder::new(cci_period),
+            ultimate_oscillator_builder: UltimateOscillatorBuilder::new(),
             _phantom: PhantomData,
         })
     }
@@ -136,7 +147,11 @@ where
 
     pub fn build(&mut self, data: &[C]) -> Momentum {
         self.values.clear();
-        self.stoch_k_values.clear();
+        self.stochastic_builder = StochasticBuilder::new(self.stoch_period);
+        self.williams_r_builder = WilliamsRBuilder::new(self.williams_period);
+        self.roc_builder = ROCBuilder::new(self.roc_period);
+        self.cci_builder = CCIBuilder::new(self.cci_period);
+        self.ultimate_oscillator_builder = UltimateOscillatorBuilder::new();
 
         if data.is_empty() {
             return self.empty_momentum();
@@ -157,8 +172,6 @@ where
 
     fn push(&mut self, data: &C) {
         self.values.push(MomentumInput {
-            high: data.high_price(),
-            low: data.low_price(),
             close: data.close_price(),
         });
 
@@ -196,24 +209,17 @@ where
     fn calculate(&mut self, _data: &C) -> Momentum {
         let recent = self.recent_values();
         let rsi = calculate_rsi(&recent, self.rsi_period);
-        let stoch_k = calculate_stochastic_k(&recent, self.stoch_period);
-
-        self.stoch_k_values.insert(0, stoch_k);
-        if self.stoch_k_values.len() > 3 {
-            self.stoch_k_values.truncate(3);
-        }
-        let stoch_d = calculate_stochastic_d(&self.stoch_k_values);
-
-        let williams_r = calculate_williams_r(&recent, self.williams_period);
-        let roc = calculate_roc(&recent, self.roc_period);
-        let cci = calculate_cci(&recent, self.cci_period);
+        let stochastic = self.stochastic_builder.next(_data);
+        let williams_r = self.williams_r_builder.next(_data).value;
+        let roc = self.roc_builder.next(_data).value;
+        let cci = self.cci_builder.next(_data).value;
         let momentum = calculate_momentum(&recent, self.momentum_period);
-        let ultimate_oscillator = calculate_ultimate_oscillator(&recent);
+        let ultimate_oscillator = self.ultimate_oscillator_builder.next(_data).value;
 
         MomentumIndicators {
             rsi,
-            stoch_k,
-            stoch_d,
+            stoch_k: stochastic.k,
+            stoch_d: stochastic.d,
             williams_r,
             roc,
             cci,
@@ -269,109 +275,6 @@ fn calculate_rsi(candles: &[MomentumInput], period: usize) -> f64 {
     100.0 - (100.0 / (1.0 + rs))
 }
 
-fn calculate_stochastic_k(candles: &[MomentumInput], period: usize) -> f64 {
-    if candles.len() < period {
-        return 50.0;
-    }
-
-    let recent_candles = &candles[..period];
-    let highest_high = recent_candles.iter().map(|c| c.high).fold(0.0, f64::max);
-    let lowest_low = recent_candles
-        .iter()
-        .map(|c| c.low)
-        .fold(f64::MAX, f64::min);
-    let current_close = match candles.first() {
-        Some(c) => c.close,
-        None => return 50.0,
-    };
-
-    if highest_high == lowest_low {
-        return 50.0;
-    }
-
-    ((current_close - lowest_low) / (highest_high - lowest_low)) * 100.0
-}
-
-fn calculate_stochastic_d(k_values: &[f64]) -> f64 {
-    if k_values.len() < 3 {
-        return k_values.first().copied().unwrap_or(50.0);
-    }
-
-    k_values[..3].iter().sum::<f64>() / 3.0
-}
-
-fn calculate_williams_r(candles: &[MomentumInput], period: usize) -> f64 {
-    if candles.len() < period {
-        return -50.0;
-    }
-
-    let recent_candles = &candles[..period];
-    let highest_high = recent_candles.iter().map(|c| c.high).fold(0.0, f64::max);
-    let lowest_low = recent_candles
-        .iter()
-        .map(|c| c.low)
-        .fold(f64::MAX, f64::min);
-    let current_close = match candles.first() {
-        Some(c) => c.close,
-        None => return 50.0,
-    };
-
-    if highest_high == lowest_low {
-        return -50.0;
-    }
-
-    -((highest_high - current_close) / (highest_high - lowest_low)) * 100.0
-}
-
-fn calculate_roc(candles: &[MomentumInput], period: usize) -> f64 {
-    if candles.len() < period {
-        return 0.0;
-    }
-
-    let current_price = match candles.first() {
-        Some(c) => c.close,
-        None => return 0.0,
-    };
-    let past_price = match candles.get(period - 1) {
-        Some(c) => c.close,
-        None => return 0.0,
-    };
-
-    if past_price == 0.0 {
-        return 0.0;
-    }
-
-    ((current_price - past_price) / past_price) * 100.0
-}
-
-fn calculate_cci(candles: &[MomentumInput], period: usize) -> f64 {
-    if candles.len() < period {
-        return 0.0;
-    }
-
-    let recent_candles = &candles[..period];
-    let typical_prices: Vec<f64> = recent_candles
-        .iter()
-        .map(|c| (c.high + c.low + c.close) / 3.0)
-        .collect();
-    let sma = typical_prices.iter().sum::<f64>() / typical_prices.len() as f64;
-    let current_typical = match typical_prices.first() {
-        Some(&tp) => tp,
-        None => return 0.0,
-    };
-    let mad = typical_prices
-        .iter()
-        .map(|&tp| (tp - sma).abs())
-        .sum::<f64>()
-        / typical_prices.len() as f64;
-
-    if mad == 0.0 {
-        return 0.0;
-    }
-
-    (current_typical - sma) / (0.015 * mad)
-}
-
 fn calculate_momentum(candles: &[MomentumInput], period: usize) -> f64 {
     if candles.len() < period {
         return 0.0;
@@ -387,58 +290,6 @@ fn calculate_momentum(candles: &[MomentumInput], period: usize) -> f64 {
     };
 
     current_price - past_price
-}
-
-fn calculate_ultimate_oscillator(candles: &[MomentumInput]) -> f64 {
-    if candles.len() < 28 {
-        return 50.0;
-    }
-
-    let calculate_bp_tr = |current: &MomentumInput, previous: &MomentumInput| -> (f64, f64) {
-        let bp = current.close - current.low.min(previous.close);
-        let tr = current.high.max(previous.close) - current.low.min(previous.close);
-        (bp, tr)
-    };
-
-    let mut bp_sum_7 = 0.0;
-    let mut tr_sum_7 = 0.0;
-    let mut bp_sum_14 = 0.0;
-    let mut tr_sum_14 = 0.0;
-    let mut bp_sum_28 = 0.0;
-    let mut tr_sum_28 = 0.0;
-
-    for i in 0..28.min(candles.len() - 1) {
-        let (bp, tr) = calculate_bp_tr(&candles[i], &candles[i + 1]);
-
-        if i < 7 {
-            bp_sum_7 += bp;
-            tr_sum_7 += tr;
-        }
-        if i < 14 {
-            bp_sum_14 += bp;
-            tr_sum_14 += tr;
-        }
-        bp_sum_28 += bp;
-        tr_sum_28 += tr;
-    }
-
-    let avg_7 = if tr_sum_7 != 0.0 {
-        bp_sum_7 / tr_sum_7
-    } else {
-        0.0
-    };
-    let avg_14 = if tr_sum_14 != 0.0 {
-        bp_sum_14 / tr_sum_14
-    } else {
-        0.0
-    };
-    let avg_28 = if tr_sum_28 != 0.0 {
-        bp_sum_28 / tr_sum_28
-    } else {
-        0.0
-    };
-
-    ((4.0 * avg_7) + (2.0 * avg_14) + avg_28) / 7.0 * 100.0
 }
 
 #[cfg(test)]
