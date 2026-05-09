@@ -77,6 +77,26 @@ pub enum FilterError {
     UnknownSupportResistanceFilterType { input: String },
     #[error("알 수 없는 Momentum 필터 타입: {input}")]
     UnknownMomentumFilterType { input: String },
+    #[error("알 수 없는 Donchian 필터 타입: {input}")]
+    UnknownDonchianFilterType { input: String },
+    #[error("알 수 없는 Keltner 필터 타입: {input}")]
+    UnknownKeltnerFilterType { input: String },
+    #[error("알 수 없는 OBV 필터 타입: {input}")]
+    UnknownObvFilterType { input: String },
+    #[error("알 수 없는 MFI 필터 타입: {input}")]
+    UnknownMfiFilterType { input: String },
+    #[error("알 수 없는 Aroon 필터 타입: {input}")]
+    UnknownAroonFilterType { input: String },
+    #[error("알 수 없는 Choppiness 필터 타입: {input}")]
+    UnknownChoppinessFilterType { input: String },
+    #[error("알 수 없는 KAMA 필터 타입: {input}")]
+    UnknownKamaFilterType { input: String },
+    #[error("알 수 없는 Chaikin 필터 타입: {input}")]
+    UnknownChaikinFilterType { input: String },
+    #[error("알 수 없는 PPO 필터 타입: {input}")]
+    UnknownPpoFilterType { input: String },
+    #[error("알 수 없는 ParabolicSAR 필터 타입: {input}")]
+    UnknownParabolicSarFilterType { input: String },
     #[error("알 수 없는 Slope 필터 타입: {input}")]
     UnknownSlopeFilterType { input: String },
 }
@@ -216,18 +236,29 @@ macro_rules! impl_filter_type_fromstr {
 
 // 각 필터 모듈 가져오기
 mod adx;
+mod aroon;
 mod atr;
 mod bollinger_band;
 mod box_range;
 mod candle_pattern;
+mod chaikin;
+mod choppiness;
 mod copys;
+mod donchian;
 mod ichimoku;
+mod kama;
+mod keltner;
 mod macd;
+mod mfi;
 mod momentum;
 mod moving_average;
+mod obv;
+mod parabolic_sar;
+mod ppo;
 mod price_reference_gap;
 mod rsi;
 mod slope;
+mod standalone_indicator;
 mod supertrend;
 mod support_resistance;
 mod three_rsi;
@@ -385,6 +416,16 @@ pub enum TechnicalFilterType {
     SupportResistance,
     /// Momentum 기반 필터 (모멘텀)
     Momentum,
+    Donchian,
+    Keltner,
+    OBV,
+    MFI,
+    Aroon,
+    Choppiness,
+    KAMA,
+    Chaikin,
+    PPO,
+    ParabolicSAR,
     /// Slope 기반 필터 (기울기)
     Slope,
 }
@@ -409,6 +450,16 @@ impl fmt::Display for TechnicalFilterType {
             TechnicalFilterType::CandlePattern => write!(f, "CandlePattern"),
             TechnicalFilterType::SupportResistance => write!(f, "SupportResistance"),
             TechnicalFilterType::Momentum => write!(f, "Momentum"),
+            TechnicalFilterType::Donchian => write!(f, "DONCHIAN"),
+            TechnicalFilterType::Keltner => write!(f, "KELTNER"),
+            TechnicalFilterType::OBV => write!(f, "OBV"),
+            TechnicalFilterType::MFI => write!(f, "MFI"),
+            TechnicalFilterType::Aroon => write!(f, "AROON"),
+            TechnicalFilterType::Choppiness => write!(f, "CHOPPINESS"),
+            TechnicalFilterType::KAMA => write!(f, "KAMA"),
+            TechnicalFilterType::Chaikin => write!(f, "CHAIKIN"),
+            TechnicalFilterType::PPO => write!(f, "PPO"),
+            TechnicalFilterType::ParabolicSAR => write!(f, "PARABOLIC_SAR"),
             TechnicalFilterType::Slope => write!(f, "Slope"),
         }
     }
@@ -438,6 +489,16 @@ impl FromStr for TechnicalFilterType {
             "CANDLEPATTERN" => Ok(TechnicalFilterType::CandlePattern),
             "SUPPORTRESISTANCE" => Ok(TechnicalFilterType::SupportResistance),
             "MOMENTUM" => Ok(TechnicalFilterType::Momentum),
+            "DONCHIAN" => Ok(TechnicalFilterType::Donchian),
+            "KELTNER" => Ok(TechnicalFilterType::Keltner),
+            "OBV" => Ok(TechnicalFilterType::OBV),
+            "MFI" => Ok(TechnicalFilterType::MFI),
+            "AROON" => Ok(TechnicalFilterType::Aroon),
+            "CHOPPINESS" => Ok(TechnicalFilterType::Choppiness),
+            "KAMA" => Ok(TechnicalFilterType::KAMA),
+            "CHAIKIN" => Ok(TechnicalFilterType::Chaikin),
+            "PPO" => Ok(TechnicalFilterType::PPO),
+            "PARABOLICSAR" | "PARABOLIC_SAR" => Ok(TechnicalFilterType::ParabolicSAR),
             "SLOPE" => Ok(TechnicalFilterType::Slope),
             _ => Err(FilterError::UnknownTechnicalFilterType {
                 input: s.to_string(),
@@ -1374,6 +1435,203 @@ impl_filter_type_fromstr!(
 
 impl_filter_type_deserialize!(MomentumFilterType, MomentumFilterTypeVisitor, "Momentum");
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum DonchianFilterType {
+    BreakoutAbove,
+    BreakoutBelow,
+    InsideChannel,
+    AboveMiddle,
+    BelowMiddle,
+    NearUpperEdge,
+    NearLowerEdge,
+}
+impl_filter_type_fromstr!(
+    DonchianFilterType,
+    UnknownDonchianFilterType,
+    parse_i32,
+    [
+        BreakoutAbove,
+        BreakoutBelow,
+        InsideChannel,
+        AboveMiddle,
+        BelowMiddle,
+        NearUpperEdge,
+        NearLowerEdge
+    ]
+);
+impl_filter_type_deserialize!(DonchianFilterType, DonchianFilterTypeVisitor, "Donchian");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum KeltnerFilterType {
+    BreakoutAbove,
+    BreakoutBelow,
+    InsideChannel,
+    AboveMiddle,
+    BelowMiddle,
+    NearUpperEdge,
+    NearLowerEdge,
+}
+impl_filter_type_fromstr!(
+    KeltnerFilterType,
+    UnknownKeltnerFilterType,
+    parse_i32,
+    [
+        BreakoutAbove,
+        BreakoutBelow,
+        InsideChannel,
+        AboveMiddle,
+        BelowMiddle,
+        NearUpperEdge,
+        NearLowerEdge
+    ]
+);
+impl_filter_type_deserialize!(KeltnerFilterType, KeltnerFilterTypeVisitor, "Keltner");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum OBVFilterType {
+    Rising,
+    Falling,
+}
+impl_filter_type_fromstr!(
+    OBVFilterType,
+    UnknownObvFilterType,
+    parse_i32,
+    [Rising, Falling]
+);
+impl_filter_type_deserialize!(OBVFilterType, OBVFilterTypeVisitor, "OBV");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum MFIFilterType {
+    Overbought,
+    Oversold,
+    AboveThreshold,
+    BelowThreshold,
+}
+impl_filter_type_fromstr!(
+    MFIFilterType,
+    UnknownMfiFilterType,
+    parse_i32,
+    [Overbought, Oversold, AboveThreshold, BelowThreshold]
+);
+impl_filter_type_deserialize!(MFIFilterType, MFIFilterTypeVisitor, "MFI");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum AroonFilterType {
+    BullishTrend,
+    BearishTrend,
+}
+impl_filter_type_fromstr!(
+    AroonFilterType,
+    UnknownAroonFilterType,
+    parse_i32,
+    [BullishTrend, BearishTrend]
+);
+impl_filter_type_deserialize!(AroonFilterType, AroonFilterTypeVisitor, "Aroon");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum ChoppinessFilterType {
+    Trending,
+    Ranging,
+}
+impl_filter_type_fromstr!(
+    ChoppinessFilterType,
+    UnknownChoppinessFilterType,
+    parse_i32,
+    [Trending, Ranging]
+);
+impl_filter_type_deserialize!(
+    ChoppinessFilterType,
+    ChoppinessFilterTypeVisitor,
+    "Choppiness"
+);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum KAMAFilterType {
+    PriceAbove,
+    PriceBelow,
+    PriceCrossAbove,
+    PriceCrossBelow,
+    Rising,
+    Falling,
+    ERAboveThreshold,
+    ERBelowThreshold,
+}
+impl_filter_type_fromstr!(
+    KAMAFilterType,
+    UnknownKamaFilterType,
+    parse_i32,
+    [
+        PriceAbove,
+        PriceBelow,
+        PriceCrossAbove,
+        PriceCrossBelow,
+        Rising,
+        Falling,
+        ERAboveThreshold,
+        ERBelowThreshold
+    ]
+);
+impl_filter_type_deserialize!(KAMAFilterType, KAMAFilterTypeVisitor, "KAMA");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum ChaikinFilterType {
+    CMFPositive,
+    CMFNegative,
+    ADOSCPositive,
+    ADOSCNegative,
+}
+impl_filter_type_fromstr!(
+    ChaikinFilterType,
+    UnknownChaikinFilterType,
+    parse_i32,
+    [CMFPositive, CMFNegative, ADOSCPositive, ADOSCNegative]
+);
+impl_filter_type_deserialize!(ChaikinFilterType, ChaikinFilterTypeVisitor, "Chaikin");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum PPOFilterType {
+    AboveSignal,
+    BelowSignal,
+    AboveZero,
+    BelowZero,
+    HistogramPositive,
+    HistogramNegative,
+}
+impl_filter_type_fromstr!(
+    PPOFilterType,
+    UnknownPpoFilterType,
+    parse_i32,
+    [
+        AboveSignal,
+        BelowSignal,
+        AboveZero,
+        BelowZero,
+        HistogramPositive,
+        HistogramNegative
+    ]
+);
+impl_filter_type_deserialize!(PPOFilterType, PPOFilterTypeVisitor, "PPO");
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+pub enum ParabolicSARFilterType {
+    Bullish,
+    Bearish,
+    Reversal,
+    PriceCrossAbove,
+    PriceCrossBelow,
+}
+impl_filter_type_fromstr!(
+    ParabolicSARFilterType,
+    UnknownParabolicSarFilterType,
+    parse_i32,
+    [Bullish, Bearish, Reversal, PriceCrossAbove, PriceCrossBelow]
+);
+impl_filter_type_deserialize!(
+    ParabolicSARFilterType,
+    ParabolicSARFilterTypeVisitor,
+    "ParabolicSAR"
+);
+
 /// RSI 필터 파라미터
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -1978,6 +2236,115 @@ pub struct MomentumParams {
     pub p: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DonchianParams {
+    pub period: usize,
+    pub filter_type: DonchianFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub edge_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct KeltnerParams {
+    pub period: usize,
+    pub multiplier: f64,
+    pub filter_type: KeltnerFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub edge_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct OBVParams {
+    pub filter_type: OBVFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct MFIParams {
+    pub period: usize,
+    pub filter_type: MFIFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub overbought: f64,
+    pub oversold: f64,
+    pub threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct AroonParams {
+    pub period: usize,
+    pub filter_type: AroonFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub strong_threshold: f64,
+    pub weak_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ChoppinessParams {
+    pub period: usize,
+    pub filter_type: ChoppinessFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub trending_threshold: f64,
+    pub ranging_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct KAMAParams {
+    pub period: usize,
+    pub fast_period: usize,
+    pub slow_period: usize,
+    pub filter_type: KAMAFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub er_threshold: f64,
+    pub er_low_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ChaikinParams {
+    pub cmf_period: usize,
+    pub fast_period: usize,
+    pub slow_period: usize,
+    pub filter_type: ChaikinFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+    pub cmf_threshold: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PPOParams {
+    pub fast_period: usize,
+    pub slow_period: usize,
+    pub signal_period: usize,
+    pub filter_type: PPOFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ParabolicSARParams {
+    pub step: f64,
+    pub max_step: f64,
+    pub filter_type: ParabolicSARFilterType,
+    pub consecutive_n: usize,
+    pub p: usize,
+}
+
 impl Default for CopysParams {
     fn default() -> Self {
         Self {
@@ -2092,6 +2459,135 @@ impl Default for MomentumParams {
     }
 }
 
+impl Default for DonchianParams {
+    fn default() -> Self {
+        Self {
+            period: 20,
+            filter_type: DonchianFilterType::BreakoutAbove,
+            consecutive_n: 1,
+            p: 0,
+            edge_threshold: 0.1,
+        }
+    }
+}
+
+impl Default for KeltnerParams {
+    fn default() -> Self {
+        Self {
+            period: 20,
+            multiplier: 2.0,
+            filter_type: KeltnerFilterType::BreakoutAbove,
+            consecutive_n: 1,
+            p: 0,
+            edge_threshold: 0.1,
+        }
+    }
+}
+
+impl Default for OBVParams {
+    fn default() -> Self {
+        Self {
+            filter_type: OBVFilterType::Rising,
+            consecutive_n: 1,
+            p: 0,
+        }
+    }
+}
+
+impl Default for MFIParams {
+    fn default() -> Self {
+        Self {
+            period: 14,
+            filter_type: MFIFilterType::Overbought,
+            consecutive_n: 1,
+            p: 0,
+            overbought: 80.0,
+            oversold: 20.0,
+            threshold: 50.0,
+        }
+    }
+}
+
+impl Default for AroonParams {
+    fn default() -> Self {
+        Self {
+            period: 25,
+            filter_type: AroonFilterType::BullishTrend,
+            consecutive_n: 1,
+            p: 0,
+            strong_threshold: 70.0,
+            weak_threshold: 30.0,
+        }
+    }
+}
+
+impl Default for ChoppinessParams {
+    fn default() -> Self {
+        Self {
+            period: 14,
+            filter_type: ChoppinessFilterType::Trending,
+            consecutive_n: 1,
+            p: 0,
+            trending_threshold: 38.2,
+            ranging_threshold: 61.8,
+        }
+    }
+}
+
+impl Default for KAMAParams {
+    fn default() -> Self {
+        Self {
+            period: 10,
+            fast_period: 2,
+            slow_period: 30,
+            filter_type: KAMAFilterType::PriceAbove,
+            consecutive_n: 1,
+            p: 0,
+            er_threshold: 0.6,
+            er_low_threshold: 0.2,
+        }
+    }
+}
+
+impl Default for ChaikinParams {
+    fn default() -> Self {
+        Self {
+            cmf_period: 20,
+            fast_period: 3,
+            slow_period: 10,
+            filter_type: ChaikinFilterType::CMFPositive,
+            consecutive_n: 1,
+            p: 0,
+            cmf_threshold: 0.05,
+        }
+    }
+}
+
+impl Default for PPOParams {
+    fn default() -> Self {
+        Self {
+            fast_period: 12,
+            slow_period: 26,
+            signal_period: 9,
+            filter_type: PPOFilterType::AboveSignal,
+            consecutive_n: 1,
+            p: 0,
+        }
+    }
+}
+
+impl Default for ParabolicSARParams {
+    fn default() -> Self {
+        Self {
+            step: 0.02,
+            max_step: 0.2,
+            filter_type: ParabolicSARFilterType::Bullish,
+            consecutive_n: 1,
+            p: 0,
+        }
+    }
+}
+
 /// Slope 필터 타입
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
 pub enum SlopeFilterType {
@@ -2143,6 +2639,16 @@ impl_filter_type_display!(
     CandlePatternFilterType,
     SupportResistanceFilterType,
     MomentumFilterType,
+    DonchianFilterType,
+    KeltnerFilterType,
+    OBVFilterType,
+    MFIFilterType,
+    AroonFilterType,
+    ChoppinessFilterType,
+    KAMAFilterType,
+    ChaikinFilterType,
+    PPOFilterType,
+    ParabolicSARFilterType,
     SlopeFilterType,
 );
 
@@ -2236,6 +2742,26 @@ pub enum TechnicalFilterConfig {
     /// Momentum 필터 설정
     #[serde(rename = "MOMENTUM")]
     Momentum(MomentumParams),
+    #[serde(rename = "DONCHIAN")]
+    Donchian(DonchianParams),
+    #[serde(rename = "KELTNER")]
+    Keltner(KeltnerParams),
+    #[serde(rename = "OBV")]
+    OBV(OBVParams),
+    #[serde(rename = "MFI")]
+    MFI(MFIParams),
+    #[serde(rename = "AROON")]
+    Aroon(AroonParams),
+    #[serde(rename = "CHOPPINESS")]
+    Choppiness(ChoppinessParams),
+    #[serde(rename = "KAMA")]
+    KAMA(KAMAParams),
+    #[serde(rename = "CHAIKIN")]
+    Chaikin(ChaikinParams),
+    #[serde(rename = "PPO")]
+    PPO(PPOParams),
+    #[serde(rename = "PARABOLIC_SAR")]
+    ParabolicSAR(ParabolicSARParams),
     /// Slope 필터 설정
     #[serde(rename = "SLOPE")]
     Slope(SlopeParams),
@@ -2261,6 +2787,16 @@ impl TechnicalFilterConfig {
             Self::CandlePattern(_) => TechnicalFilterType::CandlePattern,
             Self::SupportResistance(_) => TechnicalFilterType::SupportResistance,
             Self::Momentum(_) => TechnicalFilterType::Momentum,
+            Self::Donchian(_) => TechnicalFilterType::Donchian,
+            Self::Keltner(_) => TechnicalFilterType::Keltner,
+            Self::OBV(_) => TechnicalFilterType::OBV,
+            Self::MFI(_) => TechnicalFilterType::MFI,
+            Self::Aroon(_) => TechnicalFilterType::Aroon,
+            Self::Choppiness(_) => TechnicalFilterType::Choppiness,
+            Self::KAMA(_) => TechnicalFilterType::KAMA,
+            Self::Chaikin(_) => TechnicalFilterType::Chaikin,
+            Self::PPO(_) => TechnicalFilterType::PPO,
+            Self::ParabolicSAR(_) => TechnicalFilterType::ParabolicSAR,
             Self::Slope(_) => TechnicalFilterType::Slope,
         }
     }
@@ -2543,6 +3079,16 @@ impl TechnicalFilterConfig {
                 utils::validate_non_negative_number(params.threshold, "Momentum threshold")?;
                 utils::validate_consecutive_n(params.consecutive_n, "Momentum consecutive_n")
             }
+            Self::Donchian(params) => donchian::validate_params(params),
+            Self::Keltner(params) => keltner::validate_params(params),
+            Self::OBV(params) => obv::validate_params(params),
+            Self::MFI(params) => mfi::validate_params(params),
+            Self::Aroon(params) => aroon::validate_params(params),
+            Self::Choppiness(params) => choppiness::validate_params(params),
+            Self::KAMA(params) => kama::validate_params(params),
+            Self::Chaikin(params) => chaikin::validate_params(params),
+            Self::PPO(params) => ppo::validate_params(params),
+            Self::ParabolicSAR(params) => parabolic_sar::validate_params(params),
             Self::Slope(params) => {
                 utils::validate_period(params.period, "Slope")?;
                 utils::validate_consecutive_n(params.consecutive_n, "Slope consecutive_n")?;
@@ -2767,6 +3313,36 @@ impl TechnicalFilter {
             }
             TechnicalFilterConfig::Momentum(params) => {
                 momentum::filter_momentum(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::Donchian(params) => {
+                donchian::filter_donchian(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::Keltner(params) => {
+                keltner::filter_keltner(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::OBV(params) => {
+                obv::filter_obv(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::MFI(params) => {
+                mfi::filter_mfi(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::Aroon(params) => {
+                aroon::filter_aroon(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::Choppiness(params) => {
+                choppiness::filter_choppiness(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::KAMA(params) => {
+                kama::filter_kama(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::Chaikin(params) => {
+                chaikin::filter_chaikin(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::PPO(params) => {
+                ppo::filter_ppo(symbol, params, candle_store, current_price)
+            }
+            TechnicalFilterConfig::ParabolicSAR(params) => {
+                parabolic_sar::filter_parabolic_sar(symbol, params, candle_store, current_price)
             }
             TechnicalFilterConfig::Slope(params) => {
                 slope::filter_slope(symbol, params, candle_store, current_price)
@@ -3338,6 +3914,208 @@ mod tests {
         assert_eq!(box_range_params.p, 0);
         assert_eq!(box_range_params.prior_box_count, 1);
         assert_eq!(box_range_params.width_ratio_threshold, 0.05);
+    }
+
+    #[test]
+    fn test_independent_indicator_default_parameters() {
+        let donchian = DonchianParams::default();
+        assert_eq!(donchian.period, 20);
+        assert_eq!(donchian.filter_type, DonchianFilterType::BreakoutAbove);
+        assert_eq!(donchian.edge_threshold, 0.1);
+
+        let keltner = KeltnerParams::default();
+        assert_eq!(keltner.multiplier, 2.0);
+
+        let mfi = MFIParams::default();
+        assert_eq!(mfi.overbought, 80.0);
+        assert_eq!(mfi.oversold, 20.0);
+
+        let choppiness = ChoppinessParams::default();
+        assert_eq!(choppiness.trending_threshold, 38.2);
+
+        let kama = KAMAParams::default();
+        assert_eq!(kama.er_threshold, 0.6);
+    }
+
+    #[test]
+    fn test_independent_indicator_params_deserialize_uses_defaults_for_missing_fields() {
+        let params: PPOParams = serde_json::from_str(r#"{"filter_type":"AboveZero"}"#).unwrap();
+
+        assert_eq!(params.fast_period, 12);
+        assert_eq!(params.slow_period, 26);
+        assert_eq!(params.signal_period, 9);
+        assert_eq!(params.filter_type, PPOFilterType::AboveZero);
+        assert_eq!(params.consecutive_n, 1);
+        assert_eq!(params.p, 0);
+    }
+
+    #[test]
+    fn test_independent_indicator_filter_type_deserialize_supports_numeric_values() {
+        let params: OBVParams = serde_json::from_str(r#"{"filter_type":1}"#).unwrap();
+
+        assert_eq!(params.filter_type, OBVFilterType::Falling);
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_independent_indicator_json() {
+        let filter: TechnicalFilterConfig = serde_json::from_str(
+            r#"{
+                "type": "DONCHIAN",
+                "period": 5,
+                "filter_type": "BreakoutAbove",
+                "consecutive_n": 1,
+                "edge_threshold": 0.15
+            }"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::Donchian(params) => {
+                assert_eq!(params.period, 5);
+                assert_eq!(params.filter_type, DonchianFilterType::BreakoutAbove);
+                assert_eq!(params.edge_threshold, 0.15);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_all_independent_indicator_json_types() {
+        let cases = [
+            (
+                r#"{"type":"DONCHIAN","filter_type":"InsideChannel"}"#,
+                TechnicalFilterType::Donchian,
+            ),
+            (
+                r#"{"type":"KELTNER","filter_type":"InsideChannel"}"#,
+                TechnicalFilterType::Keltner,
+            ),
+            (
+                r#"{"type":"OBV","filter_type":"Rising"}"#,
+                TechnicalFilterType::OBV,
+            ),
+            (
+                r#"{"type":"MFI","filter_type":"Overbought"}"#,
+                TechnicalFilterType::MFI,
+            ),
+            (
+                r#"{"type":"AROON","filter_type":"BullishTrend"}"#,
+                TechnicalFilterType::Aroon,
+            ),
+            (
+                r#"{"type":"CHOPPINESS","filter_type":"Trending"}"#,
+                TechnicalFilterType::Choppiness,
+            ),
+            (
+                r#"{"type":"KAMA","filter_type":"PriceAbove"}"#,
+                TechnicalFilterType::KAMA,
+            ),
+            (
+                r#"{"type":"CHAIKIN","filter_type":"CMFPositive"}"#,
+                TechnicalFilterType::Chaikin,
+            ),
+            (
+                r#"{"type":"PPO","filter_type":"AboveSignal"}"#,
+                TechnicalFilterType::PPO,
+            ),
+            (
+                r#"{"type":"PARABOLIC_SAR","filter_type":"Bullish"}"#,
+                TechnicalFilterType::ParabolicSAR,
+            ),
+        ];
+
+        for (json, expected_type) in cases {
+            let filter: TechnicalFilterConfig = serde_json::from_str(json).unwrap();
+            assert_eq!(filter.filter_type(), expected_type);
+        }
+    }
+
+    #[test]
+    fn test_technical_filter_config_deserializes_independent_indicator_toml() {
+        let filter: TechnicalFilterConfig = toml::from_str(
+            r#"
+type = "KAMA"
+period = 10
+fast_period = 2
+slow_period = 30
+filter_type = "PriceAbove"
+consecutive_n = 1
+p = 0
+er_threshold = 0.6
+er_low_threshold = 0.2
+"#,
+        )
+        .unwrap();
+
+        match filter {
+            TechnicalFilterConfig::KAMA(params) => {
+                assert_eq!(params.filter_type, KAMAFilterType::PriceAbove);
+                assert_eq!(params.fast_period, 2);
+                assert_eq!(params.slow_period, 30);
+            }
+            _ => panic!("잘못된 필터 타입"),
+        }
+    }
+
+    #[test]
+    fn test_independent_indicator_validate_rejects_invalid_params() {
+        let zero_period = TechnicalFilterConfig::Donchian(DonchianParams {
+            period: 0,
+            ..DonchianParams::default()
+        });
+        assert!(matches!(
+            zero_period.validate(),
+            Err(FilterError::InvalidPeriod { .. })
+        ));
+
+        let invalid_kama_order = TechnicalFilterConfig::KAMA(KAMAParams {
+            fast_period: 30,
+            slow_period: 2,
+            ..KAMAParams::default()
+        });
+        assert!(matches!(
+            invalid_kama_order.validate(),
+            Err(FilterError::InvalidPeriodOrder { .. })
+        ));
+
+        let invalid_edge_threshold = TechnicalFilterConfig::Keltner(KeltnerParams {
+            edge_threshold: 1.5,
+            ..KeltnerParams::default()
+        });
+        assert!(matches!(
+            invalid_edge_threshold.validate(),
+            Err(FilterError::InvalidRatioThreshold { .. })
+        ));
+
+        let invalid_sar_order = TechnicalFilterConfig::ParabolicSAR(ParabolicSARParams {
+            step: 0.3,
+            max_step: 0.2,
+            ..ParabolicSARParams::default()
+        });
+        assert!(matches!(
+            invalid_sar_order.validate(),
+            Err(FilterError::InvalidPeriodOrder { .. })
+        ));
+    }
+
+    #[test]
+    fn test_technical_filter_matches_independent_indicator_with_current_price() {
+        let candles = vec![
+            test_candle(1, 100.0, 101.0, 99.0),
+            test_candle(2, 101.0, 102.0, 100.0),
+            test_candle(3, 102.0, 103.0, 101.0),
+            test_candle(4, 103.0, 104.0, 102.0),
+            test_candle(5, 104.0, 105.0, 103.0),
+            test_candle(6, 105.0, 106.0, 104.0),
+        ];
+        let filter = TechnicalFilterConfig::Donchian(DonchianParams {
+            period: 3,
+            filter_type: DonchianFilterType::BreakoutAbove,
+            ..DonchianParams::default()
+        });
+
+        assert!(TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles, 107.0).unwrap());
+        assert!(!TechnicalFilter::matches_filter("TEST/USDT", &filter, &candles, 102.0).unwrap());
     }
 
     #[test]

@@ -3,8 +3,8 @@
 이 문서는 `src/filter/` 실제 구현을 기준으로 다시 정리한 **구현 기준 레퍼런스**입니다.
 
 - 기준 소스: `src/filter/mod.rs`, `src/filter/*.rs`, `src/analyzer/slope_analyzer.rs`, `src/indicator/ma/mod.rs`, `src/strategy/copys_common.rs`
-- 지원 필터 종류: **18개**
-- 전체 `filter_type` variant 수: **332개**
+- 지원 필터 종류: **28개**
+- 전체 `filter_type` variant 수: **381개**
 - 실제 조합 예시는 `ta_filter_sample/` 문서를 참고하세요.
 
 이전 문서에 있던 장세 해석/전략 추천 성격의 설명은 코드와 1:1로 대응되지 않는 부분이 많아서, 여기서는 **코드가 실제로 허용하는 설정면**만 정리합니다.
@@ -44,6 +44,16 @@ p = 0
 - `CANDLEPATTERN`
 - `SUPPORTRESISTANCE`
 - `MOMENTUM`
+- `DONCHIAN`
+- `KELTNER`
+- `OBV`
+- `MFI`
+- `AROON`
+- `CHOPPINESS`
+- `KAMA`
+- `CHAIKIN`
+- `PPO`
+- `PARABOLIC_SAR`
 - `SLOPE`
 
 ### `filter_type` 입력 규칙
@@ -83,7 +93,7 @@ p = 0
 | MovingAverage     | `MOVING_AVERAGE`      |               23 | `max(periods)`                                        |
 | Ichimoku          | `ICHIMOKU`            |               13 | `senkou_span_b_period + kijun_period + consecutive_n` |
 | VWAP              | `VWAP`                |               12 | `period + consecutive_n`                              |
-| PriceReferenceGap | `PRICE_REFERENCE_GAP` |                4 | 참조 소스에 따라 다름                                 |
+| PriceReferenceGap | `PRICE_REFERENCE_GAP` |                6 | 참조 소스에 따라 다름                                 |
 | CopyS             | `COPYS`               |               16 | `60`                                                  |
 | ATR               | `ATR`                 |                7 | `max(period, consecutive_n)`                          |
 | SuperTrend        | `SUPERTREND`          |                9 | `max(period, consecutive_n)`                          |
@@ -92,6 +102,16 @@ p = 0
 | CandlePattern     | `CANDLEPATTERN`       |               41 | `max(pattern_history_length, consecutive_n)`          |
 | SupportResistance | `SUPPORTRESISTANCE`   |               10 | `max(lookback_period, consecutive_n)`                 |
 | Momentum          | `MOMENTUM`            |               21 | `max(history_length, consecutive_n)`                  |
+| Donchian          | `DONCHIAN`            |                7 | `period + p + consecutive_n`, breakout은 이전 캔들 추가 |
+| Keltner           | `KELTNER`             |                7 | `period + p + consecutive_n`, breakout은 이전 캔들 추가 |
+| OBV               | `OBV`                 |                2 | 이전 캔들 비교 필요                                    |
+| MFI               | `MFI`                 |                4 | `period + 1 + p + consecutive_n - 1`                  |
+| Aroon             | `AROON`               |                2 | `period + p + consecutive_n - 1`                      |
+| Choppiness        | `CHOPPINESS`          |                2 | `period + p + consecutive_n - 1`                      |
+| KAMA              | `KAMA`                |                8 | `period + 1`, 교차/상승/하락은 이전 캔들 추가          |
+| Chaikin           | `CHAIKIN`             |                4 | `max(cmf_period, slow_period) + p + consecutive_n - 1` |
+| PPO               | `PPO`                 |                6 | `slow_period + signal_period + p + consecutive_n - 1` |
+| ParabolicSAR      | `PARABOLIC_SAR`       |                5 | 최소 2개, 교차/반전은 이전 캔들 추가                  |
 | Slope             | `SLOPE`               |                9 | `period + consecutive_n`                              |
 
 PriceReferenceGap 최소 필요 캔들 수:
@@ -463,6 +483,70 @@ MomentumCrossover, MomentumSupportTest, MomentumResistanceTest
 ```
 
 메모: 여러 이름이 현재는 같은 analyzer 체크를 재사용합니다. 예를 들어 `MomentumSurge` 는 `StrongPositiveMomentum`, `MomentumCrash` 는 `StrongNegativeMomentum` 과 같은 구현입니다.
+
+### Donchian
+
+- `type="DONCHIAN"`
+- 기본값: `period=20`, `filter_type="BreakoutAbove"`, `consecutive_n=1`, `p=0`, `edge_threshold=0.1`
+- `filter_type`: `BreakoutAbove`, `BreakoutBelow`, `InsideChannel`, `AboveMiddle`, `BelowMiddle`, `NearUpperEdge`, `NearLowerEdge`
+- 가격 비교는 외부 `current_price` 기준이며 breakout은 이전 Donchian channel 경계와 비교합니다.
+
+### Keltner
+
+- `type="KELTNER"`
+- 기본값: `period=20`, `multiplier=2.0`, `filter_type="BreakoutAbove"`, `consecutive_n=1`, `p=0`, `edge_threshold=0.1`
+- `filter_type`: `BreakoutAbove`, `BreakoutBelow`, `InsideChannel`, `AboveMiddle`, `BelowMiddle`, `NearUpperEdge`, `NearLowerEdge`
+- 가격 비교는 외부 `current_price` 기준이며 breakout은 이전 Keltner channel 경계와 비교합니다.
+
+### OBV
+
+- `type="OBV"`
+- 기본값: `filter_type="Rising"`, `consecutive_n=1`, `p=0`
+- `filter_type`: `Rising`, `Falling`
+
+### MFI
+
+- `type="MFI"`
+- 기본값: `period=14`, `filter_type="Overbought"`, `consecutive_n=1`, `p=0`, `overbought=80.0`, `oversold=20.0`, `threshold=50.0`
+- `filter_type`: `Overbought`, `Oversold`, `AboveThreshold`, `BelowThreshold`
+
+### Aroon
+
+- `type="AROON"`
+- 기본값: `period=25`, `filter_type="BullishTrend"`, `consecutive_n=1`, `p=0`, `strong_threshold=70.0`, `weak_threshold=30.0`
+- `filter_type`: `BullishTrend`, `BearishTrend`
+
+### Choppiness
+
+- `type="CHOPPINESS"`
+- 기본값: `period=14`, `filter_type="Trending"`, `consecutive_n=1`, `p=0`, `trending_threshold=38.2`, `ranging_threshold=61.8`
+- `filter_type`: `Trending`, `Ranging`
+
+### KAMA
+
+- `type="KAMA"`
+- 기본값: `period=10`, `fast_period=2`, `slow_period=30`, `filter_type="PriceAbove"`, `consecutive_n=1`, `p=0`, `er_threshold=0.6`, `er_low_threshold=0.2`
+- `filter_type`: `PriceAbove`, `PriceBelow`, `PriceCrossAbove`, `PriceCrossBelow`, `Rising`, `Falling`, `ERAboveThreshold`, `ERBelowThreshold`
+- 가격 위치/교차는 외부 `current_price` 기준으로 평가하고, 교차는 이전 캔들 close와 이전 KAMA 값을 비교합니다.
+
+### Chaikin
+
+- `type="CHAIKIN"`
+- 기본값: `cmf_period=20`, `fast_period=3`, `slow_period=10`, `filter_type="CMFPositive"`, `consecutive_n=1`, `p=0`, `cmf_threshold=0.05`
+- `filter_type`: `CMFPositive`, `CMFNegative`, `ADOSCPositive`, `ADOSCNegative`
+
+### PPO
+
+- `type="PPO"`
+- 기본값: `fast_period=12`, `slow_period=26`, `signal_period=9`, `filter_type="AboveSignal"`, `consecutive_n=1`, `p=0`
+- `filter_type`: `AboveSignal`, `BelowSignal`, `AboveZero`, `BelowZero`, `HistogramPositive`, `HistogramNegative`
+
+### ParabolicSAR
+
+- `type="PARABOLIC_SAR"`
+- 기본값: `step=0.02`, `max_step=0.2`, `filter_type="Bullish"`, `consecutive_n=1`, `p=0`
+- `filter_type`: `Bullish`, `Bearish`, `Reversal`, `PriceCrossAbove`, `PriceCrossBelow`
+- 가격 교차는 외부 `current_price` 기준으로 평가하고, 이전 캔들 close와 이전 SAR 값을 비교합니다.
 
 ### Slope
 

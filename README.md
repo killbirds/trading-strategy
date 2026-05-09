@@ -4,7 +4,7 @@ Rust로 구현된 포괄적인 트레이딩 전략 라이브러리입니다. 다
 
 ## 주요 특징
 
-- **다양한 트레이딩 전략**: 이동평균, RSI, 볼린저 밴드, 박스권, MACD 등 다양한 기술적 지표 기반 전략
+- **다양한 트레이딩 전략**: 이동평균, RSI, 볼린저 밴드, 박스권, MACD, Donchian/Keltner 채널 등 다양한 기술적 지표 기반 전략
 - **롱/숏 전략 지원**: 각 전략의 롱 및 숏 버전 제공
 - **고급 분석 도구**: 여러 지표를 결합한 하이브리드 전략 및 멀티 타임프레임 분석
 - **유연한 설정**: TOML 및 JSON 형식의 설정 파일 지원
@@ -227,6 +227,7 @@ BoxRange 전략은 최근 `period`개 캔들의 최고가/최저가로 박스 �
 - **BBand Analyzer**: 볼린저 밴드 분석
 - **BoxRange Analyzer**: 박스권 범위와 돌파 분석
 - **MACD Analyzer**: MACD 지표 분석
+- **Donchian/Keltner/OBV/MFI/Aroon/Choppiness/KAMA/Chaikin/PPO/ParabolicSAR Analyzers**: standalone 시장 지표를 각각 독립 분석기로 제공
 - **Momentum Analyzer**: RSI, 스토캐스틱, Williams %R, ROC, CCI 등을 조합한 모멘텀 분석
 - **RSI Analyzer**: 상대강도지수 분석
 - **MA Analyzer**: 이동평균 분석
@@ -238,12 +239,13 @@ BoxRange 전략은 최근 `period`개 캔들의 최고가/최저가로 박스 �
 
 ## 기술적 필터
 
-다음과 같은 기술적 필터를 제공합니다:
+다음과 같은 기술적 필터를 제공합니다(총 28종, 379개 filter_type variant):
 
 - RSI, MACD, 볼린저 밴드, 박스권, ADX, 이동평균선
 - 이치모쿠, VWAP, PriceReferenceGap, CopyS
 - ATR, SuperTrend, 거래량, ThreeRSI
 - 캔들 패턴, 지지/저항, 모멘텀, Slope
+- 독립 시장 지표 필터: Donchian/Keltner 채널 돌파·중심선·edge, OBV 상승/하락, MFI/Aroon/Choppiness/KAMA/Chaikin/PPO/ParabolicSAR 조건
 
 필터의 가격 비교는 캔들 저장소의 최신 종가가 아니라 호출자가 전달하는 외부 `current_price` 를 기준으로 평가합니다. 캔들 데이터는 지표와 기준값 산출에 사용하고, 실시간으로 변하는 현재가는 별도로 전달해 같은 필터 상태를 재사용할 수 있습니다.
 
