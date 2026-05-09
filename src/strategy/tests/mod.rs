@@ -4,10 +4,13 @@
 pub mod bband_strategy_tests;
 pub mod box_range_strategy_tests;
 pub mod common;
+pub mod donchian_strategy_tests;
 pub mod hybrid_short_strategy_tests;
 pub mod hybrid_strategy_tests;
+pub mod keltner_strategy_tests;
 pub mod ma_strategy_tests;
 pub mod macd_strategy_tests;
 pub mod multi_timeframe_strategy_tests;
+pub mod parabolic_sar_strategy_tests;
 pub mod rsi_strategy_tests;
 pub mod three_rsi_strategy_tests;

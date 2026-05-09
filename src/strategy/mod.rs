@@ -7,10 +7,16 @@ pub mod box_range_strategy;
 pub mod copys_common;
 pub mod copys_short_strategy;
 pub mod copys_strategy;
+pub mod donchian_common;
+pub mod donchian_short_strategy;
+pub mod donchian_strategy;
 pub mod dummy_strategy;
 pub mod hybrid_common;
 pub mod hybrid_short_strategy;
 pub mod hybrid_strategy;
+pub mod keltner_common;
+pub mod keltner_short_strategy;
+pub mod keltner_strategy;
 pub mod ma_common;
 pub mod ma_short_strategy;
 pub mod ma_strategy;
@@ -18,6 +24,9 @@ pub mod macd_common;
 pub mod macd_short_strategy;
 pub mod macd_strategy;
 pub mod multi_timeframe_strategy;
+pub mod parabolic_sar_common;
+pub mod parabolic_sar_short_strategy;
+pub mod parabolic_sar_strategy;
 pub mod rsi_common;
 pub mod rsi_short_strategy;
 pub mod rsi_strategy;
@@ -67,6 +76,18 @@ pub enum StrategyType {
     MACD,
     /// MACD 기반 숏 전략
     MACDShort,
+    /// Donchian Channel 기반 롱 전략
+    Donchian,
+    /// Donchian Channel 기반 숏 전략
+    DonchianShort,
+    /// Keltner Channel 기반 롱 전략
+    Keltner,
+    /// Keltner Channel 기반 숏 전략
+    KeltnerShort,
+    /// Parabolic SAR 기반 롱 전략
+    ParabolicSAR,
+    /// Parabolic SAR 기반 숏 전략
+    ParabolicSARShort,
     /// Copys 전략 (커스텀 롱 전략)
     Copys,
     /// Copys 숏 전략 (커스텀 숏 전략)
@@ -97,6 +118,12 @@ impl Display for StrategyType {
             StrategyType::BoxRangeShort => write!(f, "box_range_short"),
             StrategyType::MACD => write!(f, "macd"),
             StrategyType::MACDShort => write!(f, "macd_short"),
+            StrategyType::Donchian => write!(f, "donchian"),
+            StrategyType::DonchianShort => write!(f, "donchian_short"),
+            StrategyType::Keltner => write!(f, "keltner"),
+            StrategyType::KeltnerShort => write!(f, "keltner_short"),
+            StrategyType::ParabolicSAR => write!(f, "parabolic_sar"),
+            StrategyType::ParabolicSARShort => write!(f, "parabolic_sar_short"),
             StrategyType::Copys => write!(f, "copys"),
             StrategyType::CopysShort => write!(f, "copys_short"),
             StrategyType::ThreeRSI => write!(f, "three_rsi"),
@@ -235,6 +262,38 @@ impl StrategyFactory {
                 macd_short_strategy::MACDShortStrategy::new_with_config(storage, config)
                     .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
             }
+            StrategyType::Donchian => {
+                debug!("Donchian 전략 초기화 시작");
+                donchian_strategy::DonchianStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::DonchianShort => {
+                debug!("Donchian 숏 전략 초기화 시작");
+                donchian_short_strategy::DonchianShortStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::Keltner => {
+                debug!("Keltner 전략 초기화 시작");
+                keltner_strategy::KeltnerStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::KeltnerShort => {
+                debug!("Keltner 숏 전략 초기화 시작");
+                keltner_short_strategy::KeltnerShortStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::ParabolicSAR => {
+                debug!("Parabolic SAR 전략 초기화 시작");
+                parabolic_sar_strategy::ParabolicSARStrategy::new_with_config(storage, config)
+                    .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
+            StrategyType::ParabolicSARShort => {
+                debug!("Parabolic SAR 숏 전략 초기화 시작");
+                parabolic_sar_short_strategy::ParabolicSARShortStrategy::new_with_config(
+                    storage, config,
+                )
+                .map(|s| Box::new(s) as Box<dyn Strategy<C>>)
+            }
             StrategyType::Copys => {
                 debug!("Copys 전략 초기화 시작");
                 copys_strategy::CopysStrategy::new_with_config(storage, config)
@@ -319,6 +378,12 @@ impl StrategyFactory {
             StrategyType::BoxRangeShort => PositionType::Short,
             StrategyType::MACD => PositionType::Long,
             StrategyType::MACDShort => PositionType::Short,
+            StrategyType::Donchian => PositionType::Long,
+            StrategyType::DonchianShort => PositionType::Short,
+            StrategyType::Keltner => PositionType::Long,
+            StrategyType::KeltnerShort => PositionType::Short,
+            StrategyType::ParabolicSAR => PositionType::Long,
+            StrategyType::ParabolicSARShort => PositionType::Short,
             StrategyType::Copys => PositionType::Long,
             StrategyType::CopysShort => PositionType::Short,
             StrategyType::ThreeRSI => PositionType::Long,
