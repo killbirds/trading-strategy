@@ -1,5 +1,6 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
+use crate::indicator::atr::ATRBuilder;
 use std::fmt::Display;
 use trading_chart::Candle;
 
@@ -288,23 +289,7 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
 
     /// ATR 계산
     fn calculate_atr(&self, candles: &[C]) -> f64 {
-        if candles.len() < self.atr_period {
-            return 0.0;
-        }
-
-        let mut tr_sum = 0.0;
-        for i in 1..self.atr_period.min(candles.len()) {
-            let current = &candles[i];
-            let previous = &candles[i - 1];
-
-            let tr1 = current.high_price() - current.low_price();
-            let tr2 = (current.high_price() - previous.close_price()).abs();
-            let tr3 = (current.low_price() - previous.close_price()).abs();
-
-            tr_sum += tr1.max(tr2).max(tr3);
-        }
-
-        tr_sum / (self.atr_period - 1) as f64
+        ATRBuilder::<C>::new(self.atr_period).build(candles).value
     }
 
     /// 변동성 계산

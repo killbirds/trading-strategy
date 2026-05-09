@@ -1,6 +1,7 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::cci::CCIBuilder;
 use crate::indicator::roc::ROCBuilder;
+use crate::indicator::rsi::RSIBuilder;
 use crate::indicator::stochastic::StochasticBuilder;
 use crate::indicator::ultimate_oscillator::UltimateOscillatorBuilder;
 use crate::indicator::williams_r::WilliamsRBuilder;
@@ -65,6 +66,7 @@ pub struct MomentumBuilder<C: Candle> {
     cci_period: usize,
     momentum_period: usize,
     values: Vec<MomentumInput>,
+    rsi_builder: RSIBuilder<C>,
     stochastic_builder: StochasticBuilder<C>,
     williams_r_builder: WilliamsRBuilder<C>,
     roc_builder: ROCBuilder<C>,
@@ -132,6 +134,7 @@ where
             cci_period,
             momentum_period,
             values: Vec::with_capacity(max_period * 2),
+            rsi_builder: RSIBuilder::new(rsi_period),
             stochastic_builder: StochasticBuilder::new(stoch_period),
             williams_r_builder: WilliamsRBuilder::new(williams_period),
             roc_builder: ROCBuilder::new(roc_period),
@@ -147,6 +150,7 @@ where
 
     pub fn build(&mut self, data: &[C]) -> Momentum {
         self.values.clear();
+        self.rsi_builder = RSIBuilder::new(self.rsi_period);
         self.stochastic_builder = StochasticBuilder::new(self.stoch_period);
         self.williams_r_builder = WilliamsRBuilder::new(self.williams_period);
         self.roc_builder = ROCBuilder::new(self.roc_period);
@@ -208,7 +212,7 @@ where
 
     fn calculate(&mut self, _data: &C) -> Momentum {
         let recent = self.recent_values();
-        let rsi = calculate_rsi(&recent, self.rsi_period);
+        let rsi = self.rsi_builder.next(_data).value;
         let stochastic = self.stochastic_builder.next(_data);
         let williams_r = self.williams_r_builder.next(_data).value;
         let roc = self.roc_builder.next(_data).value;
@@ -244,35 +248,6 @@ where
     fn next(&mut self, data: &C) -> Momentum {
         self.next(data)
     }
-}
-
-fn calculate_rsi(candles: &[MomentumInput], period: usize) -> f64 {
-    if candles.len() < period {
-        return 50.0;
-    }
-
-    let price_changes: Vec<f64> = candles
-        .windows(2)
-        .map(|w| w[0].close - w[1].close)
-        .collect();
-    let gains: Vec<f64> = price_changes
-        .iter()
-        .map(|&x| if x > 0.0 { x } else { 0.0 })
-        .collect();
-    let losses: Vec<f64> = price_changes
-        .iter()
-        .map(|&x| if x < 0.0 { -x } else { 0.0 })
-        .collect();
-
-    let avg_gain = gains.iter().sum::<f64>() / gains.len() as f64;
-    let avg_loss = losses.iter().sum::<f64>() / losses.len() as f64;
-
-    if avg_loss == 0.0 {
-        return 100.0;
-    }
-
-    let rs = avg_gain / avg_loss;
-    100.0 - (100.0 / (1.0 + rs))
 }
 
 fn calculate_momentum(candles: &[MomentumInput], period: usize) -> f64 {

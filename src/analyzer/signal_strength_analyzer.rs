@@ -1,5 +1,8 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
+use crate::indicator::atr::ATRBuilder;
+use crate::indicator::rsi::RSIBuilder;
+use crate::indicator::utils::moving_average;
 use std::fmt::Display;
 use trading_chart::Candle;
 
@@ -320,11 +323,11 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
 
     /// 모멘텀 분석기 신호 계산
     fn calculate_momentum_signals(&self, candles: &[C]) -> (f64, f64) {
-        if candles.len() < 14 {
+        if candles.len() < 15 {
             return (0.0, 0.0);
         }
 
-        let rsi = self.calculate_rsi(&candles[..14]);
+        let rsi = self.calculate_rsi(&candles[..15], 14);
         let momentum = self.calculate_momentum(&candles[..10]);
 
         let buy_signal = if rsi < 30.0 && momentum > 0.0 {
@@ -353,7 +356,7 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
         }
 
         let volatility = self.calculate_volatility(&candles[..20]);
-        let atr = self.calculate_atr(&candles[..14]);
+        let atr = self.calculate_atr(&candles[..15], 14);
         let current_range = match candles.first() {
             Some(c) => c.high_price() - c.low_price(),
             None => return (0.0, 0.0),
@@ -620,38 +623,14 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
 
     /// 단순 이동평균 계산
     fn calculate_sma(&self, candles: &[C]) -> f64 {
-        if candles.is_empty() {
-            return 0.0;
-        }
-        candles.iter().map(|c| c.close_price()).sum::<f64>() / candles.len() as f64
+        let values: Vec<f64> = candles.iter().map(|c| c.close_price()).collect();
+        moving_average::calculate_sma(&values, candles.len())
     }
 
     /// RSI 계산 (간소화)
-    fn calculate_rsi(&self, candles: &[C]) -> f64 {
-        if candles.len() < 2 {
-            return 50.0;
-        }
-
-        let gains_losses: Vec<f64> = candles
-            .windows(2)
-            .map(|w| w[0].close_price() - w[1].close_price())
-            .collect();
-
-        let avg_gain =
-            gains_losses.iter().filter(|&&x| x > 0.0).sum::<f64>() / gains_losses.len() as f64;
-        let avg_loss = gains_losses
-            .iter()
-            .filter(|&&x| x < 0.0)
-            .map(|x| x.abs())
-            .sum::<f64>()
-            / gains_losses.len() as f64;
-
-        if avg_loss == 0.0 {
-            return 100.0;
-        }
-
-        let rs = avg_gain / avg_loss;
-        100.0 - (100.0 / (1.0 + rs))
+    fn calculate_rsi(&self, candles: &[C], period: usize) -> f64 {
+        let ordered_candles = oldest_first(candles);
+        RSIBuilder::<C>::new(period).build(&ordered_candles).value
     }
 
     /// 모멘텀 계산
@@ -688,24 +667,9 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
     }
 
     /// ATR 계산
-    fn calculate_atr(&self, candles: &[C]) -> f64 {
-        if candles.len() < 2 {
-            return 0.0;
-        }
-
-        let true_ranges: Vec<f64> = candles
-            .windows(2)
-            .map(|w| {
-                let current = &w[0];
-                let previous = &w[1];
-                let tr1 = current.high_price() - current.low_price();
-                let tr2 = (current.high_price() - previous.close_price()).abs();
-                let tr3 = (current.low_price() - previous.close_price()).abs();
-                tr1.max(tr2).max(tr3)
-            })
-            .collect();
-
-        true_ranges.iter().sum::<f64>() / true_ranges.len() as f64
+    fn calculate_atr(&self, candles: &[C], period: usize) -> f64 {
+        let ordered_candles = oldest_first(candles);
+        ATRBuilder::<C>::new(period).build(&ordered_candles).value
     }
 
     /// 강한 매수 신호 확인
@@ -905,6 +869,10 @@ impl<C: Candle + Clone + 'static> SignalStrengthAnalyzer<C> {
     pub fn is_good_market_condition(&self, n: usize, p: usize) -> bool {
         self.is_all(|data| data.is_good_market_condition(), n, p)
     }
+}
+
+fn oldest_first<C: Clone>(candles: &[C]) -> Vec<C> {
+    candles.iter().rev().cloned().collect()
 }
 
 impl<C: Candle + Clone + 'static> AnalyzerOps<SignalStrengthAnalyzerData<C>, C>
