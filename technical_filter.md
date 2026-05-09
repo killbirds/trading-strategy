@@ -59,8 +59,23 @@ p = 0
 ### `filter_type` 입력 규칙
 
 - 대부분의 필터는 `filter_type` 에 **enum 문자열** 또는 **0부터 시작하는 정수 인덱스**를 넣을 수 있습니다.
-- 예외적으로 `SLOPE` 는 현재 구현에서 **정수 인덱스를 지원하지 않고 문자열만 지원**합니다.
+- `SLOPE` 도 현재 구현과 테스트 기준으로 정수 인덱스 입력을 지원합니다. 예: `filter_type = 3` 은 `StrengthAboveThreshold` 입니다.
 - 이 문서는 가독성을 위해 **문자열 enum 이름 기준**으로 설명합니다.
+- 숫자 인덱스는 enum 선언 순서에 강하게 묶이므로, 장기 유지보수용 설정에는 문자열 사용을 권장합니다.
+
+### `type` alias 와 legacy shorthand
+
+`TechnicalFilterConfig` 의 `type` 은 serde tag 이므로 TOML/JSON 에서는 아래 공식 이름을 쓰는 것이 가장 안전합니다. 내부 `FromStr` 는 일부 대소문자/언더스코어 차이를 허용하지만, 역직렬화 tag 는 `#[serde(rename = ...)]` 기준으로 동작합니다.
+
+| 권장 `type` | 허용 의도 | 주의 |
+| --- | --- | --- |
+| `BOLLINGER_BAND` | BollingerBand 계열 | legacy shorthand `BB` 는 거부 |
+| `BOX_RANGE` | BoxRange 계열 | `BOXRANGE` 는 `FromStr` 에서는 허용되지만 설정 tag 로는 `BOX_RANGE` 권장 |
+| `MOVING_AVERAGE` | MovingAverage 계열 | legacy shorthand `MA` 는 거부 |
+| `PRICE_REFERENCE_GAP` | PriceReferenceGap 계열 | `reference_source.type = "MOVING_AVERAGE"` 에서도 legacy `MA` 는 거부 |
+| `PARABOLIC_SAR` | ParabolicSAR 계열 | `PARABOLICSAR` 는 `FromStr` 에서는 허용되지만 설정 tag 로는 `PARABOLIC_SAR` 권장 |
+
+> 구현은 `deny_unknown_fields` 를 사용합니다. 오타가 난 필드는 조용히 무시되지 않고 역직렬화 단계에서 실패합니다.
 
 ### 공통 필드
 
@@ -69,6 +84,26 @@ p = 0
 | `filter_type`   | 필터별 enum 이름                      |
 | `consecutive_n` | 조건을 연속으로 만족해야 하는 캔들 수 |
 | `p`             | 현재 캔들 기준 과거 오프셋            |
+
+`p` 와 `consecutive_n` 해석:
+
+- analyzer/filter 내부 데이터는 보통 **최신 데이터가 index 0** 인 형태로 저장됩니다.
+- `p = 0` 은 최신 기준값, `p = 1` 은 한 캔들 전 기준값을 의미합니다.
+- `consecutive_n = N` 은 `p` 부터 시작해 `N`개 연속 데이터가 조건을 만족해야 한다는 뜻입니다.
+- 교차/상승/하락처럼 이전 데이터와 비교하는 필터는 내부적으로 `p + consecutive_n + 1` 개 이상의 분석 결과를 요구할 수 있습니다.
+- 가격 비교형 필터에서 `p` 는 기준 지표/캔들 선택에만 영향을 주고, 비교 대상인 `current_price` 자체를 과거 가격으로 바꾸지는 않습니다.
+
+검증 규칙 요약:
+
+| 규칙 | 대표 필드 |
+| --- | --- |
+| 기간은 0보다 커야 함 | `period`, `fast_period`, `slow_period`, `signal_period`, `lookback_period` |
+| `consecutive_n` 은 0보다 커야 함 | 모든 `consecutive_n` |
+| 비율 임계값은 보통 유한한 0 이상 숫자 | `sideways_threshold`, `threshold`, `edge_threshold` 등 |
+| `PriceReferenceGap.gap_threshold` 는 `0.0..=1.0` | `gap_threshold` |
+| ADX/RSI 계열 퍼센트 임계값은 `0.0..=100.0` | `ADX.threshold`, `RSI.cross_threshold`, `oversold`, `overbought` |
+| 순서가 있는 기간은 `left < right` | `MACD fast_period < slow_period`, `KAMA fast_period < slow_period`, `PPO fast_period < slow_period`, `ParabolicSAR step < max_step` |
+| 빈 배열은 허용하지 않음 | `MovingAverage.periods`, `ThreeRSI.rsi_periods`, Slope RSI `ma_periods` |
 
 ### 중첩 값 표기 규칙
 
@@ -130,9 +165,60 @@ BoxRange 최소 필요 캔들 수:
 
 ---
 
+## 2.1 TOML 작성 패턴
+
+필터는 보통 selector 또는 risk management 설정 안의 배열로 사용합니다. 배열 이름은 사용하는 애플리케이션 설정 구조에 따라 달라질 수 있지만, 각 원소의 shape 은 `TechnicalFilterConfig` 와 같습니다.
+
+```toml
+[[selector.technical_filters]]
+type = "MACD"
+fast_period = 18
+slow_period = 26
+signal_period = 10
+filter_type = "ZeroLineCrossAbove"
+consecutive_n = 2
+p = 0
+threshold = 0.01
+overbought_threshold = 0.02
+oversold_threshold = 0.02
+sideways_threshold = 0.05
+
+[[risk_management.technical_filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapBelowReferenceThreshold"
+gap_threshold = 0.05
+consecutive_n = 1
+p = 0
+
+[risk_management.technical_filters.reference_source]
+type = "LOWEST_LOW"
+lookback_period = 20
+include_current_candle = false
+```
+
+같은 `reference_source` 는 inline table 로도 쓸 수 있습니다.
+
+```toml
+[[filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapAboveReferenceThreshold"
+gap_threshold = 0.0
+reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
+```
+
+숫자 인덱스도 가능하지만 문자열을 권장합니다.
+
+```toml
+[[filters]]
+type = "RSI"
+filter_type = 0 # Overbought. enum 순서가 바뀌면 의미도 바뀔 수 있으므로 문자열 권장.
+```
+
+---
+
 ## 3. 필터별 레퍼런스
 
-아래 `filter_type` 목록은 모두 **실제 enum 선언 순서**입니다. 숫자 인덱스를 써야 한다면 이 순서의 **0-based index** 를 사용하면 됩니다. 단 `SLOPE` 는 문자열만 사용하세요.
+아래 `filter_type` 목록은 모두 **실제 enum 선언 순서**입니다. 숫자 인덱스를 써야 한다면 이 순서의 **0-based index** 를 사용하면 됩니다.
 
 ### RSI
 
@@ -300,6 +386,8 @@ GapBelowReferenceUpperThreshold, GapAboveReferenceLowerThreshold
 
 메모:
 
+- `include_current_candle` 기본값은 `true` 입니다. `false` 로 두면 기준 고가/저가 산출에서 현재 캔들을 제외하고, 최소 필요 캔들 수가 1개 늘어납니다.
+- `reference_source.type = "MOVING_AVERAGE"` 에서는 `ma_type = "EMA" | "SMA"` 만 검증을 통과합니다. `WMA` 와 legacy shorthand `MA` 는 거부됩니다.
 - `GapAboveThreshold` / `GapBelowThreshold` 는 **절대 괴리율** 기준입니다.
 - `GapAboveReferenceThreshold` 는 `gap_ratio >= threshold` 입니다.
 - `GapBelowReferenceThreshold` 는 `gap_ratio <= -threshold` 입니다.
@@ -386,6 +474,11 @@ MARegularArrangement, MAReverseArrangement
 - 최소 필요 캔들 수: `max(period, consecutive_n)`
 - `filter_type`: `AboveThreshold`, `VolatilityExpanding`, `VolatilityContracting`, `HighVolatility`, `LowVolatility`, `VolatilityIncreasing`, `VolatilityDecreasing`
 
+메모:
+
+- `AboveThreshold`, `HighVolatility`, `LowVolatility` 는 현재 ATR 값과 `threshold` 를 비교합니다.
+- expanding/contracting/increasing/decreasing 계열은 이전 분석 결과와 비교하므로 충분한 히스토리가 없으면 `false` 입니다.
+
 ### SuperTrend
 
 - 기본값: `period=10`, `multiplier=3.0`, `filter_type="AllUptrend"`, `consecutive_n=1`, `p=0`
@@ -434,6 +527,7 @@ RSIExtremeOverbought, RSIExtremeOversold
 메모:
 
 - 런타임에서 `ma_type` 은 `EMA`, `WMA` 를 명시하면 그 값으로 사용하고, 그 외 문자열은 `SMA` 로 처리합니다.
+- `ma_type` 은 enum 이 아니라 문자열 필드입니다. 오타도 검증 실패가 아니라 SMA fallback 으로 이어질 수 있으므로 설정 리뷰 시 주의하세요.
 - 여러 고급 이름이 현재는 `regular_arrangement` / `reverse_arrangement` / `sideways` 같은 기존 체크를 재사용합니다.
 
 ### CandlePattern
@@ -483,6 +577,12 @@ MomentumCrossover, MomentumSupportTest, MomentumResistanceTest
 ```
 
 메모: 여러 이름이 현재는 같은 analyzer 체크를 재사용합니다. 예를 들어 `MomentumSurge` 는 `StrongPositiveMomentum`, `MomentumCrash` 는 `StrongNegativeMomentum` 과 같은 구현입니다.
+
+RSI 계산 메모:
+
+- Momentum 내부 RSI 는 `src/indicator/rsi.rs` 의 `RSIBuilder` 를 재사용합니다.
+- 따라서 단순 window 평균이 아니라 Wilder smoothing 기반 RSI 로 계산됩니다.
+- `history_length` 는 MomentumAnalyzer 히스토리 길이 guard 이고, 개별 하위 지표(`rsi_period`, `stoch_period`, `roc_period` 등)의 warm-up 과는 별개입니다.
 
 ### Donchian
 
@@ -579,11 +679,71 @@ MomentumCrossover, MomentumSupportTest, MomentumResistanceTest
 
 - `indicator_type = { type = "RSI", ... }` 는 `period` 만으로는 부족하고 `ma_type`, `ma_periods` 도 필요합니다.
 - 현재 구현에서 `consecutive_n` 은 주로 상위 최소 캔들 수 계산에만 반영되고, 각 `filter_type` 판단식에는 직접 쓰이지 않는 경우가 많습니다.
-- `SLOPE` 는 `filter_type` 정수 인덱스를 지원하지 않습니다.
+- `filter_type` 정수 인덱스도 지원하지만, 다른 필터와 마찬가지로 문자열 사용을 권장합니다.
 
 ---
 
-## 4. 구현상 주의할 점
+## 4. 실전 조합 팁
+
+### 현재가 기반 돌파/이탈 필터
+
+외부 `current_price` 로 평가되는 필터는 같은 캔들 상태에서도 tick 가격만 바꿔 재평가할 수 있습니다.
+
+대표 예시:
+
+- `PRICE_REFERENCE_GAP`: 모든 gap 판단
+- `BOX_RANGE`: `InsideBox`, `OutsideBox`, `AboveUpperBox`, `BelowLowerBox`, `BreakoutAbove`, `BreakoutBelow`
+- `MOVING_AVERAGE`: 가격과 MA 비교 계열
+- `VWAP`: 가격과 VWAP 비교 계열
+- `SUPPORTRESISTANCE`: support/resistance 근접·돌파 계열
+- `DONCHIAN`, `KELTNER`, `KAMA`, `PARABOLIC_SAR`, `SUPERTREND`: 가격 위치/교차 계열
+- `COPYS`, `THREERSI`, `VOLUME`: 일부 variant 에서 현재가를 캔들 open/MA/복합 신호와 비교
+
+반대로 `MFI`, `OBV`, `AROON`, `CHOPPINESS`, `CHAIKIN`, `PPO`, `ATR`, 대부분의 `MOMENTUM` 처럼 지표 값 자체만 비교하는 필터는 `current_price` 를 받더라도 직접 사용하지 않는 타입이 많습니다.
+
+### AND 조합으로 범위 만들기
+
+필터 배열은 일반적으로 모두 만족해야 통과하는 AND 조건으로 쓰입니다. 예를 들어 “EMA 20 위이지만 +5% 이내”는 아래처럼 두 필터를 함께 둡니다.
+
+```toml
+[[filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapAboveReferenceThreshold"
+gap_threshold = 0.0
+reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
+
+[[filters]]
+type = "PRICE_REFERENCE_GAP"
+filter_type = "GapBelowReferenceUpperThreshold"
+gap_threshold = 0.05
+reference_source = { type = "MOVING_AVERAGE", ma_type = "EMA", period = 20 }
+```
+
+### `consecutive_n` 과 교차 필터
+
+교차 필터는 “현재와 직전”을 비교합니다. `consecutive_n > 1` 로 설정하면 각 offset 지점마다 교차 조건을 반복 확인하기 때문에, 일반적인 “최근 한 번 교차 발생” 감지보다 훨씬 엄격해질 수 있습니다. 단발 교차 이벤트를 찾을 때는 보통 `consecutive_n = 1` 로 시작하세요.
+
+### 다중 필터 평가의 실패 처리
+
+`TechnicalFilter::matches_filters` 와 `TechnicalFilterContext::matches_filters` 는 배열의 모든 필터가 통과해야 `true` 를 반환합니다. 개별 필터가 `false` 이거나, 검증/실행 중 에러가 발생하면 로그를 남기고 전체 결과를 `Ok(false)` 로 반환합니다. 즉 다중 필터 평가는 **fail-closed** 동작이며, 에러를 호출자에게 그대로 전파하지 않습니다.
+
+개별 필터 하나만 평가하는 `matches_filter` 계열은 `filter.validate()?` 를 먼저 수행하므로 잘못된 설정이면 `Err` 를 반환할 수 있습니다.
+
+### 같은 구현을 공유하는 이름들
+
+일부 `filter_type` 이름은 의미를 넓게 표현하기 위해 별도 enum variant 로 존재하지만, 현재 구현은 같은 체크를 재사용합니다.
+
+| 필터 | 같은 구현을 공유하는 예 |
+| --- | --- |
+| BollingerBand | `BreakThroughLowerBand`, `BreakThroughLowerBandFromBelow` |
+| VWAP | `StrongUptrend = PriceAboveVWAP`, `StrongDowntrend = PriceBelowVWAP`, `TrendStrengthening = DivergingFromVWAP`, `TrendWeakening = ConvergingToVWAP` |
+| Volume | `VolumeSharpDecline = VolumeDecline`, `VolumeVolatile = VolumeSurge` |
+| Ichimoku | `StrongBuySignal = BuySignal` |
+| Momentum | `MomentumSurge = StrongPositiveMomentum`, `MomentumCrash = StrongNegativeMomentum` |
+
+---
+
+## 5. 구현상 주의할 점
 
 1. `technical_filter.md` 에서 과거에 사용하던 일부 count/설명은 실제 코드와 달랐습니다. 이 문서는 코드 기준으로 다시 맞춘 버전입니다.
 2. sample 문서(`ta_filter_sample/`)는 `filter_type` 에 숫자를 쓰는 경우가 많지만, 이 문서는 enum 문자열 기준으로 설명합니다.
@@ -591,11 +751,12 @@ MomentumCrossover, MomentumSupportTest, MomentumResistanceTest
 4. `MovingAverage`, `CopyS`, `ThreeRSI`, `CandlePattern`, `Momentum`, `VWAP` 은 일부 enum 이름이 내부적으로 같은 체크를 공유합니다.
 5. `TechnicalFilter::matches_filter`, `TechnicalFilter::matches_filters`, 각 필터의 내부 `matches_filter` 는 외부 `current_price` 를 마지막 인자로 받습니다. `filter_*` 래퍼는 모듈별 추가 인자 때문에 순서가 다를 수 있지만, `matches_filter` 계열 API 에서는 마지막 인자 규칙을 유지합니다.
 6. 같은 캔들 상태를 반복 평가할 때는 `TechnicalFilterContext` 로 `CandleStore` 기반 상태를 유지하고, 매 tick 마다 바뀌는 `current_price` 만 전달해서 재평가할 수 있습니다.
-7. 새 필터 타입이 추가되면 **반드시 `src/filter/mod.rs` 와 실제 `src/filter/*.rs` 구현을 함께 기준으로 문서를 갱신**해야 합니다.
+7. `type` 과 `filter_type` 은 대소문자/alias 허용 범위가 서로 다릅니다. 설정 파일에는 이 문서의 권장 `type` 과 문자열 enum 이름을 쓰는 것이 안전합니다.
+8. 새 필터 타입이 추가되면 **반드시 `src/filter/mod.rs` 와 실제 `src/filter/*.rs` 구현을 함께 기준으로 문서를 갱신**해야 합니다.
 
 ---
 
-## 5. 샘플 조합 문서
+## 6. 샘플 조합 문서
 
 실전 조합 예시는 아래 문서를 참고하세요.
 
