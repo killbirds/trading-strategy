@@ -256,31 +256,31 @@ impl<C: Candle> SuperTrendBuilder<C> {
                     };
 
                 // 슈퍼트렌드 값 및 방향 결정
-                let (super_trend, direction) = {
-                    // 이전 값이 상단 밴드였고 현재 종가가 상단 밴드 이하인 경우 -> 하락 전환
-                    if (prev.value - prev.upper_band).abs() < EPSILON && close_price <= upper_band {
-                        (upper_band, -1)
-                    }
-                    // 이전 값이 하단 밴드였고 현재 종가가 하단 밴드 이상인 경우 -> 상승 전환
-                    else if (prev.value - prev.lower_band).abs() < EPSILON
-                        && close_price >= lower_band
-                    {
+                //
+                // 표준 SuperTrend 알고리즘:
+                // - 이전 ST == 이전 upper_band (=하락 추세):
+                //     close > upper_band → 상승 전환 (lower_band, +1)
+                //     그 외                → 하락 유지 (upper_band, -1)
+                // - 이전 ST == 이전 lower_band (=상승 추세):
+                //     close < lower_band → 하락 전환 (upper_band, -1)
+                //     그 외                → 상승 유지 (lower_band, +1)
+                //
+                // EPSILON 매칭이 실패할 수 있어 prev.direction을 fallback 으로 사용한다.
+                let prev_was_upper = (prev.value - prev.upper_band).abs() < EPSILON
+                    || ((prev.value - prev.lower_band).abs() >= EPSILON && prev.direction < 0);
+
+                let (super_trend, direction) = if prev_was_upper {
+                    if close_price > upper_band {
                         (lower_band, 1)
-                    }
-                    // 상승 추세 중 종가가 상단 밴드 이하로 떨어진 경우 -> 하락 전환
-                    else if close_price <= upper_band && prev.direction > 0 {
+                    } else {
                         (upper_band, -1)
                     }
-                    // 하락 추세 중 종가가 하단 밴드 이상으로 올라간 경우 -> 상승 전환
-                    // 또는 상승 추세 유지
-                    else if (close_price >= lower_band && prev.direction < 0)
-                        || prev.direction > 0
-                    {
+                } else {
+                    // prev_was_lower: 상승 추세에서 출발
+                    if close_price < lower_band {
+                        (upper_band, -1)
+                    } else {
                         (lower_band, 1)
-                    }
-                    // 하락 추세 유지
-                    else {
-                        (upper_band, -1)
                     }
                 };
 
@@ -810,5 +810,52 @@ mod tests {
         assert_eq!(first.direction, second.direction);
         assert!((first.upper_band - second.upper_band).abs() < 1e-9);
         assert!((first.lower_band - second.lower_band).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_supertrend_uptrend_persists() {
+        // 일관된 상승 추세에서는 마지막 방향이 +1, 값이 lower_band이어야 한다.
+        let mut candles = Vec::new();
+        for i in 0..30 {
+            let base = 100.0 + i as f64;
+            candles.push(TestCandle {
+                timestamp: 1 + i as i64,
+                open: base,
+                high: base + 1.0,
+                low: base - 0.2,
+                close: base + 0.5,
+                volume: 1000.0,
+            });
+        }
+        let mut builder = SuperTrendBuilder::<TestCandle>::new(7, 3.0);
+        let st = builder.build(&candles);
+        assert_eq!(
+            st.direction, 1,
+            "expected uptrend (+1) on consistent rising candles, got direction={}, value={}, upper={}, lower={}",
+            st.direction, st.value, st.upper_band, st.lower_band
+        );
+    }
+
+    #[test]
+    fn test_supertrend_downtrend_persists() {
+        let mut candles = Vec::new();
+        for i in 0..30 {
+            let base = 200.0 - i as f64;
+            candles.push(TestCandle {
+                timestamp: 1 + i as i64,
+                open: base,
+                high: base + 0.2,
+                low: base - 1.0,
+                close: base - 0.5,
+                volume: 1000.0,
+            });
+        }
+        let mut builder = SuperTrendBuilder::<TestCandle>::new(7, 3.0);
+        let st = builder.build(&candles);
+        assert_eq!(
+            st.direction, -1,
+            "expected downtrend (-1) on consistent falling candles, got direction={}, value={}, upper={}, lower={}",
+            st.direction, st.value, st.upper_band, st.lower_band
+        );
     }
 }
