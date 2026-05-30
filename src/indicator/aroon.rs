@@ -113,11 +113,14 @@ where
                 oscillator: 0.0,
             };
         }
-        let start = self.values.len().saturating_sub(self.period);
+        // 표준 Aroon은 period+1개의 봉(현재부터 period봉 전까지)을 본다.
+        // 캔들이 부족하면 가용한 만큼만 보며, days_since 분모는 (slice.len() - 1)을 사용한다.
+        let start = self.values.len().saturating_sub(self.period + 1);
         let slice = &self.values[start..];
         let mut high_idx = 0usize;
         let mut low_idx = 0usize;
         for (idx, item) in slice.iter().enumerate() {
+            // `>=` / `<=` 로 가장 최근(=높은 인덱스)을 선호 — 동률 시 표준과 일치한다.
             if item.high >= slice[high_idx].high {
                 high_idx = idx;
             }
@@ -125,13 +128,14 @@ where
                 low_idx = idx;
             }
         }
-        let denominator = if slice.len() > 1 {
-            (slice.len() - 1) as f64
-        } else {
-            1.0
-        };
-        let up = 100.0 * high_idx as f64 / denominator;
-        let down = 100.0 * low_idx as f64 / denominator;
+        // last_idx 가 가장 최근 봉(days_since = 0). high_idx 가 last_idx 면 100, 가장 오래된이면 0.
+        let last_idx = slice.len().saturating_sub(1);
+        let days_since_high = last_idx - high_idx;
+        let days_since_low = last_idx - low_idx;
+        // 분모는 윈도우의 봉 간격 수. period 만큼 채워졌으면 period, 미만이면 last_idx.
+        let denominator = last_idx.max(1) as f64;
+        let up = ((denominator - days_since_high as f64) / denominator) * 100.0;
+        let down = ((denominator - days_since_low as f64) / denominator) * 100.0;
         Aroon {
             period: self.period,
             sample_count: slice.len(),
@@ -210,5 +214,39 @@ mod tests {
         assert_eq!(aroon.up(), 100.0);
         assert_eq!(aroon.down(), 100.0);
         assert_eq!(aroon.oscillator(), 0.0);
+    }
+
+    #[test]
+    fn standard_aroon_when_oldest_is_extreme() {
+        // 표준 Aroon: period=4 윈도우(5봉)에서 가장 오래된 봉이 high면
+        // days_since = 4, up = (4-4)/4 * 100 = 0
+        // 가장 최근 봉이 low면 down = 100
+        let data = vec![
+            candle(1, 50.0, 30.0), // 가장 오래된이 최고가
+            candle(2, 40.0, 32.0),
+            candle(3, 38.0, 31.0),
+            candle(4, 36.0, 29.0),
+            candle(5, 35.0, 25.0), // 가장 최근이 최저가
+        ];
+        let mut builder = AroonBuilder::<TestCandle>::new(4);
+        let aroon = builder.build(&data);
+        assert!((aroon.up() - 0.0).abs() < 1e-9, "got up={}", aroon.up());
+        assert!((aroon.down() - 100.0).abs() < 1e-9, "got down={}", aroon.down());
+    }
+
+    #[test]
+    fn standard_aroon_intermediate_position() {
+        // period=4 윈도우(5봉), high가 인덱스 2(=가운데)에 있음 → days_since = 2
+        // up = (4-2)/4 * 100 = 50
+        let data = vec![
+            candle(1, 30.0, 20.0),
+            candle(2, 32.0, 22.0),
+            candle(3, 50.0, 24.0), // 인덱스 2: 최고가
+            candle(4, 40.0, 23.0),
+            candle(5, 35.0, 21.0), // 가장 최근
+        ];
+        let mut builder = AroonBuilder::<TestCandle>::new(4);
+        let aroon = builder.build(&data);
+        assert!((aroon.up() - 50.0).abs() < 1e-9, "expected 50.0, got {}", aroon.up());
     }
 }
