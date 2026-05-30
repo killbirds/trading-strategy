@@ -1,6 +1,7 @@
 use crate::analyzer::base::{AnalyzerDataOps, AnalyzerOps, GetCandle};
 use crate::candle_store::CandleStore;
 use crate::indicator::atr::ATRBuilder;
+pub use crate::model::PositionType;
 use std::fmt::Display;
 use trading_chart::Candle;
 
@@ -12,13 +13,6 @@ pub enum RiskLevel {
     Medium,
     High,
     VeryHigh,
-}
-
-/// 포지션 타입
-#[derive(Debug, Clone, PartialEq)]
-pub enum PositionType {
-    Long,
-    Short,
 }
 
 /// 포지션 크기 계산 방법
@@ -565,9 +559,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         sizing_method: PositionSizingMethod,
     ) -> Option<RiskCalculation> {
         if let Some(data) = self.items.first() {
-            let stop_loss_price =
-                data.calculate_volatility_stop_loss(entry_price, position_type.clone());
-            let target_price = data.calculate_volatility_target(entry_price, position_type.clone());
+            let stop_loss_price = data.calculate_volatility_stop_loss(entry_price, position_type);
+            let target_price = data.calculate_volatility_target(entry_price, position_type);
 
             let risk_per_unit = match position_type {
                 PositionType::Long => (entry_price - stop_loss_price).abs(),
