@@ -846,3 +846,108 @@ impl<C: Candle + Clone + 'static> AnalyzerOps<RiskManagementAnalyzerData<C>, C>
         &mut self.items
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::candle_store::CandleStore;
+    use crate::tests::TestCandle;
+
+    fn make_candles(closes: &[f64]) -> Vec<TestCandle> {
+        closes
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| TestCandle {
+                timestamp: 1 + i as i64,
+                open: c,
+                high: c + 1.0,
+                low: c - 1.0,
+                close: c,
+                volume: 1000.0,
+            })
+            .collect()
+    }
+
+    fn analyzer(candles: Vec<TestCandle>) -> RiskManagementAnalyzer<TestCandle> {
+        let store = CandleStore::new(candles, 1000, false);
+        RiskManagementAnalyzer::default(&store)
+    }
+
+    fn ascending(closes: &[f64]) -> Vec<TestCandle> {
+        make_candles(closes)
+    }
+
+    #[test]
+    fn sharpe_ratio_is_positive_for_uptrend() {
+        // 일관된 상승 시 평균 수익률은 양수여야 한다.
+        let candles = ascending(&[100.0, 101.0, 102.0, 103.0, 104.0, 105.0]);
+        let a = analyzer(vec![]);
+        let sharpe = a.calculate_sharpe_ratio(&candles);
+        assert!(sharpe > 0.0, "uptrend should produce positive sharpe, got {sharpe}");
+    }
+
+    #[test]
+    fn sharpe_ratio_is_negative_for_downtrend() {
+        let candles = ascending(&[105.0, 104.0, 103.0, 102.0, 101.0, 100.0]);
+        let a = analyzer(vec![]);
+        let sharpe = a.calculate_sharpe_ratio(&candles);
+        assert!(sharpe < 0.0, "downtrend should produce negative sharpe, got {sharpe}");
+    }
+
+    #[test]
+    fn risk_adjusted_return_matches_total_return_sign() {
+        let up = ascending(&[100.0, 110.0, 120.0]);
+        let down = ascending(&[120.0, 110.0, 100.0]);
+        let a = analyzer(vec![]);
+        assert!(a.calculate_risk_adjusted_return(&up) > 0.0);
+        assert!(a.calculate_risk_adjusted_return(&down) < 0.0);
+    }
+
+    #[test]
+    fn max_drawdown_uses_forward_walk() {
+        // 100 -> 120 -> 80 -> 110 시퀀스의 표준 MDD = (120-80)/120 ≈ 0.3333
+        let candles = ascending(&[100.0, 120.0, 80.0, 110.0]);
+        let a = analyzer(vec![]);
+        let mdd = a.calculate_max_drawdown(&candles);
+        assert!(
+            (mdd - (40.0_f64 / 120.0)).abs() < 1e-9,
+            "expected ~0.3333, got {mdd}"
+        );
+    }
+
+    #[test]
+    fn max_drawdown_zero_for_monotone_uptrend() {
+        let candles = ascending(&[100.0, 101.0, 102.0, 103.0]);
+        let a = analyzer(vec![]);
+        assert_eq!(a.calculate_max_drawdown(&candles), 0.0);
+    }
+
+    #[test]
+    fn volatility_index_uses_tail_window() {
+        // 처음 10개는 변동성 0, 마지막 5개에서 큰 변동 → recent vol > long-term vol
+        let mut closes = vec![100.0; 10];
+        closes.extend([101.0, 95.0, 105.0, 90.0, 110.0]);
+        let candles = ascending(&closes);
+        let a = analyzer(vec![]);
+        let idx = a.calculate_volatility_index(&candles);
+        assert!(idx > 1.0, "tail-window volatility should exceed full-window, got {idx}");
+    }
+
+    #[test]
+    fn optimal_position_size_uses_latest_price() {
+        // first=1.0, last=100.0. 수정 전엔 first(1.0)을 current_price로 사용했으나
+        // 수정 후엔 last(100.0)을 사용. ATR 가능하도록 충분한 캔들을 준다.
+        let mut closes = Vec::new();
+        for i in 0..30 {
+            closes.push(1.0 + i as f64 * 0.1);
+        }
+        // 끝부분에서 가격을 키운다.
+        for i in 0..15 {
+            closes.push(50.0 + i as f64);
+        }
+        let candles = ascending(&closes);
+        let a = analyzer(vec![]);
+        let size = a.calculate_optimal_position_size(&candles);
+        assert!(size > 0.0, "expected positive position size, got {size}");
+    }
+}
