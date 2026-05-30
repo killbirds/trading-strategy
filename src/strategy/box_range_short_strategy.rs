@@ -90,16 +90,24 @@ impl<C: Candle> Display for BoxRangeShortStrategy<C> {
 
 impl<C: Candle + 'static> BoxRangeShortStrategy<C> {
     /// 새 박스권 숏 전략 인스턴스 생성 (JSON 설정 사용)
-    pub fn from_json(
+    pub fn new(
         storage: &CandleStore<C>,
         json_config: &str,
     ) -> Result<BoxRangeShortStrategy<C>, String> {
         let config = BoxRangeShortStrategyConfig::from_json(json_config)?;
-        Self::new(storage, config)
+        Self::from_config(storage, config)
     }
 
-    /// 새 박스권 숏 전략 인스턴스 생성
-    pub fn new(
+    /// 새 박스권 숏 전략 인스턴스 생성 (JSON 설정 사용)
+    pub fn from_json(
+        storage: &CandleStore<C>,
+        json_config: &str,
+    ) -> Result<BoxRangeShortStrategy<C>, String> {
+        Self::new(storage, json_config)
+    }
+
+    /// 새 박스권 숏 전략 인스턴스 생성 (검증 완료된 설정 사용)
+    pub fn from_config(
         storage: &CandleStore<C>,
         config: BoxRangeShortStrategyConfig,
     ) -> Result<BoxRangeShortStrategy<C>, String> {
@@ -118,7 +126,7 @@ impl<C: Candle + 'static> BoxRangeShortStrategy<C> {
             None => BoxRangeShortStrategyConfig::default(),
         };
 
-        Self::new(storage, strategy_config)
+        Self::from_config(storage, strategy_config)
     }
 }
 
@@ -165,5 +173,33 @@ mod tests {
         assert_eq!(config.count, 1);
         assert_eq!(config.period, 20);
         assert_eq!(config.max_width_ratio, 0.05);
+    }
+
+    #[test]
+    fn test_box_range_short_strategy_new_keeps_json_constructor() {
+        let storage = CandleStore::new(Vec::<crate::tests::TestCandle>::new(), 1000, false);
+        let strategy = BoxRangeShortStrategy::new(&storage, "{}").unwrap();
+
+        assert_eq!(strategy.config.count, 1);
+        assert_eq!(strategy.config.period, 20);
+        assert_eq!(strategy.config.max_width_ratio, 0.05);
+    }
+
+    #[test]
+    fn test_box_range_short_strategy_from_config_uses_typed_config() {
+        let storage = CandleStore::new(Vec::<crate::tests::TestCandle>::new(), 1000, false);
+        let strategy = BoxRangeShortStrategy::from_config(
+            &storage,
+            BoxRangeShortStrategyConfig {
+                count: 2,
+                period: 10,
+                max_width_ratio: 0.03,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(strategy.config.count, 2);
+        assert_eq!(strategy.config.period, 10);
+        assert_eq!(strategy.config.max_width_ratio, 0.03);
     }
 }
