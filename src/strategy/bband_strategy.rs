@@ -222,7 +222,9 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
     }
 
     fn should_exit(&self, _current_price: f64) -> bool {
-        self.ctx.is_above_middle_band(1, 0)
+        // 롱 청산: 종가가 중간선 아래로 내려오면 추세 약화로 보고 청산
+        // (진입은 상단 밴드 돌파 — 중간선 위는 자명하므로 청산 조건이 될 수 없음)
+        self.ctx.is_below_middle_band(1, 0)
     }
 
     fn position(&self) -> PositionType {
