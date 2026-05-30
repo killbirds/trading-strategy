@@ -89,7 +89,8 @@ where
     }
 
     fn calculate(&self) -> ROC {
-        if self.close_values.len() < self.period {
+        // 표준 ROC(N) = (close[t] / close[t-N] - 1) * 100 이므로 N+1개 봉이 필요하다.
+        if self.close_values.len() <= self.period {
             return self.empty_roc();
         }
 
@@ -97,7 +98,7 @@ where
             Some(value) => *value,
             None => return self.empty_roc(),
         };
-        let past_index = self.close_values.len() - self.period;
+        let past_index = self.close_values.len() - self.period - 1;
         let past_price = self.close_values[past_index];
         let value = if past_price == 0.0 {
             0.0
@@ -159,12 +160,25 @@ mod tests {
 
     #[test]
     fn test_roc_calculates_rate_of_change() {
-        let candles = (0..10)
+        // close[0..=10] = [100, 101, ..., 110]
+        // ROC(10) = (close[10] / close[0] - 1) * 100 = (110/100 - 1)*100 = 10.0
+        let candles = (0..=10)
             .map(|index| candle(index, 100.0 + index as f64))
             .collect::<Vec<_>>();
         let mut builder = ROCBuilder::<TestCandle>::new(10);
         let roc = builder.build(&candles);
 
-        assert_eq!(roc.value, 9.0);
+        assert_eq!(roc.value, 10.0);
+    }
+
+    #[test]
+    fn test_roc_returns_zero_when_data_eq_period() {
+        // 표준 ROC(N)은 N+1개 봉이 필요하다 — 정확히 N개일 때는 계산할 수 없다.
+        let candles = (0..10)
+            .map(|index| candle(index, 100.0 + index as f64))
+            .collect::<Vec<_>>();
+        let mut builder = ROCBuilder::<TestCandle>::new(10);
+        let roc = builder.build(&candles);
+        assert_eq!(roc.value, 0.0);
     }
 }
