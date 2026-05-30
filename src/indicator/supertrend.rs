@@ -266,8 +266,13 @@ impl<C: Candle> SuperTrendBuilder<C> {
                 //     그 외                → 상승 유지 (lower_band, +1)
                 //
                 // EPSILON 매칭이 실패할 수 있어 prev.direction을 fallback 으로 사용한다.
-                let prev_was_upper = (prev.value - prev.upper_band).abs() < EPSILON
-                    || ((prev.value - prev.lower_band).abs() >= EPSILON && prev.direction < 0);
+                let prev_was_upper = if (prev.value - prev.upper_band).abs() < EPSILON {
+                    true
+                } else if (prev.value - prev.lower_band).abs() < EPSILON {
+                    false
+                } else {
+                    prev.direction < 0
+                };
 
                 let (super_trend, direction) = if prev_was_upper {
                     if close_price > upper_band {

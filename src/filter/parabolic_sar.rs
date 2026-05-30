@@ -15,9 +15,10 @@ enum CrossDirection {
 
 /// `consecutive_n`개의 연속 봉에서 가격이 SAR을 위/아래로 돌파했는지 확인한다.
 ///
-/// 가장 최근(p 오프셋) 봉의 cross 판정에는 외부에서 전달된 실시간 `current_price`를
-/// 사용하고, 그 외 과거 봉에는 해당 봉의 close 를 사용한다. 외부 가격을 모든 봉에
-/// 적용하면 `consecutive_n > 1` 일 때 의미가 깨진다.
+/// items 는 newest-first 이고 `p == 0` 일 때 items[0] 이 "현재 시점"이다.
+/// 이 경우에 한해 외부에서 전달된 실시간 `current_price`로 cross 를 판정하고,
+/// 그 외(과거 시점 오프셋이거나 윈도우 안의 오래된 봉)에는 해당 봉의 close 를 쓴다.
+/// 모든 봉에 외부 가격을 적용하면 `consecutive_n > 1` 일 때 의미가 깨진다.
 fn price_cross<C: Candle + 'static>(
     analyzer: &ParabolicSARAnalyzer<C>,
     consecutive_n: usize,
@@ -41,8 +42,8 @@ fn price_cross<C: Candle + 'static>(
             None => return false,
         };
 
-        // 가장 최근(현재 시점) 봉만 실시간 가격을, 나머지는 자기 close 를 쓴다.
-        let current_close = if offset == 0 {
+        // index == 0 (= p == 0 && offset == 0) 인 봉만 실시간 current_price를 사용한다.
+        let current_close = if index == 0 {
             current_price
         } else {
             current.candle.close_price()
