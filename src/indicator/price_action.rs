@@ -175,7 +175,7 @@ pub fn identify_swing_points<C: Candle>(candles: &[C], strength: usize) -> Vec<S
         }
     }
 
-    swing_points.sort_by(|a, b| a.index.cmp(&b.index));
+    swing_points.sort_by_key(|a| a.index);
     swing_points.truncate(10);
 
     swing_points
