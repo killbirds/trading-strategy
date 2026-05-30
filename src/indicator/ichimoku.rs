@@ -33,7 +33,7 @@ pub struct Ichimoku {
     /// `kijun_period`봉 전 종가를 담는다. 따라서 외부에서는
     /// `current_close > ichimoku.chikou` (강세) / `<` (약세) 형태로 사용한다.
     ///
-    /// 표준 표시값(현재 종가)은 [`Self::chikou_value`]로 별도 노출한다.
+    /// 표준 표시값(현재 종가)은 호출자가 보유한 최신 종가를 그대로 사용한다.
     pub chikou: f64,
 }
 
