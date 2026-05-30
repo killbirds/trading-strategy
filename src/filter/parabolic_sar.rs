@@ -144,3 +144,92 @@ pub(crate) fn validate_params(params: &ParabolicSARParams) -> Result<()> {
     }
     helper::validate_common(params.consecutive_n, "ParabolicSAR consecutive_n")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::TestCandle;
+
+    fn candle(timestamp: i64, high: f64, low: f64, close: f64) -> TestCandle {
+        TestCandle {
+            timestamp,
+            open: close,
+            high,
+            low,
+            close,
+            volume: 1000.0,
+        }
+    }
+
+    fn candle_store(candles: Vec<TestCandle>) -> CandleStore<TestCandle> {
+        CandleStore::new(candles, 1000, false)
+    }
+
+    fn params(filter_type: ParabolicSARFilterType, consecutive_n: usize) -> ParabolicSARParams {
+        ParabolicSARParams {
+            filter_type,
+            consecutive_n,
+            ..ParabolicSARParams::default()
+        }
+    }
+
+    #[test]
+    fn price_cross_above_uses_external_price_only_for_latest_bar() {
+        let store = candle_store(vec![
+            candle(1, 20.5, 19.5, 20.0),
+            candle(2, 18.5, 17.5, 18.0),
+            candle(3, 16.5, 15.5, 16.0),
+            candle(4, 14.5, 13.5, 14.0),
+        ]);
+
+        assert!(
+            filter_parabolic_sar(
+                "TEST/USDT",
+                &params(ParabolicSARFilterType::PriceCrossAbove, 1),
+                &store,
+                100.0,
+            )
+            .unwrap()
+        );
+        assert!(
+            !filter_parabolic_sar(
+                "TEST/USDT",
+                &params(ParabolicSARFilterType::PriceCrossAbove, 2),
+                &store,
+                100.0,
+            )
+            .unwrap(),
+            "historical bars must use their candle close, not the external current_price"
+        );
+    }
+
+    #[test]
+    fn price_cross_below_uses_external_price_only_for_latest_bar() {
+        let store = candle_store(vec![
+            candle(1, 10.5, 9.5, 10.0),
+            candle(2, 12.5, 11.5, 12.0),
+            candle(3, 14.5, 13.5, 14.0),
+            candle(4, 16.5, 15.5, 16.0),
+        ]);
+
+        assert!(
+            filter_parabolic_sar(
+                "TEST/USDT",
+                &params(ParabolicSARFilterType::PriceCrossBelow, 1),
+                &store,
+                -100.0,
+            )
+            .unwrap()
+        );
+        assert!(
+            !filter_parabolic_sar(
+                "TEST/USDT",
+                &params(ParabolicSARFilterType::PriceCrossBelow, 2),
+                &store,
+                -100.0,
+            )
+            .unwrap(),
+            "historical bars must use their candle close, not the external current_price"
+        );
+    }
+}

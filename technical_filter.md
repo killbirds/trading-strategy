@@ -92,6 +92,7 @@ p = 0
 - `consecutive_n = N` 은 `p` 부터 시작해 `N`개 연속 데이터가 조건을 만족해야 한다는 뜻입니다.
 - 교차/상승/하락처럼 이전 데이터와 비교하는 필터는 내부적으로 `p + consecutive_n + 1` 개 이상의 분석 결과를 요구할 수 있습니다.
 - 가격 비교형 필터에서 `p` 는 기준 지표/캔들 선택에만 영향을 주고, 비교 대상인 `current_price` 자체를 과거 가격으로 바꾸지는 않습니다.
+  단, `ParabolicSAR`의 `PriceCrossAbove`/`PriceCrossBelow`처럼 **여러 봉의 교차 여부**를 검사하는 필터는 최신 봉(`p = 0`의 첫 비교)에만 외부 `current_price`를 쓰고, 과거 오프셋/연속 구간 안의 오래된 봉은 해당 캔들의 `close`로 비교합니다.
 
 검증 규칙 요약:
 
@@ -161,7 +162,7 @@ BoxRange 최소 필요 캔들 수:
 - `BreakoutAbove`, `BreakoutBelow`, `HighBreakThroughUpperBox`, `LowBreakThroughLowerBox`: `period + p + consecutive_n`
 - `BoxRangeStart`: `period + p + consecutive_n - 1 + prior_box_count`
 
-실시간 가격 비교가 필요한 필터는 캔들 저장소의 최신 `close` 를 현재가로 사용하지 않습니다. 필터 평가 시 외부에서 전달한 `current_price` 로 가격 조건을 판단하고, `p` 는 캔들/지표 기준값을 선택하는 오프셋으로만 사용합니다.
+실시간 가격 비교가 필요한 필터는 캔들 저장소의 최신 `close` 를 현재가로 사용하지 않습니다. 필터 평가 시 외부에서 전달한 `current_price` 로 가격 조건을 판단하고, `p` 는 캔들/지표 기준값을 선택하는 오프셋으로만 사용합니다. 다만 교차 조건을 `consecutive_n > 1`로 여러 봉에 걸쳐 확인하는 필터는 현재 시점의 첫 비교만 실시간 가격을 쓰고, 과거 봉 비교는 각 캔들의 `close`를 사용합니다.
 
 ---
 
@@ -646,7 +647,7 @@ RSI 계산 메모:
 - `type="PARABOLIC_SAR"`
 - 기본값: `step=0.02`, `max_step=0.2`, `filter_type="Bullish"`, `consecutive_n=1`, `p=0`
 - `filter_type`: `Bullish`, `Bearish`, `Reversal`, `PriceCrossAbove`, `PriceCrossBelow`
-- 가격 교차는 외부 `current_price` 기준으로 평가하고, 이전 캔들 close와 이전 SAR 값을 비교합니다.
+- 가격 교차는 최신 봉(`p=0`의 첫 비교)에서만 외부 `current_price` 기준으로 평가하고, 이전 캔들 close와 이전 SAR 값을 비교합니다. `consecutive_n > 1` 또는 `p > 0`으로 과거 봉의 교차를 확인할 때는 외부 `current_price`를 과거 봉에 재사용하지 않고 해당 캔들의 `close`와 SAR을 비교합니다.
 
 ### Slope
 
