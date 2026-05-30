@@ -293,6 +293,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 변동성 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_volatility(&self, candles: &[C]) -> f64 {
         if candles.len() < 2 {
             return 0.0;
@@ -301,8 +303,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         let returns: Vec<f64> = candles
             .windows(2)
             .map(|w| {
-                let current = w[0].close_price();
-                let previous = w[1].close_price();
+                let previous = w[0].close_price();
+                let current = w[1].close_price();
                 (current / previous).ln()
             })
             .collect();
@@ -319,6 +321,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 일일 변동성 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_daily_volatility(&self, candles: &[C]) -> f64 {
         if candles.len() < 2 {
             return 0.0;
@@ -327,8 +331,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         let daily_returns: Vec<f64> = candles
             .windows(2)
             .map(|w| {
-                let current = w[0].close_price();
-                let previous = w[1].close_price();
+                let previous = w[0].close_price();
+                let current = w[1].close_price();
                 ((current - previous) / previous).abs()
             })
             .collect();
@@ -341,6 +345,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 주간 변동성 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_weekly_volatility(&self, candles: &[C]) -> f64 {
         if candles.len() < 7 {
             return 0.0;
@@ -352,8 +358,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
                 if week.len() < 2 {
                     return None;
                 }
-                let start = week.last()?.close_price();
-                let end = week.first()?.close_price();
+                let start = week.first()?.close_price();
+                let end = week.last()?.close_price();
                 Some(((end - start) / start).abs())
             })
             .collect();
@@ -366,23 +372,28 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 최대 손실 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
+    /// 시간을 정방향으로 진행하며 누적 최고가 대비 낙폭을 추적한다.
     fn calculate_max_drawdown(&self, candles: &[C]) -> f64 {
         if candles.len() < 2 {
             return 0.0;
         }
 
         let mut max_drawdown = 0.0;
-        let mut peak = candles.last().map(|c| c.close_price()).unwrap_or(0.0);
+        let mut peak = candles.first().map(|c| c.close_price()).unwrap_or(0.0);
 
-        for candle in candles.iter().rev() {
+        for candle in candles.iter() {
             let current_price = candle.close_price();
             if current_price > peak {
                 peak = current_price;
             }
 
-            let drawdown = (peak - current_price) / peak;
-            if drawdown > max_drawdown {
-                max_drawdown = drawdown;
+            if peak > 0.0 {
+                let drawdown = (peak - current_price) / peak;
+                if drawdown > max_drawdown {
+                    max_drawdown = drawdown;
+                }
             }
         }
 
@@ -390,6 +401,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 샤프 비율 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_sharpe_ratio(&self, candles: &[C]) -> f64 {
         if candles.len() < 2 {
             return 0.0;
@@ -398,8 +411,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         let returns: Vec<f64> = candles
             .windows(2)
             .map(|w| {
-                let current = w[0].close_price();
-                let previous = w[1].close_price();
+                let previous = w[0].close_price();
+                let current = w[1].close_price();
                 (current - previous) / previous
             })
             .collect();
@@ -425,12 +438,16 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 변동성 지수 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
+    /// 최근 10개 캔들의 변동성과 전체 기간 변동성의 비율을 반환한다.
     fn calculate_volatility_index(&self, candles: &[C]) -> f64 {
         if candles.len() < 10 {
             return 0.0;
         }
 
-        let recent_volatility = self.calculate_volatility(&candles[..10]);
+        let recent_start = candles.len() - 10;
+        let recent_volatility = self.calculate_volatility(&candles[recent_start..]);
         let long_term_volatility = self.calculate_volatility(candles);
 
         if long_term_volatility == 0.0 {
@@ -441,6 +458,8 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 리스크 조정 수익률 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_risk_adjusted_return(&self, candles: &[C]) -> f64 {
         if candles.len() < 2 {
             return 0.0;
@@ -451,10 +470,10 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
             None => return 0.0,
         };
         let last_price = candles.last().map(|c| c.close_price()).unwrap_or(0.0);
-        if last_price == 0.0 {
+        if first_price == 0.0 {
             return 0.0;
         }
-        let total_return = (first_price - last_price) / last_price;
+        let total_return = (last_price - first_price) / first_price;
         let volatility = self.calculate_volatility(candles);
 
         if volatility == 0.0 {
@@ -465,10 +484,12 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
     }
 
     /// 최적 포지션 크기 계산
+    ///
+    /// 입력 캔들은 시간 오름차순(과거 → 최신)을 전제로 한다.
     fn calculate_optimal_position_size(&self, candles: &[C]) -> f64 {
         let atr = self.calculate_atr(candles);
         let volatility = self.calculate_volatility(candles);
-        let current_price = match candles.first() {
+        let current_price = match candles.last() {
             Some(c) => c.close_price(),
             None => return 0.0,
         };
