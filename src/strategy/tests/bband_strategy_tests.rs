@@ -1,7 +1,8 @@
+use crate::strategy::Strategy;
 use crate::strategy::bband_strategy::BBandStrategy;
 use crate::strategy::tests::common::{
-    backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_storage,
-    create_uptrend_candles,
+    backtest_strategy, create_downtrend_candles, create_sideways_candles, create_test_candle,
+    create_test_storage, create_uptrend_candles,
 };
 use std::collections::HashMap;
 
@@ -15,6 +16,14 @@ fn create_bband_config() -> HashMap<String, String> {
     config.insert("signal_period".to_string(), "5".to_string());
     config.insert("count".to_string(), "3".to_string());
     config.insert("multiplier".to_string(), "1.0".to_string());
+    config
+}
+
+fn create_fast_bband_config() -> HashMap<String, String> {
+    let mut config = HashMap::new();
+    config.insert("period".to_string(), "3".to_string());
+    config.insert("count".to_string(), "1".to_string());
+    config.insert("multiplier".to_string(), "2.0".to_string());
     config
 }
 
@@ -32,6 +41,42 @@ fn test_bband_strategy_creation() {
 
     // 인스턴스가 제대로 생성되었는지 확인
     assert!(!strategy.to_string().is_empty());
+}
+
+#[test]
+fn test_bband_strategy_exits_when_latest_close_is_below_middle_band() {
+    let candles = vec![
+        create_test_candle(100.0, 1, 100.0, "TEST/USDT"),
+        create_test_candle(100.0, 2, 100.0, "TEST/USDT"),
+        create_test_candle(100.0, 3, 100.0, "TEST/USDT"),
+        create_test_candle(50.0, 4, 100.0, "TEST/USDT"),
+    ];
+    let storage = create_test_storage(candles);
+    let strategy =
+        BBandStrategy::new_with_config(&storage, Some(create_fast_bband_config())).unwrap();
+
+    assert!(
+        strategy.should_exit(10_000.0),
+        "long exit should follow the latest candle closing below the middle band"
+    );
+}
+
+#[test]
+fn test_bband_strategy_does_not_exit_when_latest_close_is_above_middle_band() {
+    let candles = vec![
+        create_test_candle(100.0, 1, 100.0, "TEST/USDT"),
+        create_test_candle(100.0, 2, 100.0, "TEST/USDT"),
+        create_test_candle(100.0, 3, 100.0, "TEST/USDT"),
+        create_test_candle(120.0, 4, 100.0, "TEST/USDT"),
+    ];
+    let storage = create_test_storage(candles);
+    let strategy =
+        BBandStrategy::new_with_config(&storage, Some(create_fast_bband_config())).unwrap();
+
+    assert!(
+        !strategy.should_exit(0.0),
+        "long exit should not fire while the latest candle closes above the middle band"
+    );
 }
 
 #[test]
