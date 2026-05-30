@@ -431,22 +431,26 @@ where
         .collect()
 }
 
-/// 문자열을 안전하게 분리하여 벡터로 변환 (에러 시 빈 벡터 반환)
+/// 문자열을 안전하게 분리하여 벡터로 변환 (에러 시 빈 벡터 반환).
+///
+/// 파싱 실패는 로그만 남기고 빈 벡터를 반환하므로 호출자는 `is_empty()` 로
+/// 검증해야 한다. (이전 시그니처는 `Result`였지만 `Err`을 반환하지 않아
+/// 호출자에게 잘못된 신호를 주었다.)
 ///
 /// # Arguments
 /// * `input` - 분리할 문자열
 ///
 /// # Returns
-/// * `Result<Vec<T>, String>` - 분리된 값 벡터 또는 에러
-pub fn split_safe<T: FromStr>(input: &str) -> Result<Vec<T>, String>
+/// * `Vec<T>` - 분리된 값 벡터 (파싱 실패 시 빈 벡터)
+pub fn split_safe<T: FromStr>(input: &str) -> Vec<T>
 where
     <T as FromStr>::Err: Debug + Display,
 {
     match split::<T>(input) {
-        Ok(v) => Ok(v),
+        Ok(v) => v,
         Err(e) => {
             log::error!("분리 오류: {e}");
-            Ok(vec![])
+            vec![]
         }
     }
 }

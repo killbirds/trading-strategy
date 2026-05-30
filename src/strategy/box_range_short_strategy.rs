@@ -90,13 +90,20 @@ impl<C: Candle> Display for BoxRangeShortStrategy<C> {
 
 impl<C: Candle + 'static> BoxRangeShortStrategy<C> {
     /// 새 박스권 숏 전략 인스턴스 생성 (JSON 설정 사용)
-    pub fn new(
+    pub fn from_json(
         storage: &CandleStore<C>,
         json_config: &str,
     ) -> Result<BoxRangeShortStrategy<C>, String> {
         let config = BoxRangeShortStrategyConfig::from_json(json_config)?;
-        info!("박스권 숏 전략 설정: {config:?}");
+        Self::new(storage, config)
+    }
 
+    /// 새 박스권 숏 전략 인스턴스 생성
+    pub fn new(
+        storage: &CandleStore<C>,
+        config: BoxRangeShortStrategyConfig,
+    ) -> Result<BoxRangeShortStrategy<C>, String> {
+        info!("박스권 숏 전략 설정: {config:?}");
         let ctx = BoxRangeAnalyzer::new(config.period, config.max_width_ratio, storage);
         Ok(BoxRangeShortStrategy { config, ctx })
     }
@@ -111,17 +118,7 @@ impl<C: Candle + 'static> BoxRangeShortStrategy<C> {
             None => BoxRangeShortStrategyConfig::default(),
         };
 
-        info!("박스권 숏 전략 설정: {strategy_config:?}");
-        let ctx = BoxRangeAnalyzer::new(
-            strategy_config.period,
-            strategy_config.max_width_ratio,
-            storage,
-        );
-
-        Ok(BoxRangeShortStrategy {
-            config: strategy_config,
-            ctx,
-        })
+        Self::new(storage, strategy_config)
     }
 }
 

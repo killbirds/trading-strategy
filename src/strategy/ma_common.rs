@@ -78,8 +78,7 @@ impl MAStrategyConfigBase {
         // 이동평균 기간 설정
         let ma_periods = match config.get("ma_periods") {
             Some(periods) => {
-                let periods_vec = split_safe::<usize>(periods)
-                    .map_err(|e| format!("이동평균 기간 파싱 오류: {e}"))?;
+                let periods_vec = split_safe::<usize>(periods);
 
                 if periods_vec.is_empty() {
                     return Err("이동평균 기간이 지정되지 않았습니다".to_string());
