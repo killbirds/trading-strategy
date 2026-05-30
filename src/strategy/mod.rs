@@ -431,28 +431,20 @@ where
         .collect()
 }
 
-/// 문자열을 안전하게 분리하여 벡터로 변환 (에러 시 빈 벡터 반환).
+/// 문자열을 안전하게 분리하여 벡터로 변환.
 ///
-/// 파싱 실패는 로그만 남기고 빈 벡터를 반환하므로 호출자는 `is_empty()` 로
-/// 검증해야 한다. (이전 시그니처는 `Result`였지만 `Err`을 반환하지 않아
-/// 호출자에게 잘못된 신호를 주었다.)
+/// 파싱 실패는 호출자가 정확한 설정 오류를 보여줄 수 있도록 `Err`로 반환한다.
 ///
 /// # Arguments
 /// * `input` - 분리할 문자열
 ///
 /// # Returns
-/// * `Vec<T>` - 분리된 값 벡터 (파싱 실패 시 빈 벡터)
-pub fn split_safe<T: FromStr>(input: &str) -> Vec<T>
+/// * `Result<Vec<T>, String>` - 분리된 값 벡터 또는 파싱 오류
+pub fn split_safe<T: FromStr>(input: &str) -> Result<Vec<T>, String>
 where
     <T as FromStr>::Err: Debug + Display,
 {
-    match split::<T>(input) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("분리 오류: {e}");
-            vec![]
-        }
-    }
+    split::<T>(input).map_err(|e| format!("분리 오류: {e}"))
 }
 
 /// 공통 설정 파싱 유틸리티 모듈
@@ -608,7 +600,7 @@ pub mod config_utils {
 
 #[cfg(test)]
 mod config_utils_tests {
-    use super::config_utils;
+    use super::{config_utils, split_safe};
     use std::collections::HashMap;
 
     #[test]
@@ -617,5 +609,13 @@ mod config_utils_tests {
         config.insert("threshold".to_string(), "NaN".to_string());
 
         assert!(config_utils::parse_f64(&config, "threshold", Some((0.0, 1.0)), true).is_err());
+    }
+
+    #[test]
+    fn test_split_safe_preserves_parse_error() {
+        let err = split_safe::<usize>("5,bad,20").unwrap_err();
+
+        assert!(err.contains("분리 오류"));
+        assert!(err.contains("파싱 오류"));
     }
 }
