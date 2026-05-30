@@ -36,6 +36,17 @@ impl AverageDirectionalMovementIndex {
         })
     }
 
+    fn reset(&mut self) {
+        self.high_values.clear();
+        self.low_values.clear();
+        self.close_values.clear();
+        self.previous_tr = None;
+        self.previous_plus_dm = None;
+        self.previous_minus_dm = None;
+        self.previous_adx = None;
+        self.dx_values.clear();
+    }
+
     fn next(&mut self, input: &impl Candle) -> (f64, f64, f64) {
         self.high_values.push(input.high_price());
         self.low_values.push(input.low_price());
@@ -266,6 +277,9 @@ where
     }
 
     pub fn build(&mut self, data: &[C]) -> ADX {
+        // 동일 builder로 build()를 두 번 호출해도 결과가 일관되도록 내부 상태를 초기화한다.
+        self.indicator.reset();
+
         let mut adx = 0.0;
         let mut plus_di = 0.0;
         let mut minus_di = 0.0;
@@ -809,5 +823,17 @@ mod tests {
             adx.plus_di,
             adx.minus_di
         );
+    }
+
+    #[test]
+    fn test_adx_build_is_idempotent() {
+        let mut builder = ADXBuilder::<TestCandle>::new(2);
+        let candles = create_test_candles();
+
+        let first = builder.build(&candles);
+        let second = builder.build(&candles);
+        assert!((first.adx - second.adx).abs() < 1e-9);
+        assert!((first.plus_di - second.plus_di).abs() < 1e-9);
+        assert!((first.minus_di - second.minus_di).abs() < 1e-9);
     }
 }

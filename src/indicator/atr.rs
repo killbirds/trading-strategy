@@ -122,6 +122,12 @@ impl<C: Candle> ATRBuilder<C> {
     /// # Returns
     /// * `ATR` - 계산된 ATR 지표
     pub fn build(&mut self, data: &[C]) -> ATR {
+        // 동일 builder로 build()를 두 번 호출해도 결과가 일관되도록 내부 상태를 초기화한다.
+        self.high_values.clear();
+        self.low_values.clear();
+        self.close_values.clear();
+        self.previous_atr = None;
+
         if data.is_empty() {
             return ATR {
                 period: self.period,
@@ -604,6 +610,20 @@ mod tests {
             atr1.value(),
             atr2.value(),
             diff_percent
+        );
+    }
+
+    #[test]
+    fn test_atr_build_is_idempotent() {
+        // 동일 builder로 build()를 두 번 호출해도 결과가 같아야 한다.
+        let mut builder = ATRBuilder::<TestCandle>::new(14);
+        let candles = create_test_candles();
+
+        let first = builder.build(&candles).value();
+        let second = builder.build(&candles).value();
+        assert!(
+            (first - second).abs() < 1e-9,
+            "build should be idempotent, got {first} vs {second}"
         );
     }
 }

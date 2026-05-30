@@ -190,6 +190,13 @@ impl<C: Candle> SuperTrendBuilder<C> {
 
     /// 데이터 벡터에서 슈퍼트렌드 지표 생성
     pub fn build(&mut self, data: &[C]) -> SuperTrend {
+        // 동일 builder로 build()를 두 번 호출해도 결과가 일관되도록 내부 상태 초기화.
+        // ATRBuilder는 자체 build() 호출 시 reset되지만, 여기서는 next() 루프를 돌리므로
+        // 명시적으로 새 ATRBuilder로 교체한다.
+        self.atr_builder = ATRBuilder::new(self.period);
+        self.previous_supertrend = None;
+        self.previous_close = None;
+
         if data.is_empty() {
             return SuperTrend::default();
         }
@@ -790,5 +797,18 @@ mod tests {
             "Lower band should be finite. Got: {}",
             st.lower_band
         );
+    }
+
+    #[test]
+    fn test_supertrend_build_is_idempotent() {
+        let mut builder = SuperTrendBuilder::<TestCandle>::new(3, 3.0);
+        let candles = create_test_candles();
+
+        let first = builder.build(&candles);
+        let second = builder.build(&candles);
+        assert!((first.value - second.value).abs() < 1e-9);
+        assert_eq!(first.direction, second.direction);
+        assert!((first.upper_band - second.upper_band).abs() < 1e-9);
+        assert!((first.lower_band - second.lower_band).abs() < 1e-9);
     }
 }
