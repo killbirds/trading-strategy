@@ -25,7 +25,15 @@ pub struct Ichimoku {
     pub senkou_span_a: f64,
     /// 선행스팬 B 값 (두 번째 클라우드 구성요소)
     pub senkou_span_b: f64,
-    /// 후행스팬 값 (가격의 후행 표시)
+    /// 후행스팬 비교 기준 값
+    ///
+    /// 표준 Ichimoku에서 Chikou Span은 *현재 종가*를 차트에서 `kijun_period`만큼
+    /// 뒤로 시프트해 그린다. 이 필드는 차트 표시값(=현재 종가)이 아니라,
+    /// "현재 종가 vs `kijun_period`봉 전 종가" 비교를 바로 할 수 있도록
+    /// `kijun_period`봉 전 종가를 담는다. 따라서 외부에서는
+    /// `current_close > ichimoku.chikou` (강세) / `<` (약세) 형태로 사용한다.
+    ///
+    /// 표준 표시값(현재 종가)은 [`Self::chikou_value`]로 별도 노출한다.
     pub chikou: f64,
 }
 
@@ -109,6 +117,18 @@ impl Ichimoku {
     /// * `bool` - 클라우드 내 여부
     pub fn is_price_in_cloud(&self, price: f64) -> bool {
         !self.is_price_above_cloud(price) && !self.is_price_below_cloud(price)
+    }
+
+    /// 후행스팬 강세 신호 — 현재 종가가 `kijun_period`봉 전 종가보다 높음
+    ///
+    /// `current_close`는 호출자가 보유한 최신 종가다.
+    pub fn is_chikou_bullish(&self, current_close: f64) -> bool {
+        current_close > self.chikou
+    }
+
+    /// 후행스팬 약세 신호 — 현재 종가가 `kijun_period`봉 전 종가보다 낮음
+    pub fn is_chikou_bearish(&self, current_close: f64) -> bool {
+        current_close < self.chikou
     }
 
     /// 전환선이 기준선 위에 있는지 확인 (골든 크로스 후 상태)
@@ -310,11 +330,13 @@ where
         // 선행스팬 B (Senkou Span B) 계산 - 최근 P기간의 (최고가 + 최저가) / 2
         let senkou_span_b = donchian_midpoint(&self.candles, self.senkou_period);
 
-        // 후행스팬 (Chikou Span) 계산 - 현재 종가를 kijun_period 기간 전으로 이동
-        // data는 시간 순서대로 정렬되어 있고, 최신 데이터가 마지막에 있음
-        // candles는 역순으로 저장되어 있어 candles[0]이 최신 데이터
-        // 후행스팬은 현재 종가(data의 마지막)를 kijun_period 기간 전으로 이동
-        // candles에서 현재 종가는 candles[0], kijun_period 기간 전은 candles[kijun_period]
+        // 후행스팬 비교 기준: kijun_period봉 전 종가
+        //
+        // 표준 Chikou Span은 현재 종가를 차트에서 kijun_period만큼 뒤로 시프트
+        // 해 표시한다. 이 라이브러리에서는 차트 그리기 대신 비교 신호 생성을
+        // 위해 kijun_period봉 전 종가를 보관한다. 외부에서는
+        // `current_close > ichimoku.chikou` 형태로 강세 여부를 판정한다.
+        // candles는 newest-first이므로 candles[kijun_period]가 그 시점이다.
         let chikou = if self.candles.len() > self.kijun_period {
             self.candles[self.kijun_period].close_price()
         } else {
