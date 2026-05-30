@@ -2,9 +2,68 @@ use super::{
     FilterError, ParabolicSARFilterType, ParabolicSARParams, Result,
     standalone_indicator as helper, utils,
 };
+use crate::analyzer::base::AnalyzerOps;
 use crate::analyzer::parabolic_sar_analyzer::{ParabolicSARAnalyzer, ParabolicSARAnalyzerParams};
 use crate::candle_store::CandleStore;
 use trading_chart::Candle;
+
+#[derive(Clone, Copy)]
+enum CrossDirection {
+    Above,
+    Below,
+}
+
+/// `consecutive_n`개의 연속 봉에서 가격이 SAR을 위/아래로 돌파했는지 확인한다.
+///
+/// 가장 최근(p 오프셋) 봉의 cross 판정에는 외부에서 전달된 실시간 `current_price`를
+/// 사용하고, 그 외 과거 봉에는 해당 봉의 close 를 사용한다. 외부 가격을 모든 봉에
+/// 적용하면 `consecutive_n > 1` 일 때 의미가 깨진다.
+fn price_cross<C: Candle + 'static>(
+    analyzer: &ParabolicSARAnalyzer<C>,
+    consecutive_n: usize,
+    p: usize,
+    current_price: f64,
+    direction: CrossDirection,
+) -> bool {
+    let items = analyzer.items();
+    if items.len() < p + consecutive_n + 1 {
+        return false;
+    }
+
+    for offset in 0..consecutive_n {
+        let index = p + offset;
+        let current = match items.get(index) {
+            Some(d) => d,
+            None => return false,
+        };
+        let previous = match items.get(index + 1) {
+            Some(d) => d,
+            None => return false,
+        };
+
+        // 가장 최근(현재 시점) 봉만 실시간 가격을, 나머지는 자기 close 를 쓴다.
+        let current_close = if offset == 0 {
+            current_price
+        } else {
+            current.candle.close_price()
+        };
+        let prev_close = previous.candle.close_price();
+        let crossed = match direction {
+            CrossDirection::Above => {
+                current_close > current.parabolic_sar.value()
+                    && prev_close <= previous.parabolic_sar.value()
+            }
+            CrossDirection::Below => {
+                current_close < current.parabolic_sar.value()
+                    && prev_close >= previous.parabolic_sar.value()
+            }
+        };
+        if !crossed {
+            return false;
+        }
+    }
+    true
+}
 
 pub(crate) fn filter_parabolic_sar<C: Candle + 'static>(
     symbol: &str,
@@ -53,23 +112,19 @@ pub(crate) fn filter_parabolic_sar<C: Candle + 'static>(
             params.p,
             |current, previous| current.parabolic_sar.is_long() != previous.parabolic_sar.is_long(),
         ),
-        ParabolicSARFilterType::PriceCrossAbove => helper::matches_previous(
+        ParabolicSARFilterType::PriceCrossAbove => price_cross(
             &analyzer,
             params.consecutive_n,
             params.p,
-            |current, previous| {
-                current_price > current.parabolic_sar.value()
-                    && previous.candle.close_price() <= previous.parabolic_sar.value()
-            },
+            current_price,
+            CrossDirection::Above,
         ),
-        ParabolicSARFilterType::PriceCrossBelow => helper::matches_previous(
+        ParabolicSARFilterType::PriceCrossBelow => price_cross(
             &analyzer,
             params.consecutive_n,
             params.p,
-            |current, previous| {
-                current_price < current.parabolic_sar.value()
-                    && previous.candle.close_price() >= previous.parabolic_sar.value()
-            },
+            current_price,
+            CrossDirection::Below,
         ),
     })
 }
