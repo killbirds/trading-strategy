@@ -231,7 +231,11 @@ mod tests {
         let mut builder = AroonBuilder::<TestCandle>::new(4);
         let aroon = builder.build(&data);
         assert!((aroon.up() - 0.0).abs() < 1e-9, "got up={}", aroon.up());
-        assert!((aroon.down() - 100.0).abs() < 1e-9, "got down={}", aroon.down());
+        assert!(
+            (aroon.down() - 100.0).abs() < 1e-9,
+            "got down={}",
+            aroon.down()
+        );
     }
 
     #[test]
@@ -247,6 +251,10 @@ mod tests {
         ];
         let mut builder = AroonBuilder::<TestCandle>::new(4);
         let aroon = builder.build(&data);
-        assert!((aroon.up() - 50.0).abs() < 1e-9, "expected 50.0, got {}", aroon.up());
+        assert!(
+            (aroon.up() - 50.0).abs() < 1e-9,
+            "expected 50.0, got {}",
+            aroon.up()
+        );
     }
 }

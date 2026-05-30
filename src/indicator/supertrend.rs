@@ -232,83 +232,82 @@ impl<C: Candle> SuperTrendBuilder<C> {
         const EPSILON: f64 = 1e-10;
 
         // 이전 슈퍼트렌드 값 가져오기
-        let (final_upper_band, final_lower_band, super_trend, direction) = match self
-            .previous_supertrend
-        {
-            Some(prev) => {
-                // 이전 종가 가져오기 (안전하게)
-                let prev_close = self.previous_close.unwrap_or(close_price);
+        let (final_upper_band, final_lower_band, super_trend, direction) =
+            match self.previous_supertrend {
+                Some(prev) => {
+                    // 이전 종가 가져오기 (안전하게)
+                    let prev_close = self.previous_close.unwrap_or(close_price);
 
-                // 상단 밴드 계산: 기본 밴드가 이전 밴드보다 낮거나 이전 종가가 이전 상단 밴드를 넘었으면 업데이트
-                let upper_band =
-                    if basic_upper_band < prev.upper_band || prev_close > prev.upper_band {
-                        basic_upper_band
+                    // 상단 밴드 계산: 기본 밴드가 이전 밴드보다 낮거나 이전 종가가 이전 상단 밴드를 넘었으면 업데이트
+                    let upper_band =
+                        if basic_upper_band < prev.upper_band || prev_close > prev.upper_band {
+                            basic_upper_band
+                        } else {
+                            prev.upper_band
+                        };
+
+                    // 하단 밴드 계산: 기본 밴드가 이전 밴드보다 높거나 이전 종가가 이전 하단 밴드보다 낮으면 업데이트
+                    let lower_band =
+                        if basic_lower_band > prev.lower_band || prev_close < prev.lower_band {
+                            basic_lower_band
+                        } else {
+                            prev.lower_band
+                        };
+
+                    // 슈퍼트렌드 값 및 방향 결정
+                    //
+                    // 표준 SuperTrend 알고리즘:
+                    // - 이전 ST == 이전 upper_band (=하락 추세):
+                    //     close > upper_band → 상승 전환 (lower_band, +1)
+                    //     그 외                → 하락 유지 (upper_band, -1)
+                    // - 이전 ST == 이전 lower_band (=상승 추세):
+                    //     close < lower_band → 하락 전환 (upper_band, -1)
+                    //     그 외                → 상승 유지 (lower_band, +1)
+                    //
+                    // EPSILON 매칭이 실패할 수 있어 prev.direction을 fallback 으로 사용한다.
+                    let prev_was_upper = if (prev.value - prev.upper_band).abs() < EPSILON {
+                        true
+                    } else if (prev.value - prev.lower_band).abs() < EPSILON {
+                        false
                     } else {
-                        prev.upper_band
+                        prev.direction < 0
                     };
 
-                // 하단 밴드 계산: 기본 밴드가 이전 밴드보다 높거나 이전 종가가 이전 하단 밴드보다 낮으면 업데이트
-                let lower_band =
-                    if basic_lower_band > prev.lower_band || prev_close < prev.lower_band {
+                    let (super_trend, direction) = if prev_was_upper {
+                        if close_price > upper_band {
+                            (lower_band, 1)
+                        } else {
+                            (upper_band, -1)
+                        }
+                    } else {
+                        // prev_was_lower: 상승 추세에서 출발
+                        if close_price < lower_band {
+                            (upper_band, -1)
+                        } else {
+                            (lower_band, 1)
+                        }
+                    };
+
+                    (upper_band, lower_band, super_trend, direction)
+                }
+                None => {
+                    // 초기 방향 결정: 종가가 기본 상단 밴드보다 높으면 상승, 그렇지 않으면 하락
+                    let direction = if close_price > basic_upper_band {
+                        1
+                    } else {
+                        -1
+                    };
+
+                    // 초기 슈퍼트렌드 값: 상승 추세면 하단 밴드, 하락 추세면 상단 밴드
+                    let super_trend = if direction > 0 {
                         basic_lower_band
                     } else {
-                        prev.lower_band
+                        basic_upper_band
                     };
 
-                // 슈퍼트렌드 값 및 방향 결정
-                //
-                // 표준 SuperTrend 알고리즘:
-                // - 이전 ST == 이전 upper_band (=하락 추세):
-                //     close > upper_band → 상승 전환 (lower_band, +1)
-                //     그 외                → 하락 유지 (upper_band, -1)
-                // - 이전 ST == 이전 lower_band (=상승 추세):
-                //     close < lower_band → 하락 전환 (upper_band, -1)
-                //     그 외                → 상승 유지 (lower_band, +1)
-                //
-                // EPSILON 매칭이 실패할 수 있어 prev.direction을 fallback 으로 사용한다.
-                let prev_was_upper = if (prev.value - prev.upper_band).abs() < EPSILON {
-                    true
-                } else if (prev.value - prev.lower_band).abs() < EPSILON {
-                    false
-                } else {
-                    prev.direction < 0
-                };
-
-                let (super_trend, direction) = if prev_was_upper {
-                    if close_price > upper_band {
-                        (lower_band, 1)
-                    } else {
-                        (upper_band, -1)
-                    }
-                } else {
-                    // prev_was_lower: 상승 추세에서 출발
-                    if close_price < lower_band {
-                        (upper_band, -1)
-                    } else {
-                        (lower_band, 1)
-                    }
-                };
-
-                (upper_band, lower_band, super_trend, direction)
-            }
-            None => {
-                // 초기 방향 결정: 종가가 기본 상단 밴드보다 높으면 상승, 그렇지 않으면 하락
-                let direction = if close_price > basic_upper_band {
-                    1
-                } else {
-                    -1
-                };
-
-                // 초기 슈퍼트렌드 값: 상승 추세면 하단 밴드, 하락 추세면 상단 밴드
-                let super_trend = if direction > 0 {
-                    basic_lower_band
-                } else {
-                    basic_upper_band
-                };
-
-                (basic_upper_band, basic_lower_band, super_trend, direction)
-            }
-        };
+                    (basic_upper_band, basic_lower_band, super_trend, direction)
+                }
+            };
 
         // 계산된 슈퍼트렌드 저장
         let result = SuperTrend::new(super_trend, direction, final_upper_band, final_lower_band);

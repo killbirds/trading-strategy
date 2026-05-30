@@ -876,7 +876,10 @@ mod tests {
         let candles = ascending(&[100.0, 101.0, 102.0, 103.0, 104.0, 105.0]);
         let a = analyzer(vec![]);
         let sharpe = a.calculate_sharpe_ratio(&candles);
-        assert!(sharpe > 0.0, "uptrend should produce positive sharpe, got {sharpe}");
+        assert!(
+            sharpe > 0.0,
+            "uptrend should produce positive sharpe, got {sharpe}"
+        );
     }
 
     #[test]
@@ -884,7 +887,10 @@ mod tests {
         let candles = ascending(&[105.0, 104.0, 103.0, 102.0, 101.0, 100.0]);
         let a = analyzer(vec![]);
         let sharpe = a.calculate_sharpe_ratio(&candles);
-        assert!(sharpe < 0.0, "downtrend should produce negative sharpe, got {sharpe}");
+        assert!(
+            sharpe < 0.0,
+            "downtrend should produce negative sharpe, got {sharpe}"
+        );
     }
 
     #[test]
@@ -923,7 +929,10 @@ mod tests {
         let candles = ascending(&closes);
         let a = analyzer(vec![]);
         let idx = a.calculate_volatility_index(&candles);
-        assert!(idx > 1.0, "tail-window volatility should exceed full-window, got {idx}");
+        assert!(
+            idx > 1.0,
+            "tail-window volatility should exceed full-window, got {idx}"
+        );
     }
 
     #[test]
