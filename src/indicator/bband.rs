@@ -1,6 +1,6 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::utils::moving_average;
-use crate::indicator::{IndicatorResult, TABuilder};
+use crate::indicator::{IndicatorResult, TABuilder, checked_indicator_capacity};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -48,11 +48,11 @@ fn calculate_standard_deviation(values: &[f64], period: usize) -> f64 {
 }
 
 impl BollingerBandsIndicator {
-    fn new(period: usize, multiplier: f64) -> Self {
+    fn new(period: usize, multiplier: f64, capacity: usize) -> Self {
         Self {
             period,
             multiplier,
-            values: Vec::with_capacity(period + 1),
+            values: Vec::with_capacity(capacity),
         }
     }
 
@@ -264,11 +264,12 @@ where
             return Err("볼린저 밴드 기간은 0보다 커야 합니다".to_string());
         }
 
-        if multiplier <= 0.0 {
+        if !multiplier.is_finite() || multiplier <= 0.0 {
             return Err("볼린저 밴드 승수는 0보다 커야 합니다".to_string());
         }
+        let capacity = checked_indicator_capacity("Bollinger Bands", period, 1, 1)?;
 
-        let indicator = BollingerBandsIndicator::new(period, multiplier);
+        let indicator = BollingerBandsIndicator::new(period, multiplier, capacity);
 
         Ok(Self {
             indicator,

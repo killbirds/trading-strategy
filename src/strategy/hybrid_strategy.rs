@@ -93,11 +93,14 @@ impl HybridStrategyConfig {
             .transpose()?
             .unwrap_or_else(default_exit_threshold);
 
-        Ok(HybridStrategyConfig {
+        let strategy_config = HybridStrategyConfig {
             base: base_config,
             entry_threshold,
             exit_threshold,
-        })
+        };
+
+        strategy_config.validate()?;
+        Ok(strategy_config)
     }
 }
 
@@ -147,6 +150,7 @@ impl<C: Candle + Clone + 'static> HybridStrategy<C> {
         storage: &CandleStore<C>,
         config: HybridStrategyConfig,
     ) -> Result<HybridStrategy<C>, String> {
+        config.validate()?;
         info!("하이브리드 전략 설정: {config:?}");
         let ctx = HybridAnalyzer::new(
             &config.base.ma_type,
@@ -247,7 +251,7 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
 
     fn should_enter(&self, _current_price: f64) -> bool {
         let signal_strength = self.calculate_buy_signal_strength_cached();
-        signal_strength >= self.config.entry_threshold
+        signal_strength > 0.0 && signal_strength >= self.config.entry_threshold
     }
 
     fn should_exit(&self, _current_price: f64) -> bool {
@@ -307,5 +311,24 @@ mod tests {
         let result = HybridStrategyConfig::from_json(r#"{"entry_threshold":1.5}"#);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hybrid_strategy_does_not_enter_without_a_positive_signal() {
+        let storage = CandleStore::<TestCandle>::new(Vec::new(), 10, false);
+        let strategy = HybridStrategy::new_with_config(&storage, None).unwrap();
+
+        assert!(!strategy.should_enter(100.0));
+    }
+
+    #[test]
+    fn test_hybrid_strategy_new_rejects_invalid_direct_config() {
+        let storage = CandleStore::<TestCandle>::new(Vec::new(), 10, false);
+        let config = HybridStrategyConfig {
+            entry_threshold: -0.1,
+            ..Default::default()
+        };
+
+        assert!(HybridStrategy::new(&storage, config).is_err());
     }
 }

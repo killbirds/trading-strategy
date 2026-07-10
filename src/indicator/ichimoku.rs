@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::cmp;
 use std::fmt::Display;
 use std::marker::PhantomData;
@@ -252,12 +252,13 @@ where
                 "일목균형표 기간은 tenkan < kijun < senkou 조건을 만족해야 합니다".to_string(),
             );
         }
+        let capacity = checked_indicator_capacity("Ichimoku", senkou_period, 2, 0)?;
 
         Ok(Self {
             tenkan_period,
             kijun_period,
             senkou_period,
-            candles: Vec::with_capacity(senkou_period * 2),
+            candles: Vec::with_capacity(capacity),
             _phantom: PhantomData,
         })
     }

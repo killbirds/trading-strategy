@@ -217,17 +217,17 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
 
     fn should_enter_for_weighted_signal(&self, weighted_signal: f64) -> bool {
         if self.position() == PositionType::Long {
-            weighted_signal >= self.confirmation_threshold
+            weighted_signal > 0.0 && weighted_signal >= self.confirmation_threshold
         } else {
-            weighted_signal <= -self.confirmation_threshold
+            weighted_signal < 0.0 && weighted_signal <= -self.confirmation_threshold
         }
     }
 
     fn should_exit_for_weighted_signal(&self, weighted_signal: f64) -> bool {
         if self.position() == PositionType::Long {
-            weighted_signal <= -self.confirmation_threshold
+            weighted_signal < 0.0 && weighted_signal <= -self.confirmation_threshold
         } else {
-            weighted_signal >= self.confirmation_threshold
+            weighted_signal > 0.0 && weighted_signal >= self.confirmation_threshold
         }
     }
 

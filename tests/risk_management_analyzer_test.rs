@@ -3,7 +3,7 @@ use common_test_utils::*;
 
 use trading_strategy::analyzer::base::AnalyzerOps;
 use trading_strategy::analyzer::risk_management_analyzer::{
-    PositionSizingMethod, PositionType, RiskManagementAnalyzer,
+    PositionSizingMethod, PositionType, RiskCalculationError, RiskManagementAnalyzer,
 };
 use trading_strategy::candle_store::CandleStore;
 
@@ -110,6 +110,59 @@ fn test_risk_management_analyzer_calculate_risk() {
         assert!(calc.stop_loss_price < calc.entry_price);
         assert!(calc.target_price > calc.entry_price);
     }
+}
+
+#[test]
+fn test_risk_management_calculation_rejects_flat_market_atr() {
+    let mut storage = CandleStore::<TestCandle>::new(Vec::new(), 1000, false);
+    let mut analyzer = RiskManagementAnalyzer::default(&storage);
+
+    for index in 0..20 {
+        storage.add(TestCandle::new(index, 100.0, 100.0, 100.0, 100.0, 1000.0));
+    }
+    analyzer.init_from_storage(&storage);
+
+    let result = analyzer.calculate_risk_checked(
+        100.0,
+        PositionType::Long,
+        10_000.0,
+        PositionSizingMethod::FixedPercentage,
+    );
+
+    assert!(matches!(
+        result,
+        Err(RiskCalculationError::InvalidPositiveInput { field: "atr" })
+    ));
+    assert!(
+        analyzer
+            .calculate_risk(
+                100.0,
+                PositionType::Long,
+                10_000.0,
+                PositionSizingMethod::FixedPercentage,
+            )
+            .is_none()
+    );
+}
+
+#[test]
+fn test_risk_management_calculation_rejects_invalid_entry_price() {
+    let storage = CandleStore::<TestCandle>::new(Vec::new(), 1000, false);
+    let analyzer = RiskManagementAnalyzer::default(&storage);
+
+    let result = analyzer.calculate_risk_checked(
+        0.0,
+        PositionType::Long,
+        10_000.0,
+        PositionSizingMethod::FixedPercentage,
+    );
+
+    assert!(matches!(
+        result,
+        Err(RiskCalculationError::InvalidPositiveInput {
+            field: "entry_price"
+        })
+    ));
 }
 
 #[test]

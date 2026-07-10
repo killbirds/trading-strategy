@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -124,11 +124,12 @@ where
         if max_width_ratio <= 0.0 || max_width_ratio.is_nan() || max_width_ratio.is_infinite() {
             return Err("박스권 최대 폭 비율은 유한한 양수여야 합니다".to_string());
         }
+        let capacity = checked_indicator_capacity("BoxRange", period, 2, 0)?;
 
         Ok(Self {
             period,
             max_width_ratio,
-            values: Vec::with_capacity(period * 2),
+            values: Vec::with_capacity(capacity),
             _phantom: PhantomData,
         })
     }

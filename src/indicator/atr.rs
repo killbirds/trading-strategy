@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -92,12 +92,13 @@ impl<C: Candle> ATRBuilder<C> {
         if period == 0 {
             return Err("ATR 기간은 0보다 커야 합니다".to_string());
         }
+        let capacity = checked_indicator_capacity("ATR", period, 1, 2)?;
 
         Ok(Self {
             period,
-            high_values: Vec::with_capacity(period + 2),
-            low_values: Vec::with_capacity(period + 2),
-            close_values: Vec::with_capacity(period + 2),
+            high_values: Vec::with_capacity(capacity),
+            low_values: Vec::with_capacity(capacity),
+            close_values: Vec::with_capacity(capacity),
             previous_atr: None,
             _phantom: PhantomData,
         })

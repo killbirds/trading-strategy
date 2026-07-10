@@ -415,6 +415,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::TestCandle;
 
     #[test]
     fn test_is_regular_arrangement() {
@@ -462,5 +463,33 @@ mod tests {
             HashMap::from([(1, 3.0), (2, 1.0), (3, 2.0)]),
         );
         assert!(!tas.is_regular_arrangement(|value| *value));
+    }
+
+    #[test]
+    fn checked_builders_reject_excessive_periods() {
+        type C = TestCandle;
+
+        assert!(adx::ADXBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(atr::ATRBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(bband::BollingerBandsBuilder::<C>::new_checked(usize::MAX, 2.0).is_err());
+        assert!(bband::BollingerBandsBuilder::<C>::new_checked(20, f64::NAN).is_err());
+        assert!(box_range::BoxRangeBuilder::<C>::new_checked(usize::MAX, 0.05).is_err());
+        assert!(cci::CCIBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(ichimoku::IchimokuBuilder::<C>::new_checked(1, 2, usize::MAX).is_err());
+        assert!(macd::MACDBuilder::<C>::new_checked(1, usize::MAX, 1).is_err());
+        assert!(max::MAXBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(min::MINBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(
+            momentum::MomentumBuilder::<C>::new_checked(usize::MAX, 14, 14, 14, 14, 14,).is_err()
+        );
+        assert!(roc::ROCBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(rsi::RSIBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(stochastic::StochasticBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(volume::VolumeBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(williams_r::WilliamsRBuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(ma::ema::EMABuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(ma::sma::SMABuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(ma::wma::WMABuilder::<C>::new_checked(usize::MAX).is_err());
+        assert!(vwap::VWAPBuilder::<C>::new_checked(vwap::VWAPParams::new(usize::MAX)).is_err());
     }
 }

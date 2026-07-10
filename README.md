@@ -31,7 +31,7 @@ Rust로 구현된 포괄적인 트레이딩 전략 라이브러리입니다. 다
 
 ## 프로젝트 구조
 
-```
+```text
 src/
 ├── analyzer/          # 기술적 지표 분석기
 │   ├── adx_analyzer.rs
@@ -90,7 +90,7 @@ src/
 
 ### 요구사항
 
-- Rust 1.70 이상
+- Rust 1.85 이상 (Edition 2024)
 - Cargo
 
 ### 빌드
@@ -114,40 +114,42 @@ cargo build --release
 ### 기본 사용 예시
 
 ```rust
-use trading_strategy::strategy::BBandStrategy;
+use trading_strategy::strategy::Strategy;
+use trading_strategy::strategy::bband_strategy::BBandStrategy;
 use trading_strategy::candle_store::CandleStore;
 use std::collections::HashMap;
+use trading_chart::Candle;
 
-// 캔들 저장소 생성
-let storage = CandleStore::new();
+// C에는 애플리케이션이 사용하는 Candle 구현체를 지정합니다.
+fn build_strategy<C: Candle + 'static>() -> Result<BBandStrategy<C>, String> {
+    let storage = CandleStore::<C>::new(Vec::new(), 1_000, true);
 
-// 기본 설정으로 전략 생성
-let strategy = BBandStrategy::new_with_config(&storage, None)?;
+    let mut config = HashMap::new();
+    config.insert("period".to_string(), "20".to_string());
+    config.insert("multiplier".to_string(), "2.0".to_string());
+    config.insert("narrowing_period".to_string(), "7".to_string());
+    config.insert("squeeze_period".to_string(), "8".to_string());
+    config.insert("squeeze_threshold".to_string(), "0.015".to_string());
 
-// 커스텀 설정으로 전략 생성
-let mut config = HashMap::new();
-config.insert("period".to_string(), "20".to_string());
-config.insert("multiplier".to_string(), "2.0".to_string());
-config.insert("narrowing_period".to_string(), "7".to_string());
-config.insert("squeeze_period".to_string(), "8".to_string());
-config.insert("squeeze_threshold".to_string(), "0.015".to_string());
-
-let strategy = BBandStrategy::new_with_config(&storage, Some(config))?;
+    BBandStrategy::new_with_config(&storage, Some(config))
+}
 ```
 
 ### 전략 신호 평가
 
-전략은 `next(candle)` 로 캔들 기반 지표 상태를 업데이트하고, 매수/매도 신호는 호출부가 전달하는 `current_price` 기준으로 평가합니다. 캔들 종가가 아닌 실시간 현재가를 반복해서 전달할 수 있어, 같은 지표 상태에서 가격만 바뀌는 tick 단위 평가에 사용할 수 있습니다.
+전략은 `next(candle)` 로 캔들 기반 지표 상태를 업데이트합니다. BoxRange, Donchian, Keltner, Parabolic SAR, Copys 계열은 호출부의 `current_price`를 사용하므로 같은 지표 상태에서 tick 단위 평가가 가능합니다. MA, RSI, BBand, MACD, ThreeRSI, Hybrid 계열은 완료 캔들 기준(bar-close)으로 평가합니다.
 
 ```rust
 use trading_chart::Candle;
 use trading_strategy::strategy::Strategy;
 
-strategy.next(candle.clone());
+fn evaluate<C: Candle>(strategy: &mut dyn Strategy<C>, candle: C) {
+    let current_price = candle.close_price();
+    strategy.next(candle);
 
-let current_price = candle.close_price();
-let should_enter = strategy.should_enter(current_price);
-let should_exit = strategy.should_exit(current_price);
+    let should_enter = strategy.should_enter(current_price);
+    let should_exit = strategy.should_exit(current_price);
+}
 ```
 
 ## 볼린저 밴드 스퀴즈 돌파 전략
@@ -255,8 +257,8 @@ BoxRange 전략은 최근 `period`개 캔들의 최고가/최저가로 박스 �
 # 모든 테스트 실행
 cargo test
 
-# 특정 테스트 실행
-cargo test --test bband_strategy_tests
+# 특정 전략 단위 테스트 실행
+cargo test bband_strategy
 
 # 문서 테스트 포함
 cargo test --doc

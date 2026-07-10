@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -120,11 +120,12 @@ where
         if period == 0 {
             return Err("볼륨 계산 기간은 0보다 커야 합니다".to_string());
         }
+        let capacity = checked_indicator_capacity("Volume", period, 2, 0)?;
 
         Ok(VolumeBuilder {
             period,
             accumulated_volume: 0.0,
-            data_buffer: Vec::with_capacity(period * 2),
+            data_buffer: Vec::with_capacity(capacity),
             _phantom: PhantomData,
         })
     }

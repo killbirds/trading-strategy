@@ -1,6 +1,6 @@
 use crate::candle_store::CandleStore;
 use crate::indicator::utils::moving_average;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -186,16 +186,18 @@ where
         if fast_period >= slow_period {
             return Err("빠른 기간은 느린 기간보다 작아야 합니다".to_string());
         }
+        let values_capacity = checked_indicator_capacity("MACD", slow_period, 2, 0)?;
+        let history_capacity = checked_indicator_capacity("MACD", signal_period, 2, 0)?;
 
         Ok(Self {
             fast_period,
             slow_period,
             signal_period,
-            values: Vec::with_capacity(slow_period * 2),
+            values: Vec::with_capacity(values_capacity),
             previous_fast_ema: None,
             previous_slow_ema: None,
             previous_signal_line: None,
-            macd_history: Vec::with_capacity(signal_period * 2),
+            macd_history: Vec::with_capacity(history_capacity),
             _phantom: PhantomData,
         })
     }

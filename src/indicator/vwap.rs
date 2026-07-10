@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -128,19 +128,27 @@ where
     /// # Returns
     /// * `VWAPBuilder` - 새 빌더 인스턴스
     pub fn new(params: VWAPParams) -> Self {
+        match Self::new_checked(params) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
+        }
+    }
+
+    /// 검증된 기간으로 새 VWAP 빌더를 생성합니다.
+    pub fn new_checked(params: VWAPParams) -> IndicatorResult<Self> {
         let capacity = if params.period > 0 {
-            params.period * 2
+            checked_indicator_capacity("VWAP", params.period, 2, 0)?
         } else {
             MAX_PERIOD_0_CAPACITY
         };
 
-        Self {
+        Ok(Self {
             params,
             values: Vec::with_capacity(capacity),
             cumulative_pv: 0.0,
             cumulative_volume: 0.0,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// 저장소에서 VWAP 생성

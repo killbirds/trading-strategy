@@ -97,7 +97,7 @@ impl MABuilderFactory {
 
         let builder: Box<dyn TABuilder<Box<dyn MA>, C>> = match ma_type {
             MAType::EMA => Box::new(EMABuilder::<C>::new_checked(period)?),
-            MAType::SMA => Box::new(SMABuilder::<C>::new(period)),
+            MAType::SMA => Box::new(SMABuilder::<C>::new_checked(period)?),
             MAType::WMA => Box::new(WMABuilder::<C>::new_checked(period)?),
         };
 
@@ -160,6 +160,10 @@ impl MAsBuilderFactory {
 
         if periods.contains(&0) {
             return Err("이동평균 기간은 0보다 커야 합니다".to_string());
+        }
+
+        for period in periods {
+            MABuilderFactory::build_checked::<C>(ma_type, *period)?;
         }
 
         Ok(MAsBuilder::new("mas".to_owned(), periods, |period| {

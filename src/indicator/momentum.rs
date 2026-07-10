@@ -5,7 +5,7 @@ use crate::indicator::rsi::RSIBuilder;
 use crate::indicator::stochastic::StochasticBuilder;
 use crate::indicator::ultimate_oscillator::UltimateOscillatorBuilder;
 use crate::indicator::williams_r::WilliamsRBuilder;
-use crate::indicator::{IndicatorResult, TABuilder};
+use crate::indicator::{IndicatorResult, TABuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -125,6 +125,7 @@ where
             .max(cci_period)
             .max(momentum_period)
             .max(28);
+        let capacity = checked_indicator_capacity("Momentum", max_period, 2, 0)?;
 
         Ok(Self {
             rsi_period,
@@ -133,12 +134,12 @@ where
             roc_period,
             cci_period,
             momentum_period,
-            values: Vec::with_capacity(max_period * 2),
-            rsi_builder: RSIBuilder::new(rsi_period),
-            stochastic_builder: StochasticBuilder::new(stoch_period),
-            williams_r_builder: WilliamsRBuilder::new(williams_period),
-            roc_builder: ROCBuilder::new(roc_period),
-            cci_builder: CCIBuilder::new(cci_period),
+            values: Vec::with_capacity(capacity),
+            rsi_builder: RSIBuilder::new_checked(rsi_period)?,
+            stochastic_builder: StochasticBuilder::new_checked(stoch_period)?,
+            williams_r_builder: WilliamsRBuilder::new_checked(williams_period)?,
+            roc_builder: ROCBuilder::new_checked(roc_period)?,
+            cci_builder: CCIBuilder::new_checked(cci_period)?,
             ultimate_oscillator_builder: UltimateOscillatorBuilder::new(),
             _phantom: PhantomData,
         })

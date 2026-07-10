@@ -1,7 +1,7 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::TABuilder;
 use crate::indicator::ma::MA;
 use crate::indicator::utils::moving_average;
+use crate::indicator::{IndicatorResult, TABuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -40,11 +40,23 @@ where
     C: Candle,
 {
     pub fn new(period: usize) -> Self {
-        SMABuilder {
-            period,
-            values: Vec::with_capacity(period * 2),
-            _phantom: PhantomData,
+        match Self::new_checked(period) {
+            Ok(builder) => builder,
+            Err(message) => panic!("{message}"),
         }
+    }
+
+    pub fn new_checked(period: usize) -> IndicatorResult<Self> {
+        if period == 0 {
+            return Err("SMA 기간은 0보다 커야 합니다".to_string());
+        }
+        let capacity = checked_indicator_capacity("SMA", period, 2, 0)?;
+
+        Ok(SMABuilder {
+            period,
+            values: Vec::with_capacity(capacity),
+            _phantom: PhantomData,
+        })
     }
 
     pub fn build_from_storage(&mut self, storage: &CandleStore<C>) -> SMA {

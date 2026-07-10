@@ -3,6 +3,7 @@ use crate::candle_store::CandleStore;
 use crate::indicator::atr::ATRBuilder;
 pub use crate::model::PositionType;
 use std::fmt::Display;
+use thiserror::Error;
 use trading_chart::Candle;
 
 /// 리스크 레벨 타입
@@ -26,6 +27,19 @@ pub enum PositionSizingMethod {
     VolatilityBased,
     /// ATR 기반 (ATR Based)
     ATRBased,
+}
+
+/// 리스크 계산을 안전하게 수행할 수 없을 때의 오류
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum RiskCalculationError {
+    #[error("리스크 계산 데이터가 없습니다")]
+    MissingRiskData,
+    #[error("{field}은(는) 유한한 양수여야 합니다")]
+    InvalidPositiveInput { field: &'static str },
+    #[error("분모가 0이거나 유효하지 않아 리스크를 계산할 수 없습니다: {field}")]
+    InvalidDenominator { field: &'static str },
+    #[error("계산 결과가 유한하지 않습니다: {field}")]
+    NonFiniteCalculation { field: &'static str },
 }
 
 /// 리스크 관리 계산 결과
@@ -558,67 +572,138 @@ impl<C: Candle + Clone + 'static> RiskManagementAnalyzer<C> {
         account_balance: f64,
         sizing_method: PositionSizingMethod,
     ) -> Option<RiskCalculation> {
-        if let Some(data) = self.items.first() {
-            let stop_loss_price = data.calculate_volatility_stop_loss(entry_price, position_type);
-            let target_price = data.calculate_volatility_target(entry_price, position_type);
+        self.calculate_risk_checked(entry_price, position_type, account_balance, sizing_method)
+            .ok()
+    }
 
-            let risk_per_unit = match position_type {
-                PositionType::Long => (entry_price - stop_loss_price).abs(),
-                PositionType::Short => (stop_loss_price - entry_price).abs(),
-            };
-
-            let position_size = match sizing_method {
-                PositionSizingMethod::FixedPercentage => {
-                    let risk_amount = account_balance * self.max_risk_percentage;
-                    risk_amount / risk_per_unit
-                }
-                PositionSizingMethod::VolatilityBased => {
-                    data.optimal_position_size * account_balance / entry_price
-                }
-                PositionSizingMethod::ATRBased => {
-                    let risk_amount = account_balance * self.max_risk_percentage;
-                    risk_amount / (data.atr * 2.0)
-                }
-                PositionSizingMethod::KellyCriterion => {
-                    // 켈리 기준 (간단한 버전)
-                    let win_rate = 0.6; // 실제로는 백테스트 결과에서 계산
-                    let avg_win_loss_ratio = 1.5; // 실제로는 백테스트 결과에서 계산
-                    let kelly_fraction: f64 =
-                        (win_rate * avg_win_loss_ratio - (1.0 - win_rate)) / avg_win_loss_ratio;
-                    let safe_kelly = kelly_fraction.clamp(0.0, 0.25) * 0.5; // 안전을 위해 절반만 사용
-                    safe_kelly * account_balance / entry_price
-                }
-            };
-
-            let risk_amount = position_size * risk_per_unit;
-            let potential_profit = match position_type {
-                PositionType::Long => (target_price - entry_price) * position_size,
-                PositionType::Short => (entry_price - target_price) * position_size,
-            };
-
-            let risk_reward_ratio = if risk_amount > 0.0 {
-                potential_profit / risk_amount
-            } else {
-                0.0
-            };
-
-            let expected_return = potential_profit / (position_size * entry_price);
-
-            Some(RiskCalculation {
-                entry_price,
-                stop_loss_price,
-                target_price,
-                position_size,
-                risk_amount,
-                potential_profit,
-                risk_reward_ratio,
-                expected_return,
-                volatility_score: data.volatility_percentage,
-                confidence_score: data.sharpe_ratio.clamp(0.0, 1.0),
-            })
-        } else {
-            None
+    /// 리스크 계산을 수행합니다.
+    ///
+    /// 0 또는 비유한 가격/ATR로 인해 주문 수량이 무한대나 NaN이 되는 것을 막기 위해,
+    /// 계산할 수 없는 입력은 오류로 반환합니다.
+    pub fn calculate_risk_checked(
+        &self,
+        entry_price: f64,
+        position_type: PositionType,
+        account_balance: f64,
+        sizing_method: PositionSizingMethod,
+    ) -> Result<RiskCalculation, RiskCalculationError> {
+        if !entry_price.is_finite() || entry_price <= 0.0 {
+            return Err(RiskCalculationError::InvalidPositiveInput {
+                field: "entry_price",
+            });
         }
+        if !account_balance.is_finite() || account_balance <= 0.0 {
+            return Err(RiskCalculationError::InvalidPositiveInput {
+                field: "account_balance",
+            });
+        }
+        if !self.max_risk_percentage.is_finite() || self.max_risk_percentage <= 0.0 {
+            return Err(RiskCalculationError::InvalidPositiveInput {
+                field: "max_risk_percentage",
+            });
+        }
+
+        let data = self
+            .items
+            .first()
+            .ok_or(RiskCalculationError::MissingRiskData)?;
+
+        if !data.atr.is_finite() || data.atr <= 0.0 {
+            return Err(RiskCalculationError::InvalidPositiveInput { field: "atr" });
+        }
+        if !data.volatility_percentage.is_finite() {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "volatility_percentage",
+            });
+        }
+        if !data.sharpe_ratio.is_finite() {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "sharpe_ratio",
+            });
+        }
+
+        let stop_loss_price = data.calculate_volatility_stop_loss(entry_price, position_type);
+        let target_price = data.calculate_volatility_target(entry_price, position_type);
+        if !stop_loss_price.is_finite() || !target_price.is_finite() {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "stop_loss_price or target_price",
+            });
+        }
+
+        let risk_per_unit = match position_type {
+            PositionType::Long => (entry_price - stop_loss_price).abs(),
+            PositionType::Short => (stop_loss_price - entry_price).abs(),
+        };
+        if !risk_per_unit.is_finite() || risk_per_unit <= 0.0 {
+            return Err(RiskCalculationError::InvalidDenominator {
+                field: "risk_per_unit",
+            });
+        }
+
+        let position_size = match sizing_method {
+            PositionSizingMethod::FixedPercentage => {
+                let risk_amount = account_balance * self.max_risk_percentage;
+                risk_amount / risk_per_unit
+            }
+            PositionSizingMethod::VolatilityBased => {
+                if !data.optimal_position_size.is_finite() || data.optimal_position_size <= 0.0 {
+                    return Err(RiskCalculationError::InvalidPositiveInput {
+                        field: "optimal_position_size",
+                    });
+                }
+                data.optimal_position_size * account_balance / entry_price
+            }
+            PositionSizingMethod::ATRBased => {
+                let risk_amount = account_balance * self.max_risk_percentage;
+                risk_amount / (data.atr * 2.0)
+            }
+            PositionSizingMethod::KellyCriterion => {
+                // 켈리 기준 (간단한 버전)
+                let win_rate = 0.6;
+                let avg_win_loss_ratio = 1.5;
+                let kelly_fraction: f64 =
+                    (win_rate * avg_win_loss_ratio - (1.0 - win_rate)) / avg_win_loss_ratio;
+                let safe_kelly = kelly_fraction.clamp(0.0, 0.25) * 0.5;
+                safe_kelly * account_balance / entry_price
+            }
+        };
+        if !position_size.is_finite() || position_size <= 0.0 {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "position_size",
+            });
+        }
+
+        let risk_amount = position_size * risk_per_unit;
+        let potential_profit = match position_type {
+            PositionType::Long => (target_price - entry_price) * position_size,
+            PositionType::Short => (entry_price - target_price) * position_size,
+        };
+        if !risk_amount.is_finite() || !potential_profit.is_finite() {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "risk_amount or potential_profit",
+            });
+        }
+
+        let risk_reward_ratio = potential_profit / risk_amount;
+        let expected_return = potential_profit / (position_size * entry_price);
+        if !risk_reward_ratio.is_finite() || !expected_return.is_finite() {
+            return Err(RiskCalculationError::NonFiniteCalculation {
+                field: "risk_reward_ratio or expected_return",
+            });
+        }
+
+        Ok(RiskCalculation {
+            entry_price,
+            stop_loss_price,
+            target_price,
+            position_size,
+            risk_amount,
+            potential_profit,
+            risk_reward_ratio,
+            expected_return,
+            volatility_score: data.volatility_percentage,
+            confidence_score: data.sharpe_ratio.clamp(0.0, 1.0),
+        })
     }
 
     /// 포트폴리오 리스크 평가

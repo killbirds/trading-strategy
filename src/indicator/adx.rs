@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -22,17 +22,19 @@ impl AverageDirectionalMovementIndex {
         if period == 0 {
             return Err("ADX 기간은 0보다 커야 합니다".to_string());
         }
+        let history_capacity = checked_indicator_capacity("ADX", period, 1, 2)?;
+        let dx_capacity = checked_indicator_capacity("ADX", period, 1, 1)?;
 
         Ok(Self {
             period,
-            high_values: Vec::with_capacity(period + 2),
-            low_values: Vec::with_capacity(period + 2),
-            close_values: Vec::with_capacity(period + 2),
+            high_values: Vec::with_capacity(history_capacity),
+            low_values: Vec::with_capacity(history_capacity),
+            close_values: Vec::with_capacity(history_capacity),
             previous_tr: None,
             previous_plus_dm: None,
             previous_minus_dm: None,
             previous_adx: None,
-            dx_values: Vec::with_capacity(period + 1),
+            dx_values: Vec::with_capacity(dx_capacity),
         })
     }
 

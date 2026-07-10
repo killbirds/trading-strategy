@@ -203,6 +203,32 @@ fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
 }
 
 #[test]
+fn test_multi_timeframe_strategy_threshold_zero_does_not_turn_hold_into_a_signal() {
+    let candles = create_uptrend_candles(10, 100.0, 1.0);
+    let storage = create_test_storage(candles);
+    let mut long_config = create_multi_timeframe_config();
+    long_config.insert("confirmation_threshold".to_string(), "0.0".to_string());
+    let long_strategy =
+        MultiTimeframeStrategy::new_with_config(&storage, Some(long_config)).unwrap();
+
+    assert!(!long_strategy.should_enter_for_weighted_signal_for_test(0.0));
+    assert!(!long_strategy.should_exit_for_weighted_signal_for_test(0.0));
+
+    let short_strategy = MultiTimeframeStrategy::new_with_config(
+        &storage,
+        Some({
+            let mut config = create_short_multi_timeframe_config();
+            config.insert("confirmation_threshold".to_string(), "0.0".to_string());
+            config
+        }),
+    )
+    .unwrap();
+
+    assert!(!short_strategy.should_enter_for_weighted_signal_for_test(0.0));
+    assert!(!short_strategy.should_exit_for_weighted_signal_for_test(0.0));
+}
+
+#[test]
 fn test_multi_timeframe_strategy_uses_supplied_current_price() {
     let candle = create_test_candle(100.0, 1, 100.0, "test");
     let storage = create_test_storage(vec![candle.clone()]);

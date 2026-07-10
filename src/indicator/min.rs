@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder};
+use crate::indicator::{IndicatorResult, TABuilder, TAs, TAsBuilder, checked_indicator_capacity};
 use std::fmt::Display;
 use std::marker::PhantomData;
 use trading_chart::Candle;
@@ -38,10 +38,11 @@ where
         if period == 0 {
             return Err("MIN 기간은 0보다 커야 합니다".to_string());
         }
+        let capacity = checked_indicator_capacity("MIN", period, 2, 0)?;
 
         Ok(Self {
             period,
-            values: Vec::with_capacity(period * 2),
+            values: Vec::with_capacity(capacity),
             _phantom: PhantomData,
         })
     }

@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub mod analyzer;
 pub mod candle_store;
 pub mod filter;
