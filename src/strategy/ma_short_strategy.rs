@@ -170,22 +170,32 @@ impl<C: Candle + 'static> Strategy<C> for MAShortStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // 데드 크로스 발생시 숏 진입 신호
-        self.ctx
-            .is_ma_reverse_arrangement_dead_cross(1, self.config.cross_previous_periods, 0)
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        // 단기 이동평균이 장기 이동평균보다 높아질 때(골든 크로스) 숏 청산
-        self.check_cross_condition(|data| {
-            if data.mas.len() < 2 {
-                return false;
-            }
-            let short_ma = data.mas.get_by_key_index(0).get();
-            let long_ma = data.mas.get_by_key_index(data.mas.len() - 1).get();
-            short_ma > long_ma
-        })
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Short,
+            position_state,
+            || {
+                self.ctx.is_ma_reverse_arrangement_dead_cross(
+                    1,
+                    self.config.cross_previous_periods,
+                    0,
+                )
+            },
+            || {
+                self.check_cross_condition(|data| {
+                    if data.mas.len() < 2 {
+                        return false;
+                    }
+                    let short_ma = data.mas.get_by_key_index(0).get();
+                    let long_ma = data.mas.get_by_key_index(data.mas.len() - 1).get();
+                    short_ma > long_ma
+                })
+            },
+        )
     }
 
     fn position(&self) -> PositionType {

@@ -1,5 +1,5 @@
 use crate::candle_store::CandleStore;
-use crate::model::{PositionType, Signal};
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::{Strategy, StrategyFactory, StrategyType, split};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -172,63 +172,41 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
         })
     }
 
-    /// 가중 평균 신호를 계산합니다.
+    /// 현재 포지션 상태에서 필요한 신호의 가중 확인 비율을 계산합니다.
     ///
     /// # Arguments
     /// * `current_price` - 현재 가격
     ///
     /// # Returns
-    /// * `f64` - 가중 평균 신호 점수 (1.0에 가까울수록 매수, -1.0에 가까울수록 매도)
-    fn calculate_weighted_signal(&self, current_price: f64) -> f64 {
+    /// * `f64` - 확인된 전략 가중치의 합
+    fn calculate_weighted_confirmation(
+        &self,
+        current_price: f64,
+        position_state: PositionState,
+    ) -> f64 {
         if self.strategies.is_empty() {
             return 0.0;
         }
 
-        let mut weighted_sum = 0.0;
+        let expected_signal = match position_state {
+            PositionState::Flat => Signal::Enter,
+            PositionState::Long | PositionState::Short => Signal::Exit,
+        };
+        let mut confirmation = 0.0;
 
         for (interval, strategy) in &self.strategies {
-            if let Some(weight) = self.timeframe_weights.get(interval) {
-                let signal = Self::signal_for_strategy(strategy.as_ref(), current_price);
-                let signal_value = Self::signal_value(signal);
-                weighted_sum += signal_value * weight;
+            if let Some(weight) = self.timeframe_weights.get(interval)
+                && strategy.evaluate(current_price, position_state) == expected_signal
+            {
+                confirmation += weight;
             }
         }
 
-        weighted_sum
+        confirmation
     }
 
-    fn signal_for_strategy(strategy: &dyn Strategy<C>, current_price: f64) -> Signal {
-        if strategy.should_enter(current_price) {
-            Signal::Enter
-        } else if strategy.should_exit(current_price) {
-            Signal::Exit
-        } else {
-            Signal::Hold
-        }
-    }
-
-    fn signal_value(signal: Signal) -> f64 {
-        match signal {
-            Signal::Enter => 1.0,
-            Signal::Exit => -1.0,
-            Signal::Hold => 0.0,
-        }
-    }
-
-    fn should_enter_for_weighted_signal(&self, weighted_signal: f64) -> bool {
-        if self.position() == PositionType::Long {
-            weighted_signal > 0.0 && weighted_signal >= self.confirmation_threshold
-        } else {
-            weighted_signal < 0.0 && weighted_signal <= -self.confirmation_threshold
-        }
-    }
-
-    fn should_exit_for_weighted_signal(&self, weighted_signal: f64) -> bool {
-        if self.position() == PositionType::Long {
-            weighted_signal < 0.0 && weighted_signal <= -self.confirmation_threshold
-        } else {
-            weighted_signal > 0.0 && weighted_signal >= self.confirmation_threshold
-        }
+    fn has_confirmation(&self, confirmation: f64) -> bool {
+        confirmation > 0.0 && confirmation >= self.confirmation_threshold
     }
 
     /// 설정 파일로부터 전략 인스턴스를 생성합니다.
@@ -273,17 +251,28 @@ impl<C: Candle + 'static> Strategy<C> for MultiTimeframeStrategy<C> {
             strategy.next(candle.clone());
         }
 
-        // 신호는 should_enter/should_exit 호출 시 전달받은 current_price로 즉시 평가합니다.
+        // 신호는 evaluate 호출 시 전달받은 current_price로 즉시 평가합니다.
     }
 
-    fn should_enter(&self, current_price: f64) -> bool {
-        // 가중 평균 신호가 임계값보다 크면 매수(롱), 작으면 매도(숏)
-        self.should_enter_for_weighted_signal(self.calculate_weighted_signal(current_price))
-    }
-
-    fn should_exit(&self, current_price: f64) -> bool {
-        // 가중 평균 신호가 임계값보다 작으면 매도
-        self.should_exit_for_weighted_signal(self.calculate_weighted_signal(current_price))
+    fn evaluate(&self, current_price: f64, position_state: PositionState) -> Signal {
+        match (self.position(), position_state) {
+            (_, PositionState::Flat)
+                if self.has_confirmation(
+                    self.calculate_weighted_confirmation(current_price, PositionState::Flat),
+                ) =>
+            {
+                Signal::Enter
+            }
+            (PositionType::Long, PositionState::Long)
+            | (PositionType::Short, PositionState::Short)
+                if self.has_confirmation(
+                    self.calculate_weighted_confirmation(current_price, position_state),
+                ) =>
+            {
+                Signal::Exit
+            }
+            _ => Signal::Hold,
+        }
     }
 
     fn position(&self) -> PositionType {
@@ -311,11 +300,7 @@ impl<C: Candle + 'static> MultiTimeframeStrategy<C> {
         self.strategies.insert(interval, strategy);
     }
 
-    pub(crate) fn should_enter_for_weighted_signal_for_test(&self, weighted_signal: f64) -> bool {
-        self.should_enter_for_weighted_signal(weighted_signal)
-    }
-
-    pub(crate) fn should_exit_for_weighted_signal_for_test(&self, weighted_signal: f64) -> bool {
-        self.should_exit_for_weighted_signal(weighted_signal)
+    pub(crate) fn has_confirmation_for_test(&self, confirmation: f64) -> bool {
+        self.has_confirmation(confirmation)
     }
 }

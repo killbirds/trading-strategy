@@ -226,16 +226,25 @@ impl<C: Candle + 'static> Strategy<C> for ThreeRSIStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        self.should_enter_by_rsi_regular_arrangement()
-            || self.should_enter_by_break_through_rsi_above_50()
-            || self.should_enter_by_break_through_above_ma()
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        self.should_exit_by_rsi_reverse_arrangement()
-            || self.should_exit_by_break_through_rsi_below_50()
-            || self.should_exit_by_break_through_below_ma()
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || {
+                self.should_enter_by_rsi_regular_arrangement()
+                    || self.should_enter_by_break_through_rsi_above_50()
+                    || self.should_enter_by_break_through_above_ma()
+            },
+            || {
+                self.should_exit_by_rsi_reverse_arrangement()
+                    || self.should_exit_by_break_through_rsi_below_50()
+                    || self.should_exit_by_break_through_below_ma()
+            },
+        )
     }
 
     fn position(&self) -> PositionType {

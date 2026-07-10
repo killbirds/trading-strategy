@@ -1,3 +1,4 @@
+use crate::model::{PositionState, Signal};
 use crate::strategy::Strategy;
 use crate::strategy::hybrid_common::HybridStrategyCommon;
 use crate::strategy::hybrid_strategy::HybridStrategy;
@@ -64,8 +65,9 @@ fn test_hybrid_strategy_signals_uptrend() {
         if i >= 30 {
             // 충분한 데이터가 있을 때부터 확인
             let current_price = candle.close_price();
-            let enter_signal = strategy.should_enter(current_price);
-            let exit_signal = strategy.should_exit(current_price);
+            let enter_signal =
+                strategy.evaluate(current_price, PositionState::Flat) == Signal::Enter;
+            let exit_signal = strategy.evaluate(current_price, PositionState::Long) == Signal::Exit;
 
             if enter_signal {
                 enter_signals += 1;

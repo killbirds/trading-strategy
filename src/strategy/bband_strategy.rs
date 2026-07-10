@@ -207,24 +207,24 @@ impl<C: Candle + 'static> Strategy<C> for BBandStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // 향상된 볼린저 밴드 스퀴즈 돌파 조건 체크:
-        // 1. 밴드 폭이 좁아지다가 (narrowing_period 동안)
-        // 2. 좁은 상태를 유지하다가 (squeeze_period 동안)
-        // 3. 상단을 돌파하는 캔들이 나오고 (고가가 상단 돌파)
-        // 4. 종가가 상단 위에 위치
-        self.ctx
-            .is_enhanced_squeeze_breakout_with_close_above_upper(
-                self.config.narrowing_period,
-                self.config.squeeze_period,
-                self.config.squeeze_threshold,
-            )
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        // 롱 청산: 종가가 중간선 아래로 내려오면 추세 약화로 보고 청산
-        // (진입은 상단 밴드 돌파 — 중간선 위는 자명하므로 청산 조건이 될 수 없음)
-        self.ctx.is_below_middle_band(1, 0)
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || {
+                self.ctx
+                    .is_enhanced_squeeze_breakout_with_close_above_upper(
+                        self.config.narrowing_period,
+                        self.config.squeeze_period,
+                        self.config.squeeze_threshold,
+                    )
+            },
+            || self.ctx.is_below_middle_band(1, 0),
+        )
     }
 
     fn position(&self) -> PositionType {

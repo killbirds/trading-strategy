@@ -38,7 +38,7 @@ pub mod three_rsi_strategy;
 mod tests;
 
 use crate::candle_store::CandleStore;
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 pub use crate::{ConfigError, ConfigResult};
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -145,23 +145,12 @@ pub trait Strategy<C: Candle>: Display + Send {
     /// * `candle` - 새 캔들 데이터
     fn next(&mut self, candle: C);
 
-    /// 매수 신호 확인
+    /// 현재 포지션 상태에 맞는 단일 거래 신호를 평가합니다.
     ///
-    /// # Arguments
-    /// * `current_price` - 현재 가격
-    ///
-    /// # Returns
-    /// * `bool` - 매수 신호 여부
-    fn should_enter(&self, current_price: f64) -> bool;
-
-    /// 매도 신호 확인
-    ///
-    /// # Arguments
-    /// * `current_price` - 현재 가격
-    ///
-    /// # Returns
-    /// * `bool` - 매도 신호 여부
-    fn should_exit(&self, current_price: f64) -> bool;
+    /// 포지션이 없을 때(`Flat`)는 해당 전략 방향의 진입 조건만 평가하고,
+    /// 같은 방향의 포지션을 보유할 때만 청산 조건을 평가합니다. 전략 방향과 다른
+    /// 포지션 상태에서는 항상 `Signal::Hold`를 반환합니다.
+    fn evaluate(&self, current_price: f64, position_state: PositionState) -> Signal;
 
     /// 전략의 포지션 타입 반환
     ///
@@ -174,6 +163,78 @@ pub trait Strategy<C: Candle>: Display + Send {
     /// # Returns
     /// * `StrategyType` - 전략의 타입
     fn name(&self) -> StrategyType;
+}
+
+/// 진입/청산 조건을 현재 포지션 상태에 맞는 하나의 신호로 변환합니다.
+///
+/// 각 전략 구현은 이 함수를 통해 `Flat`에서는 진입 조건만, 보유 상태에서는 청산
+/// 조건만 평가하여 상반된 조건이 동시에 발생하더라도 단일 행동만 반환합니다.
+pub(crate) fn evaluate_signal(
+    strategy_position: PositionType,
+    position_state: PositionState,
+    entry_condition: impl FnOnce() -> bool,
+    exit_condition: impl FnOnce() -> bool,
+) -> Signal {
+    match position_state {
+        PositionState::Flat => {
+            if entry_condition() {
+                Signal::Enter
+            } else {
+                Signal::Hold
+            }
+        }
+        PositionState::Long if strategy_position == PositionType::Long => {
+            if exit_condition() {
+                Signal::Exit
+            } else {
+                Signal::Hold
+            }
+        }
+        PositionState::Short if strategy_position == PositionType::Short => {
+            if exit_condition() {
+                Signal::Exit
+            } else {
+                Signal::Hold
+            }
+        }
+        _ => Signal::Hold,
+    }
+}
+
+#[cfg(test)]
+mod signal_tests {
+    use super::*;
+
+    #[test]
+    fn evaluate_signal_only_evaluates_the_condition_for_the_current_state() {
+        assert_eq!(
+            evaluate_signal(
+                PositionType::Long,
+                PositionState::Flat,
+                || true,
+                || panic!("flat state must not evaluate the exit condition"),
+            ),
+            Signal::Enter
+        );
+        assert_eq!(
+            evaluate_signal(
+                PositionType::Long,
+                PositionState::Long,
+                || panic!("long state must not evaluate the entry condition"),
+                || true,
+            ),
+            Signal::Exit
+        );
+        assert_eq!(
+            evaluate_signal(
+                PositionType::Long,
+                PositionState::Short,
+                || panic!("opposite position must not evaluate the entry condition"),
+                || panic!("opposite position must not evaluate the exit condition"),
+            ),
+            Signal::Hold
+        );
+    }
 }
 
 /// 전략 팩토리

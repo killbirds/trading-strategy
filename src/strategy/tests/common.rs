@@ -1,4 +1,5 @@
 use crate::candle_store::CandleStore;
+use crate::model::{PositionState, Signal};
 use crate::strategy::Strategy;
 use crate::tests::TestCandle;
 use chrono::Utc;
@@ -210,35 +211,42 @@ pub fn backtest_strategy<C: Candle, S: Strategy<C>>(
         strategy.next(candle.clone());
         let current_price = candle.close_price();
 
-        // 포지션이 없는 경우 매수 신호 확인
-        if position.is_none() {
-            if strategy.should_enter(current_price) {
+        let position_state = match position {
+            Some(_) => match strategy.position() {
+                crate::model::PositionType::Long => PositionState::Long,
+                crate::model::PositionType::Short => PositionState::Short,
+            },
+            None => PositionState::Flat,
+        };
+
+        match strategy.evaluate(current_price, position_state) {
+            Signal::Enter if position.is_none() => {
                 let price = current_price;
                 let quantity = capital / price;
                 position = Some((price, quantity));
             }
-        }
-        // 포지션이 있는 경우 매도 신호 확인
-        else if let Some((entry_price, quantity)) = position
-            && strategy.should_exit(current_price)
-        {
-            let exit_price = current_price;
-            let profit = (exit_price - entry_price) * quantity;
-            let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;
+            Signal::Exit if position.is_some() => {
+                if let Some((entry_price, quantity)) = position {
+                    let exit_price = current_price;
+                    let profit = (exit_price - entry_price) * quantity;
+                    let profit_percentage = (exit_price / entry_price - 1.0) * 100.0;
 
-            trades.push(profit_percentage);
-            capital += profit;
-            position = None;
+                    trades.push(profit_percentage);
+                    capital += profit;
+                    position = None;
 
-            // 자산 최고점 업데이트
-            if capital > equity_peak {
-                equity_peak = capital;
-            } else {
-                let current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
-                if current_drawdown > max_drawdown {
-                    max_drawdown = current_drawdown;
+                    // 자산 최고점 업데이트
+                    if capital > equity_peak {
+                        equity_peak = capital;
+                    } else {
+                        let current_drawdown = (equity_peak - capital) / equity_peak * 100.0;
+                        if current_drawdown > max_drawdown {
+                            max_drawdown = current_drawdown;
+                        }
+                    }
                 }
             }
+            _ => {}
         }
     }
 

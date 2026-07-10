@@ -135,12 +135,17 @@ impl<C: Candle + 'static> Strategy<C> for ParabolicSARShortStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, current_price: f64) -> bool {
-        self.has_confirmed_bearish_trend(current_price)
-    }
-
-    fn should_exit(&self, current_price: f64) -> bool {
-        self.is_current_bullish() || self.is_price_above_current_sar(current_price)
+    fn evaluate(
+        &self,
+        current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Short,
+            position_state,
+            || self.has_confirmed_bearish_trend(current_price),
+            || self.is_current_bullish() || self.is_price_above_current_sar(current_price),
+        )
     }
 
     fn position(&self) -> PositionType {

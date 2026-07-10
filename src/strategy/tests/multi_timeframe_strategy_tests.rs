@@ -1,4 +1,4 @@
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::Strategy;
 use crate::strategy::StrategyType;
 use crate::strategy::multi_timeframe_strategy::MultiTimeframeStrategy;
@@ -63,12 +63,12 @@ impl Display for PriceSensitiveStrategy {
 impl Strategy<TestCandle> for PriceSensitiveStrategy {
     fn next(&mut self, _candle: TestCandle) {}
 
-    fn should_enter(&self, current_price: f64) -> bool {
-        current_price >= 150.0
-    }
-
-    fn should_exit(&self, current_price: f64) -> bool {
-        current_price <= 80.0
+    fn evaluate(&self, current_price: f64, position_state: PositionState) -> Signal {
+        match position_state {
+            PositionState::Flat if current_price >= 150.0 => Signal::Enter,
+            PositionState::Long if current_price <= 80.0 => Signal::Exit,
+            _ => Signal::Hold,
+        }
     }
 
     fn position(&self) -> PositionType {
@@ -188,18 +188,14 @@ fn test_multi_timeframe_strategy_with_different_weights() {
 }
 
 #[test]
-fn test_multi_timeframe_strategy_short_entry_exit_by_weighted_signal() {
+fn test_multi_timeframe_strategy_short_requires_positive_confirmation() {
     let candles = create_uptrend_candles(10, 100.0, 1.0);
     let storage = create_test_storage(candles);
     let config = create_short_multi_timeframe_config();
 
     let strategy = MultiTimeframeStrategy::new_with_config(&storage, Some(config)).unwrap();
 
-    // 숏 전략은 매도(Exit) 신호 합산이 임계값 이하이면 진입해야 한다.
-    assert!(strategy.should_enter_for_weighted_signal_for_test(-1.0));
-
-    // 숏 전략은 매수(Enter) 신호 합산이 임계값 이상이면 청산해야 한다.
-    assert!(strategy.should_exit_for_weighted_signal_for_test(1.0));
+    assert!(strategy.has_confirmation_for_test(1.0));
 }
 
 #[test]
@@ -211,8 +207,7 @@ fn test_multi_timeframe_strategy_threshold_zero_does_not_turn_hold_into_a_signal
     let long_strategy =
         MultiTimeframeStrategy::new_with_config(&storage, Some(long_config)).unwrap();
 
-    assert!(!long_strategy.should_enter_for_weighted_signal_for_test(0.0));
-    assert!(!long_strategy.should_exit_for_weighted_signal_for_test(0.0));
+    assert!(!long_strategy.has_confirmation_for_test(0.0));
 
     let short_strategy = MultiTimeframeStrategy::new_with_config(
         &storage,
@@ -224,8 +219,7 @@ fn test_multi_timeframe_strategy_threshold_zero_does_not_turn_hold_into_a_signal
     )
     .unwrap();
 
-    assert!(!short_strategy.should_enter_for_weighted_signal_for_test(0.0));
-    assert!(!short_strategy.should_exit_for_weighted_signal_for_test(0.0));
+    assert!(!short_strategy.has_confirmation_for_test(0.0));
 }
 
 #[test]
@@ -242,9 +236,9 @@ fn test_multi_timeframe_strategy_uses_supplied_current_price() {
 
     strategy.next(candle);
 
-    assert!(!strategy.should_enter(100.0));
-    assert!(strategy.should_enter(150.0));
-    assert!(strategy.should_exit(80.0));
+    assert_eq!(strategy.evaluate(100.0, PositionState::Flat), Signal::Hold);
+    assert_eq!(strategy.evaluate(150.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(80.0, PositionState::Long), Signal::Exit);
 }
 
 #[test]

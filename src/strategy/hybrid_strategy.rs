@@ -249,18 +249,23 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        let signal_strength = self.calculate_buy_signal_strength_cached();
-        signal_strength > 0.0 && signal_strength >= self.config.entry_threshold
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        if self.ctx.items.is_empty() {
-            return false;
-        }
-
-        let signal_strength = self.calculate_sell_signal_strength_cached(0.0);
-        signal_strength >= self.config.exit_threshold
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || {
+                let signal_strength = self.calculate_buy_signal_strength_cached();
+                signal_strength > 0.0 && signal_strength >= self.config.entry_threshold
+            },
+            || {
+                !self.ctx.items.is_empty()
+                    && self.calculate_sell_signal_strength_cached(0.0) >= self.config.exit_threshold
+            },
+        )
     }
 
     fn position(&self) -> PositionType {
@@ -318,7 +323,10 @@ mod tests {
         let storage = CandleStore::<TestCandle>::new(Vec::new(), 10, false);
         let strategy = HybridStrategy::new_with_config(&storage, None).unwrap();
 
-        assert!(!strategy.should_enter(100.0));
+        assert_eq!(
+            strategy.evaluate(100.0, crate::model::PositionState::Flat),
+            crate::model::Signal::Hold
+        );
     }
 
     #[test]

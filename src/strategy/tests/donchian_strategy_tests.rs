@@ -1,4 +1,4 @@
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::donchian_short_strategy::DonchianShortStrategy;
 use crate::strategy::donchian_strategy::DonchianStrategy;
 use crate::strategy::tests::common::create_test_storage;
@@ -61,10 +61,10 @@ fn test_donchian_strategy_uses_current_price_for_long_breakout() {
     let strategy =
         DonchianStrategy::new_with_config(&storage, Some(create_donchian_config())).unwrap();
 
-    assert!(strategy.should_enter(13.0));
-    assert!(!strategy.should_enter(12.0));
-    assert!(strategy.should_exit(8.0));
-    assert!(!strategy.should_exit(10.0));
+    assert_eq!(strategy.evaluate(13.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(12.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(8.0, PositionState::Long), Signal::Exit);
+    assert_ne!(strategy.evaluate(10.0, PositionState::Long), Signal::Exit);
 }
 
 #[test]
@@ -73,10 +73,10 @@ fn test_donchian_short_strategy_uses_current_price_for_downside_breakout() {
     let strategy =
         DonchianShortStrategy::new_with_config(&storage, Some(create_donchian_config())).unwrap();
 
-    assert!(strategy.should_enter(5.0));
-    assert!(!strategy.should_enter(6.0));
-    assert!(strategy.should_exit(10.0));
-    assert!(!strategy.should_exit(8.0));
+    assert_eq!(strategy.evaluate(5.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(6.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(10.0, PositionState::Short), Signal::Exit);
+    assert_ne!(strategy.evaluate(8.0, PositionState::Short), Signal::Exit);
 }
 
 #[test]

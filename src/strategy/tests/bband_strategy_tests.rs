@@ -1,3 +1,4 @@
+use crate::model::{PositionState, Signal};
 use crate::strategy::Strategy;
 use crate::strategy::bband_strategy::BBandStrategy;
 use crate::strategy::tests::common::{
@@ -56,7 +57,7 @@ fn test_bband_strategy_exits_when_latest_close_is_below_middle_band() {
         BBandStrategy::new_with_config(&storage, Some(create_fast_bband_config())).unwrap();
 
     assert!(
-        strategy.should_exit(10_000.0),
+        strategy.evaluate(10_000.0, PositionState::Long) == Signal::Exit,
         "long exit should follow the latest candle closing below the middle band"
     );
 }
@@ -74,7 +75,7 @@ fn test_bband_strategy_does_not_exit_when_latest_close_is_above_middle_band() {
         BBandStrategy::new_with_config(&storage, Some(create_fast_bband_config())).unwrap();
 
     assert!(
-        !strategy.should_exit(0.0),
+        strategy.evaluate(0.0, PositionState::Long) != Signal::Exit,
         "long exit should not fire while the latest candle closes above the middle band"
     );
 }

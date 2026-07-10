@@ -1,4 +1,4 @@
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::keltner_short_strategy::KeltnerShortStrategy;
 use crate::strategy::keltner_strategy::KeltnerStrategy;
 use crate::strategy::tests::common::create_test_storage;
@@ -62,10 +62,10 @@ fn test_keltner_strategy_uses_current_price_for_long_breakout() {
     let strategy =
         KeltnerStrategy::new_with_config(&storage, Some(create_keltner_config())).unwrap();
 
-    assert!(strategy.should_enter(16.0));
-    assert!(!strategy.should_enter(15.0));
-    assert!(strategy.should_exit(10.0));
-    assert!(!strategy.should_exit(11.0));
+    assert_eq!(strategy.evaluate(16.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(15.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(10.0, PositionState::Long), Signal::Exit);
+    assert_ne!(strategy.evaluate(11.0, PositionState::Long), Signal::Exit);
 }
 
 #[test]
@@ -74,10 +74,10 @@ fn test_keltner_short_strategy_uses_current_price_for_downside_breakout() {
     let strategy =
         KeltnerShortStrategy::new_with_config(&storage, Some(create_keltner_config())).unwrap();
 
-    assert!(strategy.should_enter(6.0));
-    assert!(!strategy.should_enter(7.0));
-    assert!(strategy.should_exit(12.0));
-    assert!(!strategy.should_exit(11.0));
+    assert_eq!(strategy.evaluate(6.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(7.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(12.0, PositionState::Short), Signal::Exit);
+    assert_ne!(strategy.evaluate(11.0, PositionState::Short), Signal::Exit);
 }
 
 #[test]

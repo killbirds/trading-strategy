@@ -59,14 +59,12 @@ impl<C: Candle + 'static> Strategy<C> for CopysFilter<C> {
         self.bband_analyzer.next(candle);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // 전략 트레이트 구현 요구사항
-        false
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        // 전략 트레이트 구현 요구사항
-        false
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        _position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::model::Signal::Hold
     }
 
     fn position(&self) -> crate::model::PositionType {

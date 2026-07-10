@@ -1,4 +1,4 @@
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::box_range_short_strategy::BoxRangeShortStrategy;
 use crate::strategy::box_range_strategy::BoxRangeStrategy;
 use crate::strategy::tests::common::create_test_storage;
@@ -64,10 +64,10 @@ fn test_box_range_strategy_uses_current_price_for_long_breakout() {
     let strategy =
         BoxRangeStrategy::new_with_config(&storage, Some(create_box_range_config())).unwrap();
 
-    assert!(strategy.should_enter(103.0));
-    assert!(!strategy.should_enter(101.0));
-    assert!(strategy.should_exit(99.0));
-    assert!(!strategy.should_exit(101.0));
+    assert_eq!(strategy.evaluate(103.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(101.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(99.0, PositionState::Long), Signal::Exit);
+    assert_ne!(strategy.evaluate(101.0, PositionState::Long), Signal::Exit);
 }
 
 #[test]
@@ -76,10 +76,10 @@ fn test_box_range_short_strategy_uses_current_price_for_downside_breakout() {
     let strategy =
         BoxRangeShortStrategy::new_with_config(&storage, Some(create_box_range_config())).unwrap();
 
-    assert!(strategy.should_enter(97.0));
-    assert!(!strategy.should_enter(100.0));
-    assert!(strategy.should_exit(101.0));
-    assert!(!strategy.should_exit(99.0));
+    assert_eq!(strategy.evaluate(97.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(100.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(101.0, PositionState::Short), Signal::Exit);
+    assert_ne!(strategy.evaluate(99.0, PositionState::Short), Signal::Exit);
 }
 
 #[test]

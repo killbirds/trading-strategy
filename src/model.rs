@@ -10,6 +10,17 @@ pub enum PositionType {
     Short,
 }
 
+/// 전략 평가 시 호출자가 보유한 포지션 상태
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum PositionState {
+    /// 포지션 없음
+    Flat,
+    /// 롱 포지션 보유
+    Long,
+    /// 숏 포지션 보유
+    Short,
+}
+
 /// 트레이딩 신호를 나타내는 열거형
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Signal {

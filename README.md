@@ -141,14 +141,18 @@ fn build_strategy<C: Candle + 'static>() -> Result<BBandStrategy<C>, String> {
 
 ```rust
 use trading_chart::Candle;
+use trading_strategy::model::PositionState;
 use trading_strategy::strategy::Strategy;
 
-fn evaluate<C: Candle>(strategy: &mut dyn Strategy<C>, candle: C) {
+fn evaluate<C: Candle>(
+    strategy: &mut dyn Strategy<C>,
+    candle: C,
+    position_state: PositionState,
+) {
     let current_price = candle.close_price();
     strategy.next(candle);
 
-    let should_enter = strategy.should_enter(current_price);
-    let should_exit = strategy.should_exit(current_price);
+    let _signal = strategy.evaluate(current_price, position_state);
 }
 ```
 

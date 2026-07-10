@@ -197,14 +197,17 @@ impl<C: Candle + 'static> Strategy<C> for RSIStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // RSI가 과매도 구간에서 진입
-        self.is_rsi_oversold()
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        // RSI가 과매수 구간에서 청산
-        self.is_rsi_overbought()
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || self.is_rsi_oversold(),
+            || self.is_rsi_overbought(),
+        )
     }
 
     fn position(&self) -> PositionType {

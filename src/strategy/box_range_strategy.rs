@@ -136,12 +136,17 @@ impl<C: Candle + 'static> Strategy<C> for BoxRangeStrategy<C> {
         self.ctx.next(candle)
     }
 
-    fn should_enter(&self, current_price: f64) -> bool {
-        self.is_current_price_breakout_above(current_price)
-    }
-
-    fn should_exit(&self, current_price: f64) -> bool {
-        self.is_current_price_below_previous_middle(current_price)
+    fn evaluate(
+        &self,
+        current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || self.is_current_price_breakout_above(current_price),
+            || self.is_current_price_below_previous_middle(current_price),
+        )
     }
 
     fn position(&self) -> PositionType {

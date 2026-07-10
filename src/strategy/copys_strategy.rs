@@ -210,14 +210,17 @@ impl<C: Candle + 'static> Strategy<C> for CopysStrategy<C> {
         self.bband_analyzer.next(candle_clone);
     }
 
-    fn should_enter(&self, current_price: f64) -> bool {
-        // 새로운 매수 신호: RSI 과매도 + 볼린저밴드 하단 + 이평선 지지
-        self.check_buy_signal(self.config_rsi_count(), current_price)
-    }
-
-    fn should_exit(&self, current_price: f64) -> bool {
-        // 새로운 매도 신호: RSI 과매수 + 볼린저밴드 상단 + 이평선 저항
-        self.check_sell_signal(self.config_rsi_count(), current_price)
+    fn evaluate(
+        &self,
+        current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Long,
+            position_state,
+            || self.check_buy_signal(self.config_rsi_count(), current_price),
+            || self.check_sell_signal(self.config_rsi_count(), current_price),
+        )
     }
 
     fn position(&self) -> PositionType {

@@ -164,7 +164,7 @@ impl HybridShortStrategyConfig {
 /// MACD, RSI, 이동평균선을 결합하여 시장 하락 상황에 적응적으로 대응하는 전략입니다.
 ///
 /// 이 전략의 신호 강도는 `next(candle)` 로 갱신된 완료 캔들의 MACD/RSI/MA 상태와
-/// 최근 캔들 종가 흐름을 기준으로 계산합니다. 따라서 `should_enter`/`should_exit`의
+/// 최근 캔들 종가 흐름을 기준으로 계산합니다. 따라서 `evaluate`의
 /// `current_price` 인자는 현재 구현에서 의도적으로 사용하지 않으며, 실시간 tick 가격보다
 /// 완료 캔들 종가 기준으로 평가되는 bar-close 전략입니다.
 pub struct HybridShortStrategy<C: Candle + Clone> {
@@ -458,30 +458,30 @@ impl<C: Candle + Clone + 'static> Strategy<C> for HybridShortStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // 여러 지표를 종합한 매도(숏 진입) 신호를 기반으로 결정
-        let signal_strength = self.calculate_sell_signal_strength_optimized(0.0);
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Short,
+            position_state,
+            || {
+                let signal_strength = self.calculate_sell_signal_strength_optimized(0.0);
+                *self.last_signal_strength.borrow_mut() = signal_strength;
+                signal_strength >= self.config.entry_threshold
+            },
+            || {
+                if self.ctx.items.is_empty() {
+                    false
+                } else {
+                    let signal_strength = self.calculate_buy_signal_strength_optimized();
+                    *self.last_signal_strength.borrow_mut() = signal_strength;
 
-        // 신호 강도 저장
-        *self.last_signal_strength.borrow_mut() = signal_strength;
-
-        // 신호 강도가 임계값 이상인 경우에만 숏 진입 (설정에서 임계값 가져옴)
-        signal_strength >= self.config.entry_threshold
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        if self.ctx.items.is_empty() {
-            return false;
-        }
-
-        // 여러 지표를 종합한 매수 신호를 기반으로 결정
-        let signal_strength = self.calculate_buy_signal_strength_optimized();
-
-        // 신호 강도 저장
-        *self.last_signal_strength.borrow_mut() = signal_strength;
-
-        // 신호 강도가 임계값 이상인 경우에만 숏 청산 (설정에서 임계값 가져옴)
-        signal_strength >= self.config.exit_threshold
+                    signal_strength >= self.config.exit_threshold
+                }
+            },
+        )
     }
 
     fn position(&self) -> PositionType {

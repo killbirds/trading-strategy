@@ -191,35 +191,30 @@ impl<C: Candle + 'static> Strategy<C> for BBandShortStrategy<C> {
         self.ctx.next(candle);
     }
 
-    fn should_enter(&self, _current_price: f64) -> bool {
-        // 숏 진입: 스퀴즈 후 상단 밴드 돌파 시 숏 진입 신호
-        // 스퀴즈 패턴 확인 (밴드 폭이 좁아지다가 좁은 상태 유지)
-        let squeeze_pattern = self.ctx.is_narrowing_then_squeeze_pattern(
-            self.config.narrowing_period,
-            self.config.squeeze_period,
-            self.config.squeeze_threshold,
-        );
-
-        // 상단 밴드 돌파 확인
-        let breaks_upper = self
-            .ctx
-            .is_break_through_upper_band_from_below(self.config.count, 0);
-
-        // 밴드 폭이 충분히 넓은지 확인 (스퀴즈 후 확대 시작)
-        let band_width_sufficient = self.ctx.is_band_width_sufficient(0);
-
-        squeeze_pattern && breaks_upper && band_width_sufficient
-    }
-
-    fn should_exit(&self, _current_price: f64) -> bool {
-        // 숏 청산: 하단 밴드 하향 돌파 또는 중간 밴드 아래로 하락
-        let breaks_lower = self
-            .ctx
-            .is_break_through_lower_band_from_below(self.config.count, 0);
-
-        let below_middle = self.ctx.is_below_middle_band(1, 0);
-
-        breaks_lower || below_middle
+    fn evaluate(
+        &self,
+        _current_price: f64,
+        position_state: crate::model::PositionState,
+    ) -> crate::model::Signal {
+        crate::strategy::evaluate_signal(
+            PositionType::Short,
+            position_state,
+            || {
+                self.ctx.is_narrowing_then_squeeze_pattern(
+                    self.config.narrowing_period,
+                    self.config.squeeze_period,
+                    self.config.squeeze_threshold,
+                ) && self
+                    .ctx
+                    .is_break_through_upper_band_from_below(self.config.count, 0)
+                    && self.ctx.is_band_width_sufficient(0)
+            },
+            || {
+                self.ctx
+                    .is_break_through_lower_band_from_below(self.config.count, 0)
+                    || self.ctx.is_below_middle_band(1, 0)
+            },
+        )
     }
 
     fn position(&self) -> PositionType {

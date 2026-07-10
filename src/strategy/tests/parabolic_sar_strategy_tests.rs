@@ -1,4 +1,4 @@
-use crate::model::PositionType;
+use crate::model::{PositionState, PositionType, Signal};
 use crate::strategy::parabolic_sar_short_strategy::ParabolicSARShortStrategy;
 use crate::strategy::parabolic_sar_strategy::ParabolicSARStrategy;
 use crate::strategy::tests::common::create_test_storage;
@@ -72,10 +72,10 @@ fn test_parabolic_sar_strategy_uses_current_price_for_long_signal() {
         ParabolicSARStrategy::new_with_config(&storage, Some(create_parabolic_sar_config()))
             .unwrap();
 
-    assert!(strategy.should_enter(12.0));
-    assert!(!strategy.should_enter(7.0));
-    assert!(strategy.should_exit(7.0));
-    assert!(!strategy.should_exit(12.0));
+    assert_eq!(strategy.evaluate(12.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(7.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(7.0, PositionState::Long), Signal::Exit);
+    assert_ne!(strategy.evaluate(12.0, PositionState::Long), Signal::Exit);
 }
 
 #[test]
@@ -85,10 +85,10 @@ fn test_parabolic_sar_short_strategy_uses_current_price_for_short_signal() {
         ParabolicSARShortStrategy::new_with_config(&storage, Some(create_parabolic_sar_config()))
             .unwrap();
 
-    assert!(strategy.should_enter(6.0));
-    assert!(!strategy.should_enter(12.0));
-    assert!(strategy.should_exit(12.0));
-    assert!(!strategy.should_exit(6.0));
+    assert_eq!(strategy.evaluate(6.0, PositionState::Flat), Signal::Enter);
+    assert_ne!(strategy.evaluate(12.0, PositionState::Flat), Signal::Enter);
+    assert_eq!(strategy.evaluate(12.0, PositionState::Short), Signal::Exit);
+    assert_ne!(strategy.evaluate(6.0, PositionState::Short), Signal::Exit);
 }
 
 #[test]
